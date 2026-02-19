@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const API = "https://sitescan-backend-production.up.railway.app/api/v1";
+const API = "https://api.yabodle.com/api/v1";
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
 
