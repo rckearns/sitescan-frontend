@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { Analytics } from "@vercel/analytics/react";
 
 const API = "https://api.yabodle.com/api/v1";
 
@@ -731,6 +732,7 @@ export default function SiteScanApp() {
         {tab === "saved" && <SavedTab saved={saved} onUnsave={unsaveProject} />}
         {tab === "history" && <HistoryTab history={history} />}
       </main>
+      <Analytics />
     </div>
   );
 }
