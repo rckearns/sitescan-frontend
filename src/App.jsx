@@ -115,6 +115,7 @@ function AuthScreen({ onAuth }) {
 
   return (
     <div style={styles.authWrap}>
+      {/* ── FORM CARD ── */}
       <div style={styles.authCard}>
         <div style={styles.authLogo}>
           <span style={{ fontSize: 32, fontWeight: 800, color: C.text, fontFamily: "'DM Sans', sans-serif", letterSpacing: -1 }}>
@@ -169,6 +170,35 @@ function AuthScreen({ onAuth }) {
           <button style={styles.authBtn} onClick={submit} disabled={loading}>
             {loading ? "..." : mode === "login" ? "Sign In" : "Create Account"}
           </button>
+        </div>
+      </div>
+
+      {/* ── BRAND PANEL ── */}
+      <div style={styles.authBrand}>
+        <img src="/yabodle.svg" alt="Yabodle" style={{ width: 96, height: 96, marginBottom: 28 }} />
+        <div style={{ fontSize: 42, fontWeight: 800, letterSpacing: -1.5, lineHeight: 1, marginBottom: 10, fontFamily: "'DM Sans', sans-serif" }}>
+          <span style={{ color: C.text }}>Ya</span><span style={{ color: C.orange }}>bodle</span>
+        </div>
+        <div style={{ color: C.textSub, fontSize: 13, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 40 }}>
+          Property Development Opportunities
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {[
+            { icon: "⚡", label: "Live opportunity scanning" },
+            { icon: "🏗️", label: "SAM.gov, permits & public bids" },
+            { icon: "📍", label: "Charleston, SC focused" },
+            { icon: "★",  label: "Save & track your pipeline" },
+          ].map(({ icon, label }) => (
+            <div key={label} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{
+                width: 32, height: 32, borderRadius: 8,
+                background: `${C.navy}`, border: `1px solid ${C.border}`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 15, flexShrink: 0,
+              }}>{icon}</span>
+              <span style={{ color: C.textSub, fontSize: 13 }}>{label}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -766,11 +796,13 @@ const styles = {
   // Auth
   authWrap: {
     display: "flex",
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 64,
     minHeight: "100vh",
-    background: `radial-gradient(ellipse at 50% 0%, #0e2040 0%, ${C.bg} 65%)`,
-    padding: 20,
+    background: `radial-gradient(ellipse at 60% 40%, #0e2040 0%, ${C.bg} 65%)`,
+    padding: "40px 24px",
   },
   authCard: {
     background: C.surface,
@@ -778,7 +810,14 @@ const styles = {
     borderRadius: 16,
     padding: 40,
     width: 380,
+    flexShrink: 0,
     boxShadow: "0 24px 64px rgba(0,0,0,0.5)",
+  },
+  authBrand: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    maxWidth: 300,
   },
   authLogo: {
     textAlign: "center",
