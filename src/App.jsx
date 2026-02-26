@@ -126,7 +126,7 @@ function AuthScreen({ onAuth }) {
           </span>
         </div>
         <p style={{ color: C.textSub, fontSize: 12, marginBottom: 28, textAlign: "center", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-          Property Development Opportunities
+          development opportunity intelligence
         </p>
         <div style={styles.authTabs}>
           <button
@@ -176,11 +176,8 @@ function AuthScreen({ onAuth }) {
       {/* ── BRAND PANEL ── */}
       <div style={styles.authBrand}>
         <img src="/yabodle.svg" alt="Yabodle" style={{ width: 96, height: 96, marginBottom: 28 }} />
-        <div style={{ fontSize: 42, fontWeight: 800, letterSpacing: -1.5, lineHeight: 1, marginBottom: 10, fontFamily: "'DM Sans', sans-serif" }}>
+        <div style={{ fontSize: 42, fontWeight: 800, letterSpacing: -1.5, lineHeight: 1, marginBottom: 40, fontFamily: "'DM Sans', sans-serif" }}>
           <span style={{ color: C.text }}>Ya</span><span style={{ color: C.orange }}>bodle</span>
-        </div>
-        <div style={{ color: C.textSub, fontSize: 13, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 40 }}>
-          Property Development Opportunities
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {[
