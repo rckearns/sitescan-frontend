@@ -115,6 +115,11 @@ function AuthScreen({ onAuth }) {
 
   return (
     <div style={styles.authWrap}>
+      <style>{`
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: ${C.bg}; }
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap');
+      `}</style>
       <div style={styles.authCard}>
         <div style={styles.authLogo}>
           <span style={{ fontSize: 32, fontWeight: 800, color: C.text, fontFamily: "'DM Sans', sans-serif", letterSpacing: -1 }}>
@@ -769,7 +774,7 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     minHeight: "100vh",
-    width: "100%",
+    minWidth: "100vw",
     background: `radial-gradient(ellipse at 50% 40%, #0e2040 0%, ${C.bg} 65%)`,
     padding: "40px 16px",
     boxSizing: "border-box",
