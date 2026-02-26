@@ -177,7 +177,10 @@ function AuthScreen({ onAuth }) {
 
       {/* ── BRAND PANEL ── */}
       <div style={styles.authBrand}>
-        <img src="/yabodle-logo.png" alt="Yabodle" style={{ maxWidth: 340, width: "55%" }} />
+        <img src="/yabodle-logo.png" alt="Yabodle" style={{
+          width: "min(360px, 55%)",
+          filter: `drop-shadow(0 0 40px ${C.orange}40) drop-shadow(0 0 80px ${C.blue}20)`,
+        }} />
       </div>
     </div>
   );
@@ -776,6 +779,7 @@ const styles = {
     display: "flex",
     flexDirection: "row",
     minHeight: "100vh",
+    width: "100%",
   },
   authFormSide: {
     display: "flex",
