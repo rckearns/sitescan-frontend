@@ -115,88 +115,69 @@ function AuthScreen({ onAuth }) {
 
   return (
     <div style={styles.authWrap}>
-      {/* ── FORM CARD ── */}
-      <div style={styles.authCard}>
-        <div style={styles.authLogo}>
-          <span style={{ fontSize: 32, fontWeight: 800, color: C.text, fontFamily: "'DM Sans', sans-serif", letterSpacing: -1 }}>
-            Ya
-          </span>
-          <span style={{ fontSize: 32, fontWeight: 800, color: C.orange, fontFamily: "'DM Sans', sans-serif", letterSpacing: -1 }}>
-            bodle
-          </span>
-        </div>
-        <p style={{ color: C.textSub, fontSize: 12, marginBottom: 28, textAlign: "center", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-          development opportunity intelligence
-        </p>
-        <div style={styles.authTabs}>
-          <button
-            style={{ ...styles.authTab, ...(mode === "login" ? styles.authTabActive : {}) }}
-            onClick={() => setMode("login")}
-          >
-            Sign In
-          </button>
-          <button
-            style={{ ...styles.authTab, ...(mode === "register" ? styles.authTabActive : {}) }}
-            onClick={() => setMode("register")}
-          >
-            Register
-          </button>
-        </div>
-        {error && <div style={styles.authError}>{error}</div>}
-        <div>
-          {mode === "register" && (
+      {/* ── FORM SIDE ── */}
+      <div style={styles.authFormSide}>
+        <div style={styles.authCard}>
+          <div style={styles.authLogo}>
+            <span style={{ fontSize: 32, fontWeight: 800, color: C.text, fontFamily: "'DM Sans', sans-serif", letterSpacing: -1 }}>
+              Ya
+            </span>
+            <span style={{ fontSize: 32, fontWeight: 800, color: C.orange, fontFamily: "'DM Sans', sans-serif", letterSpacing: -1 }}>
+              bodle
+            </span>
+          </div>
+          <p style={{ color: C.textSub, fontSize: 12, marginBottom: 28, textAlign: "center", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+            development opportunity intelligence
+          </p>
+          <div style={styles.authTabs}>
+            <button
+              style={{ ...styles.authTab, ...(mode === "login" ? styles.authTabActive : {}) }}
+              onClick={() => setMode("login")}
+            >
+              Sign In
+            </button>
+            <button
+              style={{ ...styles.authTab, ...(mode === "register" ? styles.authTabActive : {}) }}
+              onClick={() => setMode("register")}
+            >
+              Register
+            </button>
+          </div>
+          {error && <div style={styles.authError}>{error}</div>}
+          <div>
+            {mode === "register" && (
+              <input
+                style={styles.input}
+                placeholder="Full name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            )}
             <input
               style={styles.input}
-              placeholder="Full name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              placeholder="Email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
             />
-          )}
-          <input
-            style={styles.input}
-            placeholder="Email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <input
-            style={styles.input}
-            placeholder="Password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && submit(e)}
-          />
-          <button style={styles.authBtn} onClick={submit} disabled={loading}>
-            {loading ? "..." : mode === "login" ? "Sign In" : "Create Account"}
-          </button>
+            <input
+              style={styles.input}
+              placeholder="Password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && submit(e)}
+            />
+            <button style={styles.authBtn} onClick={submit} disabled={loading}>
+              {loading ? "..." : mode === "login" ? "Sign In" : "Create Account"}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* ── BRAND PANEL ── */}
       <div style={styles.authBrand}>
-        <img src="/yabodle.svg" alt="Yabodle" style={{ width: 96, height: 96, marginBottom: 28 }} />
-        <div style={{ fontSize: 42, fontWeight: 800, letterSpacing: -1.5, lineHeight: 1, marginBottom: 40, fontFamily: "'DM Sans', sans-serif" }}>
-          <span style={{ color: C.text }}>Ya</span><span style={{ color: C.orange }}>bodle</span>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {[
-            { icon: "⚡", label: "Live opportunity scanning" },
-            { icon: "🏗️", label: "SAM.gov, permits & public bids" },
-            { icon: "📍", label: "Charleston, SC focused" },
-            { icon: "★",  label: "Save & track your pipeline" },
-          ].map(({ icon, label }) => (
-            <div key={label} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={{
-                width: 32, height: 32, borderRadius: 8,
-                background: `${C.navy}`, border: `1px solid ${C.border}`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 15, flexShrink: 0,
-              }}>{icon}</span>
-              <span style={{ color: C.textSub, fontSize: 13 }}>{label}</span>
-            </div>
-          ))}
-        </div>
+        <img src="/yabodle-logo.png" alt="Yabodle" style={{ maxWidth: 340, width: "55%" }} />
       </div>
     </div>
   );
@@ -794,12 +775,15 @@ const styles = {
   authWrap: {
     display: "flex",
     flexDirection: "row",
+    minHeight: "100vh",
+  },
+  authFormSide: {
+    display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: 64,
-    minHeight: "100vh",
-    background: `radial-gradient(ellipse at 60% 40%, #0e2040 0%, ${C.bg} 65%)`,
-    padding: "40px 24px",
+    padding: "40px 48px",
+    flexShrink: 0,
+    background: `radial-gradient(ellipse at 30% 50%, #0e2040 0%, ${C.bg} 70%)`,
   },
   authCard: {
     background: C.surface,
@@ -807,14 +791,15 @@ const styles = {
     borderRadius: 16,
     padding: 40,
     width: 380,
-    flexShrink: 0,
     boxShadow: "0 24px 64px rgba(0,0,0,0.5)",
   },
   authBrand: {
+    flex: 1,
     display: "flex",
-    flexDirection: "column",
-    alignItems: "flex-start",
-    maxWidth: 300,
+    alignItems: "center",
+    justifyContent: "center",
+    background: `linear-gradient(135deg, #060d18 0%, #0d1e38 50%, #060d18 100%)`,
+    borderLeft: `1px solid ${C.border}`,
   },
   authLogo: {
     textAlign: "center",
