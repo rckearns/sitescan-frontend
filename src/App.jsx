@@ -115,72 +115,61 @@ function AuthScreen({ onAuth }) {
 
   return (
     <div style={styles.authWrap}>
-      {/* ── FORM SIDE ── */}
-      <div style={styles.authFormSide}>
-        <div style={styles.authCard}>
-          <div style={styles.authLogo}>
-            <span style={{ fontSize: 32, fontWeight: 800, color: C.text, fontFamily: "'DM Sans', sans-serif", letterSpacing: -1 }}>
-              Ya
-            </span>
-            <span style={{ fontSize: 32, fontWeight: 800, color: C.orange, fontFamily: "'DM Sans', sans-serif", letterSpacing: -1 }}>
-              bodle
-            </span>
-          </div>
-          <p style={{ color: C.textSub, fontSize: 12, marginBottom: 28, textAlign: "center", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-            development opportunity intelligence
-          </p>
-          <div style={styles.authTabs}>
-            <button
-              style={{ ...styles.authTab, ...(mode === "login" ? styles.authTabActive : {}) }}
-              onClick={() => setMode("login")}
-            >
-              Sign In
-            </button>
-            <button
-              style={{ ...styles.authTab, ...(mode === "register" ? styles.authTabActive : {}) }}
-              onClick={() => setMode("register")}
-            >
-              Register
-            </button>
-          </div>
-          {error && <div style={styles.authError}>{error}</div>}
-          <div>
-            {mode === "register" && (
-              <input
-                style={styles.input}
-                placeholder="Full name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            )}
-            <input
-              style={styles.input}
-              placeholder="Email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <input
-              style={styles.input}
-              placeholder="Password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && submit(e)}
-            />
-            <button style={styles.authBtn} onClick={submit} disabled={loading}>
-              {loading ? "..." : mode === "login" ? "Sign In" : "Create Account"}
-            </button>
-          </div>
+      <div style={styles.authCard}>
+        <div style={styles.authLogo}>
+          <span style={{ fontSize: 32, fontWeight: 800, color: C.text, fontFamily: "'DM Sans', sans-serif", letterSpacing: -1 }}>
+            Ya
+          </span>
+          <span style={{ fontSize: 32, fontWeight: 800, color: C.orange, fontFamily: "'DM Sans', sans-serif", letterSpacing: -1 }}>
+            bodle
+          </span>
         </div>
-      </div>
-
-      {/* ── BRAND PANEL ── */}
-      <div style={styles.authBrand}>
-        <img src="/yabodle-logo.png" alt="Yabodle" style={{
-          width: "min(360px, 55%)",
-          filter: `drop-shadow(0 0 40px ${C.orange}40) drop-shadow(0 0 80px ${C.blue}20)`,
-        }} />
+        <p style={{ color: C.textSub, fontSize: 12, marginBottom: 28, textAlign: "center", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+          development opportunity intelligence
+        </p>
+        <div style={styles.authTabs}>
+          <button
+            style={{ ...styles.authTab, ...(mode === "login" ? styles.authTabActive : {}) }}
+            onClick={() => setMode("login")}
+          >
+            Sign In
+          </button>
+          <button
+            style={{ ...styles.authTab, ...(mode === "register" ? styles.authTabActive : {}) }}
+            onClick={() => setMode("register")}
+          >
+            Register
+          </button>
+        </div>
+        {error && <div style={styles.authError}>{error}</div>}
+        <div>
+          {mode === "register" && (
+            <input
+              style={styles.input}
+              placeholder="Full name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          )}
+          <input
+            style={styles.input}
+            placeholder="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <input
+            style={styles.input}
+            placeholder="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submit(e)}
+          />
+          <button style={styles.authBtn} onClick={submit} disabled={loading}>
+            {loading ? "..." : mode === "login" ? "Sign In" : "Create Account"}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -777,33 +766,22 @@ const styles = {
   // Auth
   authWrap: {
     display: "flex",
-    flexDirection: "row",
-    minHeight: "100vh",
-    width: "100%",
-  },
-  authFormSide: {
-    display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    padding: "40px 48px",
-    flexShrink: 0,
-    background: `radial-gradient(ellipse at 30% 50%, #0e2040 0%, ${C.bg} 70%)`,
+    minHeight: "100vh",
+    width: "100%",
+    background: `radial-gradient(ellipse at 50% 40%, #0e2040 0%, ${C.bg} 65%)`,
+    padding: "40px 16px",
+    boxSizing: "border-box",
   },
   authCard: {
     background: C.surface,
     border: `1px solid ${C.border}`,
     borderRadius: 16,
     padding: 40,
-    width: 380,
+    width: "100%",
+    maxWidth: 380,
     boxShadow: "0 24px 64px rgba(0,0,0,0.5)",
-  },
-  authBrand: {
-    flex: 1,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: `linear-gradient(135deg, #060d18 0%, #0d1e38 50%, #060d18 100%)`,
-    borderLeft: `1px solid ${C.border}`,
   },
   authLogo: {
     textAlign: "center",
