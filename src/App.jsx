@@ -2,6 +2,23 @@ import { useState, useEffect, useCallback, useRef } from "react";
 
 const API = (import.meta.env.VITE_API_URL || "https://sitescan-backend-production-423e.up.railway.app") + "/api/v1";
 
+// ─── BRAND COLORS ────────────────────────────────────────────────────────────
+const C = {
+  bg:        "#080f1a",   // near-black navy
+  surface:   "#0c1524",  // card background
+  surfaceHi: "#101d30",  // elevated card
+  border:    "#1a2f50",  // subtle border
+  borderHi:  "#1e3a64",  // hover border
+  navy:      "#1e3a6e",  // deep navy
+  blue:      "#4a9fd4",  // mid blue
+  sky:       "#7ec8e3",  // sky blue (logo highlight)
+  orange:    "#f0a030",  // orange accent (logo)
+  orangeHi:  "#f7b84b",  // orange hover
+  text:      "#e8f0fa",  // primary text
+  textSub:   "#6b8aaa",  // secondary text
+  textMuted: "#3d5a7a",  // muted
+};
+
 // ─── HELPERS ────────────────────────────────────────────────────────────────
 
 const fmt$ = (v) => {
@@ -17,11 +34,11 @@ const fmtDate = (d) => {
 };
 
 const matchColor = (s) => {
-  if (s >= 90) return "#22c55e";
-  if (s >= 75) return "#84cc16";
-  if (s >= 60) return "#eab308";
-  if (s >= 45) return "#f97316";
-  return "#6b7280";
+  if (s >= 90) return C.orange;
+  if (s >= 75) return C.blue;
+  if (s >= 60) return C.sky;
+  if (s >= 45) return "#5b8fa8";
+  return C.textMuted;
 };
 
 const catIcons = {
@@ -41,13 +58,13 @@ const sourceLabels = {
 };
 
 const statusColors = {
-  Open: "#22c55e",
-  Active: "#22c55e",
-  "Accepting Bids": "#a78bfa",
-  Closed: "#6b7280",
-  Issued: "#3b82f6",
-  Finaled: "#6b7280",
-  "In Review": "#f59e0b",
+  Open: C.orange,
+  Active: C.orange,
+  "Accepting Bids": C.sky,
+  Closed: C.textMuted,
+  Issued: C.blue,
+  Finaled: C.textMuted,
+  "In Review": "#c9943a",
 };
 
 async function api(path, opts = {}) {
@@ -100,15 +117,15 @@ function AuthScreen({ onAuth }) {
     <div style={styles.authWrap}>
       <div style={styles.authCard}>
         <div style={styles.authLogo}>
-          <span style={{ fontSize: 28, letterSpacing: -1, fontWeight: 800, color: "#e8e6e1" }}>
-            SITE
+          <span style={{ fontSize: 32, fontWeight: 800, color: C.text, fontFamily: "'DM Sans', sans-serif", letterSpacing: -1 }}>
+            Ya
           </span>
-          <span style={{ fontSize: 28, letterSpacing: -1, fontWeight: 800, color: "#34d399" }}>
-            SCAN
+          <span style={{ fontSize: 32, fontWeight: 800, color: C.orange, fontFamily: "'DM Sans', sans-serif", letterSpacing: -1 }}>
+            bodle
           </span>
         </div>
-        <p style={{ color: "#666", fontSize: 13, marginBottom: 28, textAlign: "center" }}>
-          Construction opportunity intelligence
+        <p style={{ color: C.textSub, fontSize: 12, marginBottom: 28, textAlign: "center", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+          Property Development Opportunities
         </p>
         <div style={styles.authTabs}>
           <button
@@ -327,15 +344,15 @@ function StatsBar({ stats }) {
         <div style={styles.statLabel}>Projects</div>
       </div>
       <div style={styles.statBox}>
-        <div style={{ ...styles.statNumber, color: "#34d399" }}>{fmt$(stats.total_pipeline_value)}</div>
+        <div style={{ ...styles.statNumber, color: C.orange }}>{fmt$(stats.total_pipeline_value)}</div>
         <div style={styles.statLabel}>Pipeline Value</div>
       </div>
       <div style={styles.statBox}>
-        <div style={{ ...styles.statNumber, color: "#eab308" }}>{stats.avg_match_score}%</div>
+        <div style={{ ...styles.statNumber, color: C.sky }}>{stats.avg_match_score}%</div>
         <div style={styles.statLabel}>Avg Match</div>
       </div>
       <div style={styles.statBox}>
-        <div style={{ ...styles.statNumber, color: "#22c55e" }}>{stats.high_match_count}</div>
+        <div style={{ ...styles.statNumber, color: C.blue }}>{stats.high_match_count}</div>
         <div style={styles.statLabel}>High Match (80%+)</div>
       </div>
     </div>
@@ -373,7 +390,7 @@ function ScanButton({ onScan }) {
           "⚡ Run Scan"
         )}
       </button>
-      {result && <span style={{ color: "#34d399", fontSize: 12 }}>{result}</span>}
+      {result && <span style={{ color: C.orange, fontSize: 12 }}>{result}</span>}
     </div>
   );
 }
@@ -637,12 +654,14 @@ export default function SiteScanApp() {
   return (
     <div style={styles.app}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700;800&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #08080a; }
+        body { background: #080f1a; }
         ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #111; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        ::-webkit-scrollbar-track { background: #080f1a; }
+        ::-webkit-scrollbar-thumb { background: #1a2f50; border-radius: 3px; }
+        input::placeholder { color: #3d5a7a; }
+        select option { background: #0c1524; }
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
@@ -651,14 +670,14 @@ export default function SiteScanApp() {
       <header style={styles.header}>
         <div style={styles.headerLeft}>
           <div style={styles.logo}>
-            <span style={{ color: "#e8e6e1", fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 900, letterSpacing: -0.5 }}>
-              SITE
+            <span style={{ color: C.text, fontFamily: "'DM Sans', sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: -0.5 }}>
+              Ya
             </span>
-            <span style={{ color: "#34d399", fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 900, letterSpacing: -0.5 }}>
-              SCAN
+            <span style={{ color: C.orange, fontFamily: "'DM Sans', sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: -0.5 }}>
+              bodle
             </span>
-            <span style={{ fontSize: 9, color: "#555", marginLeft: 8, fontFamily: "'Space Mono', monospace", letterSpacing: 1 }}>
-              v1.0
+            <span style={{ fontSize: 9, color: C.textMuted, marginLeft: 8, fontFamily: "'Space Mono', monospace", letterSpacing: 1, textTransform: "uppercase" }}>
+              beta
             </span>
           </div>
           <nav style={styles.nav}>
@@ -740,8 +759,8 @@ export default function SiteScanApp() {
 const styles = {
   app: {
     fontFamily: "'DM Sans', -apple-system, sans-serif",
-    background: "#08080a",
-    color: "#e8e6e1",
+    background: C.bg,
+    color: C.text,
     minHeight: "100vh",
   },
   // Auth
@@ -750,35 +769,36 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     minHeight: "100vh",
-    background: "#08080a",
+    background: `radial-gradient(ellipse at 50% 0%, #0e2040 0%, ${C.bg} 65%)`,
     padding: 20,
   },
   authCard: {
-    background: "#0c0c0e",
-    border: "1px solid #1a1a1f",
+    background: C.surface,
+    border: `1px solid ${C.border}`,
     borderRadius: 16,
     padding: 40,
     width: 380,
+    boxShadow: "0 24px 64px rgba(0,0,0,0.5)",
   },
   authLogo: {
     textAlign: "center",
     marginBottom: 4,
-    fontFamily: "'Playfair Display', serif",
   },
   authTabs: {
     display: "flex",
     gap: 4,
     marginBottom: 20,
-    background: "#111113",
+    background: C.bg,
     borderRadius: 8,
     padding: 3,
+    border: `1px solid ${C.border}`,
   },
   authTab: {
     flex: 1,
     padding: "8px 0",
     background: "none",
     border: "none",
-    color: "#666",
+    color: C.textSub,
     fontSize: 13,
     fontWeight: 600,
     cursor: "pointer",
@@ -786,8 +806,8 @@ const styles = {
     fontFamily: "'DM Sans', sans-serif",
   },
   authTabActive: {
-    background: "#1a1a1f",
-    color: "#e8e6e1",
+    background: C.navy,
+    color: C.text,
   },
   authError: {
     background: "#dc262615",
@@ -801,8 +821,8 @@ const styles = {
   authBtn: {
     width: "100%",
     padding: "12px 0",
-    background: "#34d399",
-    color: "#08080a",
+    background: `linear-gradient(135deg, ${C.orange}, ${C.orangeHi})`,
+    color: "#fff",
     border: "none",
     borderRadius: 8,
     fontSize: 14,
@@ -810,14 +830,15 @@ const styles = {
     cursor: "pointer",
     fontFamily: "'DM Sans', sans-serif",
     marginTop: 8,
+    letterSpacing: "0.02em",
   },
   input: {
     width: "100%",
     padding: "11px 14px",
-    background: "#111113",
-    border: "1px solid #1a1a1f",
+    background: C.bg,
+    border: `1px solid ${C.border}`,
     borderRadius: 8,
-    color: "#e8e6e1",
+    color: C.text,
     fontSize: 14,
     marginBottom: 10,
     outline: "none",
@@ -829,11 +850,12 @@ const styles = {
     justifyContent: "space-between",
     alignItems: "center",
     padding: "12px 24px",
-    borderBottom: "1px solid #1a1a1f",
-    background: "#0a0a0c",
+    borderBottom: `1px solid ${C.border}`,
+    background: C.surface,
     position: "sticky",
     top: 0,
     zIndex: 100,
+    boxShadow: "0 2px 16px rgba(0,0,0,0.3)",
   },
   headerLeft: {
     display: "flex",
@@ -851,7 +873,7 @@ const styles = {
     padding: "8px 14px",
     background: "none",
     border: "none",
-    color: "#666",
+    color: C.textSub,
     fontSize: 13,
     fontWeight: 500,
     cursor: "pointer",
@@ -860,12 +882,12 @@ const styles = {
     transition: "all 0.15s",
   },
   navBtnActive: {
-    background: "#1a1a1f",
-    color: "#e8e6e1",
+    background: C.navy,
+    color: C.text,
   },
   scanBtn: {
     padding: "8px 18px",
-    background: "linear-gradient(135deg, #059669, #34d399)",
+    background: `linear-gradient(135deg, #c47d10, ${C.orange})`,
     color: "#fff",
     border: "none",
     borderRadius: 8,
@@ -873,12 +895,13 @@ const styles = {
     fontWeight: 700,
     cursor: "pointer",
     fontFamily: "'DM Sans', sans-serif",
+    letterSpacing: "0.02em",
   },
   logoutBtn: {
     padding: "8px 12px",
     background: "none",
-    border: "1px solid #1a1a1f",
-    color: "#666",
+    border: `1px solid ${C.border}`,
+    color: C.textSub,
     fontSize: 12,
     borderRadius: 6,
     cursor: "pointer",
@@ -898,8 +921,8 @@ const styles = {
     marginBottom: 20,
   },
   statBox: {
-    background: "#0c0c0e",
-    border: "1px solid #1a1a1f",
+    background: C.surface,
+    border: `1px solid ${C.border}`,
     borderRadius: 12,
     padding: "16px 20px",
     textAlign: "center",
@@ -907,12 +930,12 @@ const styles = {
   statNumber: {
     fontSize: 22,
     fontWeight: 800,
-    color: "#e8e6e1",
+    color: C.text,
     fontFamily: "'Space Mono', monospace",
   },
   statLabel: {
     fontSize: 11,
-    color: "#555",
+    color: C.textSub,
     textTransform: "uppercase",
     letterSpacing: "0.08em",
     marginTop: 4,
@@ -928,20 +951,20 @@ const styles = {
     flex: 1,
     minWidth: 200,
     padding: "9px 14px",
-    background: "#0c0c0e",
-    border: "1px solid #1a1a1f",
+    background: C.surface,
+    border: `1px solid ${C.border}`,
     borderRadius: 8,
-    color: "#e8e6e1",
+    color: C.text,
     fontSize: 13,
     outline: "none",
     fontFamily: "'DM Sans', sans-serif",
   },
   select: {
     padding: "9px 12px",
-    background: "#0c0c0e",
-    border: "1px solid #1a1a1f",
+    background: C.surface,
+    border: `1px solid ${C.border}`,
     borderRadius: 8,
-    color: "#e8e6e1",
+    color: C.text,
     fontSize: 12,
     outline: "none",
     fontFamily: "'DM Sans', sans-serif",
@@ -950,12 +973,12 @@ const styles = {
   resultHeader: {
     marginBottom: 12,
     paddingBottom: 8,
-    borderBottom: "1px solid #111113",
+    borderBottom: `1px solid ${C.border}`,
   },
   // Projects
   projectRow: {
-    background: "#0c0c0e",
-    border: "1px solid #1a1a1f",
+    background: C.surface,
+    border: `1px solid ${C.border}`,
     borderRadius: 10,
     marginBottom: 6,
     padding: "14px 18px",
@@ -971,37 +994,37 @@ const styles = {
   projectTitle: {
     fontSize: 14,
     fontWeight: 600,
-    color: "#e8e6e1",
+    color: C.text,
     marginBottom: 4,
     lineHeight: 1.3,
   },
   projectMeta: {
     fontSize: 12,
-    color: "#666",
+    color: C.textSub,
   },
   projectExpanded: {
     marginTop: 16,
     paddingTop: 16,
-    borderTop: "1px solid #1a1a1f",
+    borderTop: `1px solid ${C.border}`,
   },
   detailLabel: {
     fontSize: 10,
-    color: "#555",
+    color: C.textMuted,
     textTransform: "uppercase",
     letterSpacing: "0.06em",
     marginBottom: 3,
   },
   detailValue: {
     fontSize: 13,
-    color: "#ccc",
+    color: C.textSub,
   },
   linkBtn: {
     display: "inline-block",
     padding: "6px 14px",
-    background: "#818cf820",
-    border: "1px solid #818cf840",
+    background: `${C.blue}18`,
+    border: `1px solid ${C.blue}40`,
     borderRadius: 6,
-    color: "#818cf8",
+    color: C.sky,
     fontSize: 12,
     fontWeight: 600,
     textDecoration: "none",
@@ -1009,10 +1032,10 @@ const styles = {
   },
   saveBtn: {
     padding: "6px 14px",
-    background: "#eab30820",
-    border: "1px solid #eab30840",
+    background: `${C.orange}18`,
+    border: `1px solid ${C.orange}40`,
     borderRadius: 6,
-    color: "#eab308",
+    color: C.orange,
     fontSize: 12,
     fontWeight: 600,
     cursor: "pointer",
@@ -1023,26 +1046,26 @@ const styles = {
     textAlign: "left",
     padding: "10px 14px",
     fontSize: 10,
-    color: "#555",
+    color: C.textMuted,
     textTransform: "uppercase",
     letterSpacing: "0.08em",
-    borderBottom: "1px solid #1a1a1f",
+    borderBottom: `1px solid ${C.border}`,
   },
   tr: {
-    borderBottom: "1px solid #111113",
+    borderBottom: `1px solid ${C.border}`,
   },
   td: {
     padding: "10px 14px",
     fontSize: 13,
-    color: "#ccc",
+    color: C.textSub,
   },
   // Misc
   spinner: {
     display: "inline-block",
     width: 14,
     height: 14,
-    border: "2px solid #333",
-    borderTopColor: "#34d399",
+    border: `2px solid ${C.border}`,
+    borderTopColor: C.orange,
     borderRadius: "50%",
     animation: "spin 0.6s linear infinite",
     verticalAlign: "middle",
