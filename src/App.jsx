@@ -256,7 +256,7 @@ function ProjectRow({ project, onSave, saved }) {
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
           <MatchBadge score={p.match_score} />
           <div style={{ textAlign: "right", minWidth: 70 }}>
-            <div style={{ color: "#34d399", fontWeight: 700, fontSize: 14, fontFamily: "'JetBrains Mono', monospace" }}>
+            <div style={{ color: C.orange, fontWeight: 700, fontSize: 14, fontFamily: "'JetBrains Mono', monospace" }}>
               {fmt$(p.value)}
             </div>
           </div>
@@ -360,6 +360,171 @@ function StatsBar({ stats }) {
         <div style={{ ...styles.statNumber, color: C.blue }}>{stats.high_match_count}</div>
         <div style={styles.statLabel}>High Match (80%+)</div>
       </div>
+    </div>
+  );
+}
+
+// ─── PROFILE TAB ────────────────────────────────────────────────────────────
+
+const ALL_CATEGORIES = [
+  { id: "commercial", label: "Commercial" },
+  { id: "government", label: "Government" },
+  { id: "residential", label: "Residential" },
+  { id: "structural", label: "Structural" },
+  { id: "historic-restoration", label: "Historic Restoration" },
+  { id: "masonry", label: "Masonry" },
+];
+const ALL_STATUSES = ["Open", "Active", "Accepting Bids", "Issued", "In Review", "Finaled"];
+const ALL_SOURCES = [
+  { id: "sam-gov", label: "SAM.gov" },
+  { id: "charleston-permits", label: "CHS Permits" },
+  { id: "scbo", label: "SCBO" },
+  { id: "charleston-city-bids", label: "CHS City Bids" },
+];
+
+function ProfileTab({ onCriteriaChange, lastScanAt, onScan }) {
+  const [profile, setProfile] = useState(null);
+  const [minValue, setMinValue] = useState(0);
+  const [categories, setCategories] = useState([]);
+  const [statuses, setStatuses] = useState([]);
+  const [sources, setSources] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [savedMsg, setSavedMsg] = useState("");
+  const [scanning, setScanning] = useState(false);
+  const [scanMsg, setScanMsg] = useState("");
+
+  useEffect(() => {
+    api("/auth/me").then((data) => {
+      setProfile(data);
+      setMinValue(data.criteria_min_value || 0);
+      setCategories(data.criteria_categories || []);
+      setStatuses(data.criteria_statuses || []);
+      setSources(data.criteria_sources || []);
+    });
+  }, []);
+
+  const toggle = (arr, setArr, item) =>
+    setArr(arr.includes(item) ? arr.filter((x) => x !== item) : [...arr, item]);
+
+  const save = async () => {
+    setSaving(true);
+    await api("/auth/me", {
+      method: "PATCH",
+      body: JSON.stringify({
+        criteria_min_value: minValue || null,
+        criteria_categories: categories,
+        criteria_statuses: statuses,
+        criteria_sources: sources,
+      }),
+    });
+    setSaving(false);
+    setSavedMsg("✓ Criteria saved — scores updated");
+    onCriteriaChange();
+    setTimeout(() => setSavedMsg(""), 4000);
+  };
+
+  const doScan = async () => {
+    setScanning(true);
+    setScanMsg("");
+    try {
+      const data = await api("/scan/trigger", { method: "POST" });
+      setScanMsg(data.message);
+      onScan();
+    } catch {
+      setScanMsg("Scan failed");
+    }
+    setScanning(false);
+    setTimeout(() => setScanMsg(""), 6000);
+  };
+
+  const chipStyle = (active, color) => ({
+    padding: "8px 16px",
+    borderRadius: 8,
+    border: `1px solid ${active ? color : C.border}`,
+    background: active ? `${color}20` : "transparent",
+    color: active ? color : C.textSub,
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: "pointer",
+    fontFamily: "'DM Sans', sans-serif",
+    transition: "all 0.15s",
+  });
+
+  return (
+    <div style={{ maxWidth: 620 }}>
+      <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 8 }}>Match Criteria</h2>
+      <p style={{ color: C.textSub, fontSize: 13, lineHeight: 1.6, marginBottom: 32 }}>
+        Projects meeting <strong style={{ color: C.text }}>all</strong> your criteria score 100%.
+        Projects meeting some criteria are scored proportionally.
+        Projects meeting none score 0%.
+      </p>
+
+      {/* Min Value */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={styles.criteriaLabel}>Minimum Project Value</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {[0, 100000, 500000, 1000000, 5000000].map((v) => (
+            <button key={v} onClick={() => setMinValue(v)} style={chipStyle(minValue === v, C.orange)}>
+              {v === 0 ? "Any" : v >= 1000000 ? `$${v / 1000000}M+` : `$${v / 1000}K+`}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Categories */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={styles.criteriaLabel}>Project Type</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {ALL_CATEGORIES.map(({ id, label }) => (
+            <button key={id} onClick={() => toggle(categories, setCategories, id)} style={chipStyle(categories.includes(id), C.blue)}>
+              {catIcons[id] || ""} {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Statuses */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={styles.criteriaLabel}>Project Status</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {ALL_STATUSES.map((s) => (
+            <button key={s} onClick={() => toggle(statuses, setStatuses, s)} style={chipStyle(statuses.includes(s), C.sky)}>
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Sources */}
+      <div style={{ marginBottom: 36 }}>
+        <div style={styles.criteriaLabel}>Data Sources</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {ALL_SOURCES.map(({ id, label }) => (
+            <button key={id} onClick={() => toggle(sources, setSources, id)} style={chipStyle(sources.includes(id), C.orange)}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <button onClick={save} disabled={saving} style={styles.authBtn}>
+        {saving ? "Saving..." : "Save Criteria"}
+      </button>
+      {savedMsg && <span style={{ color: C.orange, fontSize: 13, marginLeft: 16 }}>{savedMsg}</span>}
+
+      {/* Divider */}
+      <div style={{ borderTop: `1px solid ${C.border}`, margin: "40px 0 32px" }} />
+
+      {/* Manual scan */}
+      <h3 style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>Data Refresh</h3>
+      <p style={{ color: C.textSub, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
+        Scans run automatically every 24 hours.
+        {lastScanAt && <span> Last scan: <strong style={{ color: C.text }}>{fmtDate(lastScanAt)}</strong></span>}
+      </p>
+      <button onClick={doScan} disabled={scanning} style={{ ...styles.authBtn, background: C.navy, maxWidth: 180 }}>
+        {scanning ? "Scanning..." : "⚡ Run Scan Now"}
+      </button>
+      {scanMsg && <div style={{ color: C.orange, fontSize: 12, marginTop: 12 }}>{scanMsg}</div>}
     </div>
   );
 }
@@ -485,7 +650,7 @@ function SavedTab({ saved, onUnsave }) {
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <MatchBadge score={s.project.match_score} />
-              <div style={{ color: "#34d399", fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>
+              <div style={{ color: C.orange, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>
                 {fmt$(s.project.value)}
               </div>
               <button
@@ -633,6 +798,11 @@ export default function SiteScanApp() {
     loadHistory();
   };
 
+  const handleCriteriaChange = () => {
+    loadProjects();
+    loadStats();
+  };
+
   const logout = () => {
     localStorage.removeItem("sitescan_token");
     setAuthed(false);
@@ -690,6 +860,7 @@ export default function SiteScanApp() {
               { id: "scanner", label: "Scanner", icon: "⚡" },
               { id: "saved", label: `Saved (${saved.length})`, icon: "★" },
               { id: "history", label: "History", icon: "📊" },
+              { id: "profile", label: "Profile", icon: "⚙" },
             ].map((t) => (
               <button
                 key={t.id}
@@ -702,7 +873,6 @@ export default function SiteScanApp() {
           </nav>
         </div>
         <div style={styles.headerRight}>
-          <ScanButton onScan={handleScanComplete} />
           <button style={styles.logoutBtn} onClick={logout}>Sign Out</button>
         </div>
       </header>
@@ -754,6 +924,13 @@ export default function SiteScanApp() {
         )}
         {tab === "saved" && <SavedTab saved={saved} onUnsave={unsaveProject} />}
         {tab === "history" && <HistoryTab history={history} />}
+        {tab === "profile" && (
+          <ProfileTab
+            onCriteriaChange={handleCriteriaChange}
+            lastScanAt={stats?.last_scan_at}
+            onScan={handleScanComplete}
+          />
+        )}
       </main>
     </div>
   );
@@ -1066,6 +1243,14 @@ const styles = {
     padding: "10px 14px",
     fontSize: 13,
     color: C.textSub,
+  },
+  criteriaLabel: {
+    fontSize: 11,
+    color: C.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    marginBottom: 10,
+    fontWeight: 600,
   },
   // Misc
   spinner: {
