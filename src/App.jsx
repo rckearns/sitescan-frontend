@@ -709,6 +709,22 @@ function ScanButton({ onScan }) {
 // ─── FILTER BAR ─────────────────────────────────────────────────────────────
 
 function FilterBar({ filters, setFilters, onOpenMatchFilter }) {
+  const toggleDir = () =>
+    setFilters((f) => ({ ...f, sortDir: f.sortDir === "desc" ? "asc" : "desc" }));
+
+  const btnBase = {
+    padding: "9px 14px",
+    background: C.surface,
+    border: `1px solid ${C.border}`,
+    borderRadius: 8,
+    color: C.textSub,
+    fontSize: 13, fontWeight: 600,
+    cursor: "pointer",
+    fontFamily: "'DM Sans', sans-serif",
+    whiteSpace: "nowrap",
+    transition: "border-color 0.15s, color 0.15s",
+  };
+
   return (
     <div style={styles.filterBar}>
       <input
@@ -726,21 +742,19 @@ function FilterBar({ filters, setFilters, onOpenMatchFilter }) {
         <option value="value">Sort: Value</option>
         <option value="posted_date">Sort: Recent</option>
       </select>
+      {/* Ascending / Descending toggle */}
+      <button
+        onClick={toggleDir}
+        title={filters.sortDir === "desc" ? "Descending — click for Ascending" : "Ascending — click for Descending"}
+        style={{ ...btnBase, padding: "9px 11px", fontSize: 16, minWidth: 38, textAlign: "center" }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.borderHi; e.currentTarget.style.color = C.text; }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textSub; }}
+      >
+        {filters.sortDir === "desc" ? "↓" : "↑"}
+      </button>
       <button
         onClick={onOpenMatchFilter}
-        style={{
-          display: "flex", alignItems: "center", gap: 6,
-          padding: "9px 16px",
-          background: C.surface,
-          border: `1px solid ${C.border}`,
-          borderRadius: 8,
-          color: C.textSub,
-          fontSize: 13, fontWeight: 600,
-          cursor: "pointer",
-          fontFamily: "'DM Sans', sans-serif",
-          whiteSpace: "nowrap",
-          transition: "border-color 0.15s, color 0.15s",
-        }}
+        style={{ ...btnBase, display: "flex", alignItems: "center", gap: 6 }}
         onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.borderHi; e.currentTarget.style.color = C.text; }}
         onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textSub; }}
       >
@@ -1140,7 +1154,7 @@ export default function SiteScanApp() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
-    search: "", category: "", source: "", minMatch: 0, sortBy: "match_score",
+    search: "", category: "", source: "", minMatch: 0, sortBy: "match_score", sortDir: "desc",
   });
   const [categories, setCategories] = useState([]);
   const [sources, setSources] = useState([]);
@@ -1151,9 +1165,9 @@ export default function SiteScanApp() {
     try {
       const params = new URLSearchParams({
         sort_by: filters.sortBy,
-        sort_dir: "desc",
-        limit: "100",
-        min_match: String(filters.minMatch),
+        sort_dir: filters.sortDir || "desc",
+        limit: "1000",
+        min_match: String(filters.minMatch || 0),
       });
       if (filters.search) params.set("search", filters.search);
       if (filters.category) params.set("categories", filters.category);
@@ -1334,7 +1348,7 @@ export default function SiteScanApp() {
                 {projects.map((p, i) => (
                   <div
                     key={p.id}
-                    style={{ animation: `fadeIn 0.3s ease ${i * 0.03}s both` }}
+                    style={{ animation: `fadeIn 0.3s ease ${Math.min(i, 25) * 0.03}s both` }}
                   >
                     <ProjectRow
                       project={p}
@@ -1556,9 +1570,9 @@ const styles = {
   },
   // Main
   main: {
-    maxWidth: 1200,
-    margin: "0 auto",
-    padding: "20px 24px",
+    padding: "20px 32px",
+    width: "100%",
+    boxSizing: "border-box",
   },
   // Stats
   statsBar: {
