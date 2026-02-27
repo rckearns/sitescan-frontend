@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { MapContainer, TileLayer, CircleMarker, Popup } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
 
 const API = (import.meta.env.VITE_API_URL || "https://sitescan-backend-production-423e.up.railway.app") + "/api/v1";
 
@@ -822,6 +824,109 @@ function HistoryTab({ history }) {
   );
 }
 
+// ─── MAP TAB ────────────────────────────────────────────────────────────────
+
+const CHARLESTON_CENTER = [32.7765, -79.9311];
+
+function MapTab({ projects }) {
+  const mapped   = projects.filter((p) => p.latitude && p.longitude);
+  const unmapped = projects.length - mapped.length;
+
+  return (
+    <div>
+      {/* Legend + count */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <span style={{ fontSize: 13, color: C.textSub }}>
+          <strong style={{ color: C.text }}>{mapped.length}</strong> projects plotted
+          {unmapped > 0 && (
+            <span style={{ color: C.textMuted, marginLeft: 8 }}>· {unmapped} without coordinates</span>
+          )}
+        </span>
+        <div style={{ display: "flex", gap: 16, fontSize: 11, color: C.textSub }}>
+          {[
+            { label: "90%+", color: C.orange },
+            { label: "75%+", color: C.blue },
+            { label: "60%+", color: C.sky },
+            { label: "<60%", color: C.textMuted },
+          ].map(({ label, color }) => (
+            <span key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: color }} />
+              {label}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Map */}
+      <div style={{ borderRadius: 12, overflow: "hidden", border: `1px solid ${C.border}` }}>
+        <MapContainer
+          center={CHARLESTON_CENTER}
+          zoom={12}
+          style={{ height: "calc(100vh - 230px)", width: "100%" }}
+        >
+          <TileLayer
+            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            attribution='&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+            maxZoom={19}
+          />
+          {mapped.map((p) => (
+            <CircleMarker
+              key={p.id}
+              center={[p.latitude, p.longitude]}
+              radius={9}
+              pathOptions={{
+                fillColor: matchColor(p.match_score),
+                fillOpacity: 0.85,
+                color: "#fff",
+                weight: 1.5,
+                opacity: 0.6,
+              }}
+            >
+              <Popup>
+                <div style={{ minWidth: 210, fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}>
+                  <div style={{ fontWeight: 700, marginBottom: 4, lineHeight: 1.3, color: "#111" }}>
+                    {catIcons[p.category] || "📋"} {p.title}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#777", marginBottom: 10 }}>
+                    📍 {p.location}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                    <span style={{
+                      background: matchColor(p.match_score),
+                      color: "#fff",
+                      borderRadius: 10,
+                      padding: "2px 9px",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      fontFamily: "'Space Mono', monospace",
+                    }}>
+                      {p.match_score}%
+                    </span>
+                    <span style={{ color: "#c47d10", fontWeight: 700, fontSize: 12 }}>{fmt$(p.value)}</span>
+                    <span style={{ fontSize: 10, color: "#888", background: "#f0f0f0", borderRadius: 4, padding: "1px 6px" }}>
+                      {p.status}
+                    </span>
+                  </div>
+                  {p.source_url && (
+                    <a
+                      href={p.source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: 11, color: "#4a9fd4", textDecoration: "none", fontWeight: 600 }}
+                    >
+                      View Source →
+                    </a>
+                  )}
+                </div>
+              </Popup>
+            </CircleMarker>
+          ))}
+        </MapContainer>
+      </div>
+    </div>
+  );
+}
+
 // ─── MAIN APP ───────────────────────────────────────────────────────────────
 
 export default function SiteScanApp() {
@@ -949,6 +1054,14 @@ export default function SiteScanApp() {
         select option { background: #0c1524; }
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .leaflet-popup-content-wrapper { border-radius: 10px !important; box-shadow: 0 8px 32px rgba(0,0,0,0.4) !important; padding: 0 !important; }
+        .leaflet-popup-content { margin: 14px 16px !important; }
+        .leaflet-popup-tip-container { margin-top: -1px; }
+        .leaflet-container { font-family: 'DM Sans', sans-serif; }
+        .leaflet-control-attribution { background: rgba(8,15,26,0.8) !important; color: #3d5a7a !important; }
+        .leaflet-control-attribution a { color: #4a9fd4 !important; }
+        .leaflet-control-zoom a { background: #0c1524 !important; color: #e8f0fa !important; border-color: #1a2f50 !important; }
+        .leaflet-control-zoom a:hover { background: #101d30 !important; }
       `}</style>
 
       {/* HEADER */}
@@ -968,7 +1081,8 @@ export default function SiteScanApp() {
           <nav style={styles.nav}>
             {[
               { id: "scanner", label: "Scanner", icon: "⚡" },
-              { id: "saved", label: `Saved (${saved.length})`, icon: "★" },
+              { id: "map",     label: "Map",     icon: "🗺️" },
+              { id: "saved",   label: `Saved (${saved.length})`, icon: "★" },
               { id: "history", label: "History", icon: "📊" },
               { id: "profile", label: "Profile", icon: "⚙" },
             ].map((t) => (
@@ -1033,6 +1147,7 @@ export default function SiteScanApp() {
             )}
           </>
         )}
+        {tab === "map" && <MapTab projects={projects} />}
         {tab === "saved" && <SavedTab saved={saved} onUnsave={unsaveProject} />}
         {tab === "history" && <HistoryTab history={history} />}
         {tab === "profile" && (
