@@ -708,7 +708,7 @@ function ScanButton({ onScan }) {
 
 // ─── FILTER BAR ─────────────────────────────────────────────────────────────
 
-function FilterBar({ filters, setFilters, categories, sources }) {
+function FilterBar({ filters, setFilters, onOpenMatchFilter }) {
   return (
     <div style={styles.filterBar}>
       <input
@@ -719,41 +719,6 @@ function FilterBar({ filters, setFilters, categories, sources }) {
       />
       <select
         style={styles.select}
-        value={filters.category || ""}
-        onChange={(e) => setFilters({ ...filters, category: e.target.value })}
-      >
-        <option value="">All Categories</option>
-        {categories.map((c) => (
-          <option key={c} value={c}>
-            {catIcons[c] || ""} {c}
-          </option>
-        ))}
-      </select>
-      <select
-        style={styles.select}
-        value={filters.source || ""}
-        onChange={(e) => setFilters({ ...filters, source: e.target.value })}
-      >
-        <option value="">All Sources</option>
-        {sources.map((s) => (
-          <option key={s} value={s}>
-            {sourceLabels[s] || s}
-          </option>
-        ))}
-      </select>
-      <select
-        style={styles.select}
-        value={filters.minMatch || 0}
-        onChange={(e) => setFilters({ ...filters, minMatch: Number(e.target.value) })}
-      >
-        <option value={0}>Any Match</option>
-        <option value={50}>50%+</option>
-        <option value={60}>60%+</option>
-        <option value={75}>75%+</option>
-        <option value={90}>90%+</option>
-      </select>
-      <select
-        style={styles.select}
         value={filters.sortBy || "match_score"}
         onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
       >
@@ -761,6 +726,26 @@ function FilterBar({ filters, setFilters, categories, sources }) {
         <option value="value">Sort: Value</option>
         <option value="posted_date">Sort: Recent</option>
       </select>
+      <button
+        onClick={onOpenMatchFilter}
+        style={{
+          display: "flex", alignItems: "center", gap: 6,
+          padding: "9px 16px",
+          background: C.surface,
+          border: `1px solid ${C.border}`,
+          borderRadius: 8,
+          color: C.textSub,
+          fontSize: 13, fontWeight: 600,
+          cursor: "pointer",
+          fontFamily: "'DM Sans', sans-serif",
+          whiteSpace: "nowrap",
+          transition: "border-color 0.15s, color 0.15s",
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.borderHi; e.currentTarget.style.color = C.text; }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textSub; }}
+      >
+        <span style={{ fontSize: 14 }}>⚙</span> Match Filter
+      </button>
     </div>
   );
 }
@@ -1296,11 +1281,11 @@ export default function SiteScanApp() {
           </div>
           <nav style={styles.nav}>
             {[
-              { id: "scanner", label: "Scanner", icon: "⚡" },
-              { id: "map",     label: "Map",     icon: "🗺️" },
-              { id: "saved",   label: `Saved (${saved.length})`, icon: "★" },
-              { id: "history", label: "History", icon: "📊" },
-              { id: "profile", label: "Profile", icon: "⚙" },
+              { id: "scanner",      label: "Scanner",                    icon: "⚡" },
+              { id: "map",          label: "Map",                        icon: "🗺️" },
+              { id: "saved",        label: `Saved (${saved.length})`,    icon: "★" },
+              { id: "history",      label: "History",                    icon: "📊" },
+              { id: "profile",      label: "Match Filter",               icon: "⚙" },
             ].map((t) => (
               <button
                 key={t.id}
@@ -1326,8 +1311,7 @@ export default function SiteScanApp() {
             <FilterBar
               filters={filters}
               setFilters={setFilters}
-              categories={categories}
-              sources={sources}
+              onOpenMatchFilter={() => setTab("profile")}
             />
             <div style={styles.resultHeader}>
               <span style={{ color: "#888", fontSize: 13 }}>
