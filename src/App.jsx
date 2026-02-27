@@ -828,19 +828,26 @@ function HistoryTab({ history }) {
 
 const CHARLESTON_CENTER = [32.7765, -79.9311];
 
-function MapTab({ projects, mapHeight = "calc(100vh - 230px)" }) {
-  const mapped   = projects.filter((p) => p.latitude && p.longitude);
-  const unmapped = projects.length - mapped.length;
+function MapTab({ mapHeight = "calc(100vh - 230px)" }) {
+  const [points, setPoints] = useState([]);
+  const [mapLoading, setMapLoading] = useState(true);
+
+  useEffect(() => {
+    setMapLoading(true);
+    api("/projects/map/points")
+      .then((data) => setPoints(Array.isArray(data) ? data : []))
+      .finally(() => setMapLoading(false));
+  }, []);
 
   return (
     <div>
       {/* Legend + count */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         <span style={{ fontSize: 13, color: C.textSub }}>
-          <strong style={{ color: C.text }}>{mapped.length}</strong> projects plotted
-          {unmapped > 0 && (
-            <span style={{ color: C.textMuted, marginLeft: 8 }}>· {unmapped} without coordinates</span>
-          )}
+          {mapLoading
+            ? <span style={{ color: C.textMuted }}>Loading points…</span>
+            : <><strong style={{ color: C.text }}>{points.length}</strong> projects plotted</>
+          }
         </span>
         <div style={{ display: "flex", gap: 16, fontSize: 11, color: C.textSub }}>
           {[
@@ -869,7 +876,7 @@ function MapTab({ projects, mapHeight = "calc(100vh - 230px)" }) {
             attribution='&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
             maxZoom={19}
           />
-          {mapped.map((p) => (
+          {points.map((p) => (
             <CircleMarker
               key={p.id}
               center={[p.latitude, p.longitude]}
@@ -1191,7 +1198,7 @@ export default function SiteScanApp() {
           </div>
           {/* Map content */}
           <div style={{ flex: 1, padding: "16px 24px", overflow: "hidden", minHeight: 0 }}>
-            <MapTab projects={projects} mapHeight="calc(100vh - 116px)" />
+            <MapTab mapHeight="calc(100vh - 116px)" />
           </div>
         </div>
       )}
