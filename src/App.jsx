@@ -254,13 +254,17 @@ function ProjectRow({ project, onSave, saved }) {
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-          <MatchBadge score={p.match_score} />
-          <div style={{ textAlign: "right", minWidth: 70 }}>
+          <div style={{ width: 64, display: "flex", justifyContent: "center" }}>
+            <MatchBadge score={p.match_score} />
+          </div>
+          <div style={{ width: 80, textAlign: "right" }}>
             <div style={{ color: C.orange, fontWeight: 700, fontSize: 14, fontFamily: "'JetBrains Mono', monospace" }}>
               {fmt$(p.value)}
             </div>
           </div>
-          <StatusPill status={p.status} />
+          <div style={{ width: 110, display: "flex", justifyContent: "flex-end" }}>
+            <StatusPill status={p.status} />
+          </div>
         </div>
       </div>
       {expanded && (
