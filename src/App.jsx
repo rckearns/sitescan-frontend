@@ -708,20 +708,21 @@ function ScanButton({ onScan }) {
 
 // ─── FILTER BAR ─────────────────────────────────────────────────────────────
 
-function FilterBar({ filters, setFilters, onOpenMatchFilter }) {
+function FilterBar({ filters, setFilters }) {
   const toggleDir = () =>
     setFilters((f) => ({ ...f, sortDir: f.sortDir === "desc" ? "asc" : "desc" }));
 
   const btnBase = {
-    padding: "9px 14px",
+    padding: "9px 11px",
     background: C.surface,
     border: `1px solid ${C.border}`,
     borderRadius: 8,
     color: C.textSub,
-    fontSize: 13, fontWeight: 600,
+    fontSize: 16,
     cursor: "pointer",
     fontFamily: "'DM Sans', sans-serif",
-    whiteSpace: "nowrap",
+    minWidth: 38,
+    textAlign: "center",
     transition: "border-color 0.15s, color 0.15s",
   };
 
@@ -742,23 +743,14 @@ function FilterBar({ filters, setFilters, onOpenMatchFilter }) {
         <option value="value">Sort: Value</option>
         <option value="posted_date">Sort: Recent</option>
       </select>
-      {/* Ascending / Descending toggle */}
       <button
         onClick={toggleDir}
-        title={filters.sortDir === "desc" ? "Descending — click for Ascending" : "Ascending — click for Descending"}
-        style={{ ...btnBase, padding: "9px 11px", fontSize: 16, minWidth: 38, textAlign: "center" }}
+        title={filters.sortDir === "desc" ? "High → Low (click to flip)" : "Low → High (click to flip)"}
+        style={btnBase}
         onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.borderHi; e.currentTarget.style.color = C.text; }}
         onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textSub; }}
       >
         {filters.sortDir === "desc" ? "↓" : "↑"}
-      </button>
-      <button
-        onClick={onOpenMatchFilter}
-        style={{ ...btnBase, display: "flex", alignItems: "center", gap: 6 }}
-        onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.borderHi; e.currentTarget.style.color = C.text; }}
-        onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textSub; }}
-      >
-        <span style={{ fontSize: 14 }}>⚙</span> Match Filter
       </button>
     </div>
   );
@@ -1256,6 +1248,21 @@ export default function SiteScanApp() {
 
   const savedIds = new Set(saved.map((s) => s.project_id));
 
+  // Compute live stats from the currently-loaded (filtered) projects so the
+  // stats bar always reflects whatever search / match-filter criteria are active.
+  const liveStats = total > 0
+    ? {
+        total_projects: total,
+        total_pipeline_value: projects.reduce((s, p) => s + (p.value || 0), 0),
+        avg_match_score:
+          projects.length > 0
+            ? Math.round((projects.reduce((s, p) => s + p.match_score, 0) / projects.length) * 10) / 10
+            : 0,
+        high_match_count: projects.filter((p) => p.match_score >= 80).length,
+        last_scan_at: stats?.last_scan_at,
+      }
+    : stats;
+
   return (
     <div style={styles.app}>
       <style>{`
@@ -1321,11 +1328,10 @@ export default function SiteScanApp() {
       <main style={styles.main}>
         {tab === "scanner" && (
           <>
-            <StatsBar stats={stats} />
+            <StatsBar stats={liveStats} />
             <FilterBar
               filters={filters}
               setFilters={setFilters}
-              onOpenMatchFilter={() => setTab("profile")}
             />
             <div style={styles.resultHeader}>
               <span style={{ color: "#888", fontSize: 13 }}>
