@@ -828,7 +828,7 @@ function HistoryTab({ history }) {
 
 const CHARLESTON_CENTER = [32.7765, -79.9311];
 
-function MapTab({ projects }) {
+function MapTab({ projects, mapHeight = "calc(100vh - 230px)" }) {
   const mapped   = projects.filter((p) => p.latitude && p.longitude);
   const unmapped = projects.length - mapped.length;
 
@@ -862,7 +862,7 @@ function MapTab({ projects }) {
         <MapContainer
           center={CHARLESTON_CENTER}
           zoom={12}
-          style={{ height: "calc(100vh - 230px)", width: "100%" }}
+          style={{ height: mapHeight, width: "100%" }}
         >
           <TileLayer
             url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
@@ -932,6 +932,7 @@ function MapTab({ projects }) {
 export default function SiteScanApp() {
   const [authed, setAuthed] = useState(!!localStorage.getItem("sitescan_token"));
   const [tab, setTab] = useState("scanner");
+  const [showMap, setShowMap] = useState(false);
   const [projects, setProjects] = useState([]);
   const [total, setTotal] = useState(0);
   const [stats, setStats] = useState(null);
@@ -1088,8 +1089,8 @@ export default function SiteScanApp() {
             ].map((t) => (
               <button
                 key={t.id}
-                style={{ ...styles.navBtn, ...(tab === t.id ? styles.navBtnActive : {}) }}
-                onClick={() => setTab(t.id)}
+                style={{ ...styles.navBtn, ...((t.id === "map" ? showMap : tab === t.id) ? styles.navBtnActive : {}) }}
+                onClick={() => t.id === "map" ? setShowMap((v) => !v) : setTab(t.id)}
               >
                 {t.icon} {t.label}
               </button>
@@ -1147,7 +1148,6 @@ export default function SiteScanApp() {
             )}
           </>
         )}
-        {tab === "map" && <MapTab projects={projects} />}
         {tab === "saved" && <SavedTab saved={saved} onUnsave={unsaveProject} />}
         {tab === "history" && <HistoryTab history={history} />}
         {tab === "profile" && (
@@ -1158,6 +1158,43 @@ export default function SiteScanApp() {
           />
         )}
       </main>
+
+      {/* MAP OVERLAY */}
+      {showMap && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 200,
+          display: "flex", flexDirection: "column",
+          background: C.bg,
+        }}>
+          {/* Overlay header */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "10px 24px",
+            borderBottom: `1px solid ${C.border}`,
+            background: C.surface,
+            boxShadow: "0 2px 16px rgba(0,0,0,0.3)",
+            flexShrink: 0,
+          }}>
+            <span style={{ color: C.text, fontWeight: 700, fontSize: 15, fontFamily: "'DM Sans', sans-serif" }}>
+              🗺️ Project Map — Charleston, SC
+            </span>
+            <button
+              onClick={() => setShowMap(false)}
+              style={{
+                background: "none", border: `1px solid ${C.border}`,
+                color: C.textSub, borderRadius: 6, padding: "5px 14px",
+                cursor: "pointer", fontSize: 13, fontFamily: "'DM Sans', sans-serif",
+              }}
+            >
+              ✕ Close
+            </button>
+          </div>
+          {/* Map content */}
+          <div style={{ flex: 1, padding: "16px 24px", overflow: "hidden", minHeight: 0 }}>
+            <MapTab projects={projects} mapHeight="calc(100vh - 116px)" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
