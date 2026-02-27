@@ -69,9 +69,6 @@ function parcelColor(score) {
   return "#1a2f50";                   // dark  — fully developed
 }
 
-const PARCEL_URL =
-  "https://gis.charleston-sc.gov/arcgis2/rest/services/External/Zoning/MapServer/26/query";
-
 const catIcons = {
   "historic-restoration": "🏛️",
   masonry: "🧱",
@@ -867,18 +864,20 @@ function ParcelLayer({ show, onStatus }) {
 
     const b = map.getBounds();
     const params = new URLSearchParams({
-      geometry: `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`,
-      geometryType: "esriGeometryEnvelope",
-      inSR: "4326",
-      outSR: "4326",
-      outFields: "TMS,PARCELID,OWNER,STREET,HOUSE,GENUSE,YRBUILT,APPRVAL,IMP_APPR,LAND_APPR",
-      f: "geojson",
-      resultRecordCount: "800",
+      west:  String(b.getWest()),
+      south: String(b.getSouth()),
+      east:  String(b.getEast()),
+      north: String(b.getNorth()),
+      limit: "800",
     });
 
+    const token = localStorage.getItem("sitescan_token");
     onStatus?.({ zoom, count: 0, loading: true });
 
-    fetch(`${PARCEL_URL}?${params}`, { signal: ctrl.signal })
+    fetch(`${API}/projects/map/parcels?${params}`, {
+      signal: ctrl.signal,
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
       .then((r) => r.json())
       .then((d) => {
         if (!ctrl.signal.aborted) {
