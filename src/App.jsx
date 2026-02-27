@@ -236,7 +236,7 @@ function ProjectRow({ project, onSave, saved }) {
   const p = project;
 
   return (
-    <div style={styles.projectRow} onClick={() => setExpanded(!expanded)}>
+    <div style={{ ...styles.projectRow, borderLeft: `3px solid ${matchColor(p.match_score)}` }} onClick={() => setExpanded(!expanded)}>
       <div style={styles.projectHeader}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={styles.projectTitle}>
@@ -344,20 +344,20 @@ function StatsBar({ stats }) {
   if (!stats) return null;
   return (
     <div style={styles.statsBar}>
-      <div style={styles.statBox}>
+      <div style={{ ...styles.statBox, borderLeft: `3px solid ${C.blue}` }}>
         <div style={styles.statNumber}>{stats.total_projects}</div>
-        <div style={styles.statLabel}>Projects</div>
+        <div style={styles.statLabel}>Active Projects</div>
       </div>
-      <div style={styles.statBox}>
+      <div style={{ ...styles.statBox, borderLeft: `3px solid ${C.orange}` }}>
         <div style={{ ...styles.statNumber, color: C.orange }}>{fmt$(stats.total_pipeline_value)}</div>
         <div style={styles.statLabel}>Pipeline Value</div>
       </div>
-      <div style={styles.statBox}>
+      <div style={{ ...styles.statBox, borderLeft: `3px solid ${C.sky}` }}>
         <div style={{ ...styles.statNumber, color: C.sky }}>{stats.avg_match_score}%</div>
-        <div style={styles.statLabel}>Avg Match</div>
+        <div style={styles.statLabel}>Avg Match Score</div>
       </div>
-      <div style={styles.statBox}>
-        <div style={{ ...styles.statNumber, color: C.blue }}>{stats.high_match_count}</div>
+      <div style={{ ...styles.statBox, borderLeft: `3px solid #22c55e` }}>
+        <div style={{ ...styles.statNumber, color: "#22c55e" }}>{stats.high_match_count}</div>
         <div style={styles.statLabel}>High Match (80%+)</div>
       </div>
     </div>
@@ -525,6 +525,112 @@ function ProfileTab({ onCriteriaChange, lastScanAt, onScan }) {
         {scanning ? "Scanning..." : "⚡ Run Scan Now"}
       </button>
       {scanMsg && <div style={{ color: C.orange, fontSize: 12, marginTop: 12 }}>{scanMsg}</div>}
+    </div>
+  );
+}
+
+// ─── CITY SELECTOR ──────────────────────────────────────────────────────────
+
+const CITIES = [
+  { id: "charleston-sc", label: "Charleston, SC", icon: "🌊", active: true },
+  { id: "charlotte-nc",  label: "Charlotte, NC",  icon: "🏙️" },
+  { id: "columbia-sc",   label: "Columbia, SC",   icon: "🏛️" },
+  { id: "atlanta-ga",    label: "Atlanta, GA",    icon: "🍑" },
+  { id: "raleigh-nc",    label: "Raleigh, NC",    icon: "🔬" },
+  { id: "nashville-tn",  label: "Nashville, TN",  icon: "🎸" },
+  { id: "miami-fl",      label: "Miami, FL",      icon: "🌴" },
+  { id: "houston-tx",    label: "Houston, TX",    icon: "⭐" },
+  { id: "dallas-tx",     label: "Dallas, TX",     icon: "🤠" },
+  { id: "denver-co",     label: "Denver, CO",     icon: "⛰️" },
+  { id: "seattle-wa",    label: "Seattle, WA",    icon: "☕" },
+  { id: "phoenix-az",    label: "Phoenix, AZ",    icon: "☀️" },
+];
+
+function CitySelector() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, []);
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "5px 11px",
+          background: open ? C.surfaceHi : "transparent",
+          border: `1px solid ${open ? C.borderHi : C.border}`,
+          borderRadius: 8,
+          color: C.text,
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: "pointer",
+          fontFamily: "'DM Sans', sans-serif",
+          transition: "all 0.15s",
+          whiteSpace: "nowrap",
+        }}
+      >
+        <span style={{ fontSize: 13 }}>🌊</span>
+        Charleston, SC
+        <span style={{ color: C.textMuted, fontSize: 9, marginLeft: 2 }}>▾</span>
+      </button>
+
+      {open && (
+        <div style={{
+          position: "absolute",
+          top: "calc(100% + 6px)",
+          left: 0,
+          background: C.surface,
+          border: `1px solid ${C.border}`,
+          borderRadius: 10,
+          padding: "6px",
+          zIndex: 300,
+          minWidth: 210,
+          boxShadow: "0 12px 40px rgba(0,0,0,0.6)",
+        }}>
+          <div style={{ padding: "4px 10px 8px", fontSize: 10, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600, borderBottom: `1px solid ${C.border}`, marginBottom: 4 }}>
+            Select Market
+          </div>
+          {CITIES.map((city) => (
+            <div
+              key={city.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "7px 10px",
+                borderRadius: 6,
+                background: city.active ? `${C.blue}12` : "transparent",
+                cursor: city.active ? "default" : "not-allowed",
+              }}
+            >
+              <span style={{ fontSize: 13, color: city.active ? C.text : C.textSub, fontWeight: city.active ? 600 : 400 }}>
+                {city.icon} {city.label}
+              </span>
+              {city.active ? (
+                <span style={{ fontSize: 9, fontWeight: 700, color: C.blue, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  Active
+                </span>
+              ) : (
+                <span style={{
+                  fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em",
+                  color: C.textMuted, background: `${C.textMuted}15`,
+                  border: `1px solid ${C.textMuted}25`, padding: "2px 6px", borderRadius: 4,
+                }}>
+                  Soon
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -873,6 +979,7 @@ export default function SiteScanApp() {
           </nav>
         </div>
         <div style={styles.headerRight}>
+          <CitySelector />
           <button style={styles.logoutBtn} onClick={logout}>Sign Out</button>
         </div>
       </header>
@@ -1108,9 +1215,9 @@ const styles = {
   statBox: {
     background: C.surface,
     border: `1px solid ${C.border}`,
-    borderRadius: 12,
-    padding: "16px 20px",
-    textAlign: "center",
+    borderRadius: 10,
+    padding: "18px 22px",
+    textAlign: "left",
   },
   statNumber: {
     fontSize: 22,
@@ -1165,8 +1272,8 @@ const styles = {
     background: C.surface,
     border: `1px solid ${C.border}`,
     borderRadius: 10,
-    marginBottom: 6,
-    padding: "14px 18px",
+    marginBottom: 8,
+    padding: "16px 20px",
     cursor: "pointer",
     transition: "border-color 0.15s, background 0.15s",
   },
