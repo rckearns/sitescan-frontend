@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { MapContainer, TileLayer, CircleMarker, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, CircleMarker, Popup, GeoJSON, useMap, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
 const API = (import.meta.env.VITE_API_URL || "https://sitescan-backend-production-423e.up.railway.app") + "/api/v1";
@@ -42,6 +42,35 @@ const matchColor = (s) => {
   if (s >= 45) return "#5b8fa8";
   return C.textMuted;
 };
+
+// ─── PARCEL OPPORTUNITY HELPERS ───────────────────────────────────────────────
+
+// Score 0–100: how underimproved is this parcel relative to its land value?
+// Vacant land = 95 (max opportunity), full build = ~5.
+function parcelOppScore(props) {
+  const genuse = (props.GENUSE || "").toLowerCase();
+  if (genuse.includes("undevelopable")) return 3;
+
+  const land = parseFloat(props.LAND_APPR) || 0;
+  const imp  = parseFloat(props.IMP_APPR)  || 0;
+
+  if (land === 0 && imp === 0) return 50;   // unknown
+  if (imp === 0)  return 95;                // vacant land → maximum opportunity
+  if (land === 0) return 15;               // improvements only, no land value recorded
+
+  const impRatio = imp / (land + imp);
+  return Math.max(3, Math.round((1 - impRatio) * 100));
+}
+
+function parcelColor(score) {
+  if (score >= 80) return "#f0a030";  // orange — vacant/underbuilt
+  if (score >= 55) return "#7ec8e3";  // sky   — mixed
+  if (score >= 30) return "#2d6a9f";  // blue  — moderate build
+  return "#1a2f50";                   // dark  — fully developed
+}
+
+const PARCEL_URL =
+  "https://gis.charleston-sc.gov/arcgis2/rest/services/External/Zoning/MapServer/26/query";
 
 const catIcons = {
   "historic-restoration": "🏛️",
@@ -824,6 +853,130 @@ function HistoryTab({ history }) {
   );
 }
 
+// ─── PARCEL LAYER ─────────────────────────────────────────────────────────────
+
+function ParcelLayer({ show, onStatus }) {
+  const map = useMap();
+  const [data, setData] = useState(null);
+  const [fetchKey, setFetchKey] = useState(0);
+  const abortRef = useRef(null);
+  const timerRef = useRef(null);
+
+  const doFetch = useCallback(() => {
+    const zoom = map.getZoom();
+    if (zoom < 14) {
+      setData(null);
+      onStatus?.({ zoom, count: 0, loading: false });
+      return;
+    }
+
+    if (abortRef.current) abortRef.current.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+
+    const b = map.getBounds();
+    const params = new URLSearchParams({
+      geometry: `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`,
+      geometryType: "esriGeometryEnvelope",
+      inSR: "4326",
+      outSR: "4326",
+      outFields: "TMS,PARCELID,OWNER,STREET,HOUSE,GENUSE,YRBUILT,APPRVAL,IMP_APPR,LAND_APPR",
+      f: "geojson",
+      resultRecordCount: "800",
+    });
+
+    onStatus?.({ zoom, count: 0, loading: true });
+
+    fetch(`${PARCEL_URL}?${params}`, { signal: ctrl.signal })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!ctrl.signal.aborted) {
+          setData(d);
+          setFetchKey((n) => n + 1);
+          onStatus?.({ zoom, count: d.features?.length ?? 0, loading: false });
+        }
+      })
+      .catch((e) => {
+        if (e.name !== "AbortError") onStatus?.({ zoom, count: 0, loading: false });
+      });
+  }, [map, onStatus]);
+
+  const schedule = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(doFetch, 600);
+  }, [doFetch]);
+
+  useMapEvents({
+    moveend: () => show && schedule(),
+    zoomend: () => { if (show) { clearTimeout(timerRef.current); doFetch(); } },
+  });
+
+  useEffect(() => {
+    if (show) {
+      doFetch();
+    } else {
+      if (abortRef.current) abortRef.current.abort();
+      clearTimeout(timerRef.current);
+      setData(null);
+      onStatus?.({ count: 0, loading: false, zoom: map.getZoom() });
+    }
+  }, [show]); // eslint-disable-line
+
+  if (!show || !data) return null;
+
+  return (
+    <GeoJSON
+      key={fetchKey}
+      data={data}
+      style={(feat) => {
+        const score = parcelOppScore(feat.properties);
+        return {
+          fillColor: parcelColor(score),
+          fillOpacity: 0.45,
+          color: parcelColor(score),
+          weight: 0.5,
+          opacity: 0.85,
+        };
+      }}
+      onEachFeature={(feat, layer) => {
+        const p = feat.properties;
+        const score = parcelOppScore(p);
+        const addr = [p.HOUSE, p.STREET].filter(Boolean).join(" ") || "No address";
+        const oppLabel = score >= 80 ? "🔥 High" : score >= 55 ? "📈 Medium" : "✓ Low";
+        layer.bindPopup(`
+          <div style="font-family:'DM Sans',sans-serif;min-width:230px;font-size:13px">
+            <div style="font-weight:700;margin-bottom:3px;color:#111;font-size:14px">${addr}</div>
+            <div style="color:#777;font-size:11px;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em">${p.GENUSE || "Unknown use"}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;margin-bottom:12px">
+              <div>
+                <div style="color:#999;font-size:10px;text-transform:uppercase;letter-spacing:.05em">Land Value</div>
+                <strong>$${Number(p.LAND_APPR||0).toLocaleString()}</strong>
+              </div>
+              <div>
+                <div style="color:#999;font-size:10px;text-transform:uppercase;letter-spacing:.05em">Improvements</div>
+                <strong>$${Number(p.IMP_APPR||0).toLocaleString()}</strong>
+              </div>
+              <div>
+                <div style="color:#999;font-size:10px;text-transform:uppercase;letter-spacing:.05em">Total Appraisal</div>
+                <strong>$${Number(p.APPRVAL||0).toLocaleString()}</strong>
+              </div>
+              <div>
+                <div style="color:#999;font-size:10px;text-transform:uppercase;letter-spacing:.05em">Year Built</div>
+                <strong>${p.YRBUILT || "—"}</strong>
+              </div>
+            </div>
+            <div style="background:${parcelColor(score)}20;border:1px solid ${parcelColor(score)}50;border-radius:6px;padding:7px 12px;text-align:center;font-weight:700;color:${parcelColor(score)};font-size:13px;margin-bottom:8px">
+              ${oppLabel} Opportunity · ${score}%
+            </div>
+            <div style="color:#aaa;font-size:10px">Owner: ${p.OWNER || "—"}</div>
+            <div style="color:#aaa;font-size:10px">TMS: ${p.TMS || "—"}</div>
+          </div>
+        `);
+      }}
+    />
+  );
+}
+
 // ─── MAP TAB ────────────────────────────────────────────────────────────────
 
 const CHARLESTON_CENTER = [32.7765, -79.9311];
@@ -831,6 +984,8 @@ const CHARLESTON_CENTER = [32.7765, -79.9311];
 function MapTab({ mapHeight = "calc(100vh - 230px)" }) {
   const [points, setPoints] = useState([]);
   const [mapLoading, setMapLoading] = useState(true);
+  const [showParcels, setShowParcels] = useState(false);
+  const [parcelStatus, setParcelStatus] = useState({ count: 0, loading: false, zoom: 12 });
 
   useEffect(() => {
     setMapLoading(true);
@@ -839,28 +994,78 @@ function MapTab({ mapHeight = "calc(100vh - 230px)" }) {
       .finally(() => setMapLoading(false));
   }, []);
 
+  const parcelStatusCb = useCallback((s) => setParcelStatus(s), []);
+
   return (
     <div>
-      {/* Legend + count */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-        <span style={{ fontSize: 13, color: C.textSub }}>
-          {mapLoading
-            ? <span style={{ color: C.textMuted }}>Loading points…</span>
-            : <><strong style={{ color: C.text }}>{points.length}</strong> projects plotted</>
-          }
-        </span>
-        <div style={{ display: "flex", gap: 16, fontSize: 11, color: C.textSub }}>
-          {[
-            { label: "90%+", color: C.orange },
-            { label: "75%+", color: C.blue },
-            { label: "60%+", color: C.sky },
-            { label: "<60%", color: C.textMuted },
-          ].map(({ label, color }) => (
-            <span key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: color }} />
-              {label}
+      {/* Toolbar */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+        {/* Left: counts */}
+        <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 13, color: C.textSub }}>
+          <span>
+            {mapLoading
+              ? <span style={{ color: C.textMuted }}>Loading…</span>
+              : <><strong style={{ color: C.text }}>{points.length}</strong> projects</>
+            }
+          </span>
+          {showParcels && (
+            <span style={{ fontSize: 12, color: C.textSub }}>
+              {parcelStatus.loading
+                ? "⌛ Loading parcels…"
+                : parcelStatus.zoom < 14
+                  ? <span style={{ color: C.textMuted }}>🔍 Zoom in (level 14+) for parcels</span>
+                  : <><strong style={{ color: C.text }}>{parcelStatus.count}</strong> parcels in view</>
+              }
             </span>
-          ))}
+          )}
+        </div>
+
+        {/* Right: toggle + legend */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button
+            onClick={() => setShowParcels((v) => !v)}
+            style={{
+              padding: "5px 12px",
+              background: showParcels ? `${C.orange}20` : "transparent",
+              border: `1px solid ${showParcels ? C.orange : C.border}`,
+              borderRadius: 6,
+              color: showParcels ? C.orange : C.textSub,
+              fontSize: 12, fontWeight: 600, cursor: "pointer",
+              fontFamily: "'DM Sans', sans-serif",
+              transition: "all 0.15s",
+            }}
+          >
+            🏘️ Parcels {showParcels ? "on" : "off"}
+          </button>
+
+          {showParcels ? (
+            <div style={{ display: "flex", gap: 10, fontSize: 11, color: C.textSub }}>
+              {[
+                { label: "Vacant / Underbuilt", color: "#f0a030", shape: "square" },
+                { label: "Mixed",               color: "#7ec8e3", shape: "square" },
+                { label: "Developed",           color: "#2d6a9f", shape: "square" },
+              ].map(({ label, color, shape }) => (
+                <span key={label} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: shape === "square" ? 2 : "50%", background: color }} />
+                  {label}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: 14, fontSize: 11, color: C.textSub }}>
+              {[
+                { label: "90%+", color: C.orange },
+                { label: "75%+", color: C.blue },
+                { label: "60%+", color: C.sky },
+                { label: "<60%", color: C.textMuted },
+              ].map(({ label, color }) => (
+                <span key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                  <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: color }} />
+                  {label}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -876,6 +1081,9 @@ function MapTab({ mapHeight = "calc(100vh - 230px)" }) {
             attribution='&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
             maxZoom={19}
           />
+          {/* Parcel heat map layer (rendered below project dots) */}
+          <ParcelLayer show={showParcels} onStatus={parcelStatusCb} />
+          {/* Project dots on top */}
           {points.map((p) => (
             <CircleMarker
               key={p.id}
