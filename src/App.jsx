@@ -65,8 +65,8 @@ function parcelOppScore(props) {
 function parcelColor(score) {
   if (score >= 80) return "#f0a030";  // orange — vacant/underbuilt
   if (score >= 55) return "#7ec8e3";  // sky   — mixed
-  if (score >= 30) return "#2d6a9f";  // blue  — moderate build
-  return "#1a2f50";                   // dark  — fully developed
+  if (score >= 30) return "#4a90d9";  // blue  — moderate build
+  return "#3a5f85";                   // slate — fully developed (visible on dark map)
 }
 
 const catIcons = {
@@ -852,9 +852,9 @@ function ParcelLayer({ show, onStatus }) {
 
   const doFetch = useCallback(() => {
     const zoom = map.getZoom();
-    if (zoom < 14) {
+    if (zoom < 12) {
       setData(null);
-      onStatus?.({ zoom, count: 0, loading: false });
+      onStatus?.({ zoom, count: 0, loading: false, error: null });
       return;
     }
 
@@ -872,22 +872,33 @@ function ParcelLayer({ show, onStatus }) {
     });
 
     const token = localStorage.getItem("sitescan_token");
-    onStatus?.({ zoom, count: 0, loading: true });
+    onStatus?.({ zoom, count: 0, loading: true, error: null });
 
     fetch(`${API}/projects/map/parcels?${params}`, {
       signal: ctrl.signal,
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((d) => {
         if (!ctrl.signal.aborted) {
+          if (!d.features) {
+            console.error("[Parcels] Unexpected response — no features array:", d);
+            onStatus?.({ zoom, count: 0, loading: false, error: "Bad response from parcels API" });
+            return;
+          }
           setData(d);
           setFetchKey((n) => n + 1);
-          onStatus?.({ zoom, count: d.features?.length ?? 0, loading: false });
+          onStatus?.({ zoom, count: d.features.length, loading: false, error: null });
         }
       })
       .catch((e) => {
-        if (e.name !== "AbortError") onStatus?.({ zoom, count: 0, loading: false });
+        if (e.name !== "AbortError") {
+          console.error("[Parcels] Fetch failed:", e);
+          onStatus?.({ zoom, count: 0, loading: false, error: e.message });
+        }
       });
   }, [map, onStatus]);
 
@@ -920,12 +931,13 @@ function ParcelLayer({ show, onStatus }) {
       data={data}
       style={(feat) => {
         const score = parcelOppScore(feat.properties);
+        const c = parcelColor(score);
         return {
-          fillColor: parcelColor(score),
-          fillOpacity: 0.45,
-          color: parcelColor(score),
-          weight: 0.5,
-          opacity: 0.85,
+          fillColor: c,
+          fillOpacity: 0.55,
+          color: "#ffffff",   // white stroke so parcel borders are always visible
+          weight: 0.8,
+          opacity: 0.5,
         };
       }}
       onEachFeature={(feat, layer) => {
@@ -1002,9 +1014,11 @@ function MapTab({ mapHeight = "calc(100vh - 230px)" }) {
             <span style={{ fontSize: 12, color: C.textSub }}>
               {parcelStatus.loading
                 ? "⌛ Loading parcels…"
-                : parcelStatus.zoom < 14
-                  ? <span style={{ color: C.textMuted }}>🔍 Zoom in (level 14+) for parcels</span>
-                  : <><strong style={{ color: C.text }}>{parcelStatus.count}</strong> parcels in view</>
+                : parcelStatus.error
+                  ? <span style={{ color: "#ef4444" }}>⚠ Parcel error: {parcelStatus.error}</span>
+                  : parcelStatus.zoom < 12
+                    ? <span style={{ color: C.textMuted }}>🔍 Zoom in for parcels</span>
+                    : <><strong style={{ color: C.text }}>{parcelStatus.count}</strong> parcels in view</>
               }
             </span>
           )}
