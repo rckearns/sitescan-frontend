@@ -953,6 +953,281 @@ function SavedTab({ saved, onUnsave }) {
   );
 }
 
+// ─── CONTRACTORS TAB ────────────────────────────────────────────────────────
+
+const BLANK_FORM = { name: "", specialty: "", phone: "", email: "", website: "", notes: "" };
+
+function ContractorCard({ c, onEdit, onDelete }) {
+  return (
+    <div style={{
+      background: C.surface,
+      border: `1px solid ${C.border}`,
+      borderRadius: 10,
+      padding: "14px 18px",
+      display: "flex",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 12,
+    }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, color: C.text, marginBottom: 3 }}>{c.name}</div>
+        {c.specialty && (
+          <div style={{ fontSize: 11, color: C.blue, fontWeight: 600, marginBottom: 4 }}>
+            {c.specialty}
+          </div>
+        )}
+        <div style={{ fontSize: 12, color: C.textSub, display: "flex", flexWrap: "wrap", gap: "4px 16px" }}>
+          {c.phone && <span>📞 {c.phone}</span>}
+          {c.email && <span>✉ {c.email}</span>}
+          {c.website && (
+            <a href={c.website.startsWith("http") ? c.website : `https://${c.website}`}
+              target="_blank" rel="noopener"
+              style={{ color: C.sky, textDecoration: "none" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              🌐 {c.website.replace(/^https?:\/\//, "")}
+            </a>
+          )}
+        </div>
+        {c.notes && (
+          <div style={{ fontSize: 12, color: C.textMuted, marginTop: 6, fontStyle: "italic" }}>
+            {c.notes}
+          </div>
+        )}
+      </div>
+      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+        <button onClick={() => onEdit(c)} style={{
+          padding: "4px 10px", background: "transparent",
+          border: `1px solid ${C.border}`, borderRadius: 6,
+          color: C.textSub, fontSize: 11, cursor: "pointer",
+          fontFamily: "'DM Sans', sans-serif",
+        }}>Edit</button>
+        <button onClick={() => onDelete(c.id)} style={{
+          padding: "4px 10px", background: "transparent",
+          border: `1px solid #dc262640`, borderRadius: 6,
+          color: "#f87171", fontSize: 11, cursor: "pointer",
+          fontFamily: "'DM Sans', sans-serif",
+        }}>✕</button>
+      </div>
+    </div>
+  );
+}
+
+function ContractorForm({ initial, type, onSave, onCancel }) {
+  const [form, setForm] = useState(initial || BLANK_FORM);
+  const [saving, setSaving] = useState(false);
+
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const submit = async () => {
+    if (!form.name.trim()) return;
+    setSaving(true);
+    await onSave({ ...form, type });
+    setSaving(false);
+  };
+
+  const inputStyle = {
+    width: "100%", padding: "9px 12px",
+    background: C.bg, border: `1px solid ${C.border}`,
+    borderRadius: 7, color: C.text, fontSize: 13,
+    outline: "none", fontFamily: "'DM Sans', sans-serif",
+    marginBottom: 8,
+  };
+
+  return (
+    <div style={{
+      background: C.surfaceHi, border: `1px solid ${C.borderHi}`,
+      borderRadius: 10, padding: "16px 18px", marginBottom: 10,
+    }}>
+      <input style={inputStyle} placeholder="Name *" value={form.name} onChange={(e) => set("name", e.target.value)} />
+      <input style={inputStyle} placeholder="Specialty / trade (e.g. masonry, MEP, roofing)" value={form.specialty} onChange={(e) => set("specialty", e.target.value)} />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <input style={{ ...inputStyle, marginBottom: 0 }} placeholder="Phone" value={form.phone} onChange={(e) => set("phone", e.target.value)} />
+        <input style={{ ...inputStyle, marginBottom: 0 }} placeholder="Email" value={form.email} onChange={(e) => set("email", e.target.value)} />
+      </div>
+      <input style={{ ...inputStyle, marginTop: 8 }} placeholder="Website" value={form.website} onChange={(e) => set("website", e.target.value)} />
+      <textarea
+        style={{ ...inputStyle, resize: "vertical", minHeight: 56 }}
+        placeholder="Notes"
+        value={form.notes}
+        onChange={(e) => set("notes", e.target.value)}
+      />
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onClick={submit}
+          disabled={saving || !form.name.trim()}
+          style={{
+            padding: "8px 18px", background: `linear-gradient(135deg, ${C.orange}, ${C.orangeHi})`,
+            border: "none", borderRadius: 7, color: "#fff",
+            fontSize: 13, fontWeight: 700, cursor: "pointer",
+            fontFamily: "'DM Sans', sans-serif", opacity: form.name.trim() ? 1 : 0.5,
+          }}
+        >
+          {saving ? "Saving…" : initial ? "Save Changes" : "Add"}
+        </button>
+        <button onClick={onCancel} style={{
+          padding: "8px 14px", background: "transparent",
+          border: `1px solid ${C.border}`, borderRadius: 7,
+          color: C.textSub, fontSize: 13, cursor: "pointer",
+          fontFamily: "'DM Sans', sans-serif",
+        }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function ContractorSection({ type, label, contractors, onAdd, onEdit, onDelete }) {
+  const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const list = contractors.filter((c) => c.type === type);
+
+  const handleAdd = async (data) => {
+    await onAdd(data);
+    setAdding(false);
+  };
+
+  const handleEdit = async (data) => {
+    await onEdit(editingId, data);
+    setEditingId(null);
+  };
+
+  return (
+    <div style={{ flex: 1, minWidth: 300 }}>
+      {/* Section header */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        marginBottom: 12,
+      }}>
+        <div>
+          <span style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{label}</span>
+          <span style={{
+            marginLeft: 10, fontSize: 11, fontWeight: 700, color: C.blue,
+            background: `${C.blue}18`, border: `1px solid ${C.blue}30`,
+            borderRadius: 10, padding: "2px 8px",
+          }}>
+            {list.length}
+          </span>
+        </div>
+        <button
+          onClick={() => { setAdding(true); setEditingId(null); }}
+          style={{
+            padding: "6px 14px",
+            background: `${C.orange}18`, border: `1px solid ${C.orange}40`,
+            borderRadius: 7, color: C.orange, fontSize: 12,
+            fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+          }}
+        >
+          + Add
+        </button>
+      </div>
+
+      {/* Add form */}
+      {adding && (
+        <ContractorForm
+          type={type}
+          onSave={handleAdd}
+          onCancel={() => setAdding(false)}
+        />
+      )}
+
+      {/* List */}
+      {list.length === 0 && !adding ? (
+        <div style={{
+          textAlign: "center", padding: "32px 20px",
+          color: C.textMuted, fontSize: 13,
+          border: `1px dashed ${C.border}`, borderRadius: 10,
+        }}>
+          No {label.toLowerCase()} yet. Click + Add to get started.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {list.map((c) => (
+            editingId === c.id ? (
+              <ContractorForm
+                key={c.id}
+                initial={c}
+                type={type}
+                onSave={handleEdit}
+                onCancel={() => setEditingId(null)}
+              />
+            ) : (
+              <ContractorCard
+                key={c.id}
+                c={c}
+                onEdit={(c) => { setEditingId(c.id); setAdding(false); }}
+                onDelete={onDelete}
+              />
+            )
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ContractorsTab() {
+  const [contractors, setContractors] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const data = await api("/contractors");
+      setContractors(Array.isArray(data) ? data : []);
+    } catch (e) { /* ignore */ }
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleAdd = async (data) => {
+    const created = await api("/contractors", { method: "POST", body: JSON.stringify(data) });
+    setContractors((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+  };
+
+  const handleEdit = async (id, data) => {
+    const updated = await api(`/contractors/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+    setContractors((prev) => prev.map((c) => (c.id === id ? updated : c)));
+  };
+
+  const handleDelete = async (id) => {
+    await api(`/contractors/${id}`, { method: "DELETE" });
+    setContractors((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  if (loading) {
+    return <div style={{ textAlign: "center", padding: 60, color: C.textMuted }}>Loading…</div>;
+  }
+
+  return (
+    <div>
+      <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 6 }}>Contractors</h2>
+      <p style={{ color: C.textSub, fontSize: 13, marginBottom: 28 }}>
+        Track general contractors and subcontractors you work with or want to pursue.
+      </p>
+      <div style={{ display: "flex", gap: 28, alignItems: "flex-start", flexWrap: "wrap" }}>
+        <ContractorSection
+          type="gc"
+          label="General Contractors"
+          contractors={contractors}
+          onAdd={handleAdd}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
+        <ContractorSection
+          type="sub"
+          label="Subcontractors"
+          contractors={contractors}
+          onAdd={handleAdd}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
+      </div>
+    </div>
+  );
+}
+
+
 // ─── SCAN HISTORY TAB ───────────────────────────────────────────────────────
 
 function HistoryTab({ history }) {
@@ -1475,6 +1750,7 @@ export default function SiteScanApp() {
               { id: "scanner",      label: "Scanner",                    icon: "⚡" },
               { id: "map",          label: "Map",                        icon: "🗺️" },
               { id: "saved",        label: `Saved (${saved.length})`,    icon: "★" },
+              { id: "contractors",  label: "Contractors",                icon: "🤝" },
               { id: "history",      label: "History",                    icon: "📊" },
               { id: "profile",      label: "Match Filter",               icon: "⚙" },
             ].map((t) => (
@@ -1535,6 +1811,7 @@ export default function SiteScanApp() {
           </>
         )}
         {tab === "saved" && <SavedTab saved={saved} onUnsave={unsaveProject} />}
+        {tab === "contractors" && <ContractorsTab />}
         {tab === "history" && <HistoryTab history={history} />}
         {tab === "profile" && (
           <ProfileTab
