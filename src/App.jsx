@@ -346,7 +346,14 @@ function ProjectRow({ project, onSave, saved, inGroup = false, isLast = false })
             {p.title}
           </div>
           <div style={styles.projectMeta}>
-            {locationLine && <span style={{ color: C.textSub }}>{locationLine}</span>}
+            <span style={{
+              fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 3,
+              background: `${C.blue}18`, color: C.blue, textTransform: "capitalize",
+              letterSpacing: "0.03em", flexShrink: 0,
+            }}>
+              {p.category.replace(/-/g, " ")}
+            </span>
+            {locationLine && <span style={{ marginLeft: 10, color: C.textSub }}>{locationLine}</span>}
             {p.agency && <span style={{ marginLeft: locationLine ? 12 : 0 }}>🏢 {p.agency}</span>}
             {p.contractor && <span style={{ marginLeft: 12, color: C.textMuted }}>👷 {p.contractor}</span>}
             <span style={{ marginLeft: 12 }}>
