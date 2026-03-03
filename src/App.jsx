@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { MapContainer, TileLayer, CircleMarker, Popup, GeoJSON, useMap, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -946,6 +946,41 @@ function SavedTab({ saved, onUnsave }) {
 
 // ─── PERMIT CONTRACTOR DATA ──────────────────────────────────────────────────
 
+const TRADE_RULES = [
+  { trade: "Roofing",           keywords: ["roof", "roofing"] },
+  { trade: "Masonry & Concrete", keywords: ["mason", "masonry", "brick", "stone", "concrete", "cement", "tuckpoint"] },
+  { trade: "Structural Steel",  keywords: ["steel", "ironwork", "iron work"] },
+  { trade: "Electrical",        keywords: ["electric", "electrical"] },
+  { trade: "Plumbing",          keywords: ["plumb", "plumbing"] },
+  { trade: "HVAC / Mechanical", keywords: ["hvac", "mechanical", "heating", "cooling", "air condition"] },
+  { trade: "Sitework",          keywords: ["excavat", "grading", "earthwork", "sitework", "paving", "asphalt"] },
+  { trade: "Windows & Glazing", keywords: ["window", "glass", "glazing", "curtain wall", "storefront"] },
+  { trade: "Painting",          keywords: ["paint", "painting", "coating", "stucco"] },
+  { trade: "Demolition",        keywords: ["demo", "demolition"] },
+];
+
+const TRADE_ICONS = {
+  "Roofing": "🏠",
+  "Masonry & Concrete": "🧱",
+  "Structural Steel": "⚙️",
+  "Electrical": "⚡",
+  "Plumbing": "🔧",
+  "HVAC / Mechanical": "💨",
+  "Sitework": "🚜",
+  "Windows & Glazing": "🪟",
+  "Painting": "🎨",
+  "Demolition": "💥",
+  "General Contractor": "🏗️",
+};
+
+function inferContractorTrade(name) {
+  const lower = name.toLowerCase();
+  for (const { trade, keywords } of TRADE_RULES) {
+    if (keywords.some((k) => lower.includes(k))) return trade;
+  }
+  return "General Contractor";
+}
+
 function PermitContractorCard({ sub }) {
   const [open, setOpen] = useState(false);
   return (
@@ -1011,26 +1046,36 @@ function PermitContractorCard({ sub }) {
 function PermitContractorsSection() {
   const [view, setView] = useState("by-trade");
   const [allData, setAllData] = useState(null);
-  const [tradeData, setTradeData] = useState(null);
-  const [loadingAll, setLoadingAll] = useState(false);
-  const [loadingTrade, setLoadingTrade] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (view === "all" && !allData && !loadingAll) {
-      setLoadingAll(true);
+    if (!allData && !loading) {
+      setLoading(true);
       api("/projects/subcontractors?source=charleston-permits")
         .then((d) => setAllData(d))
         .catch(() => {})
-        .finally(() => setLoadingAll(false));
+        .finally(() => setLoading(false));
     }
-    if (view === "by-trade" && !tradeData && !loadingTrade) {
-      setLoadingTrade(true);
-      api("/projects/subcontractors/by-trade")
-        .then((d) => setTradeData(d))
-        .catch(() => {})
-        .finally(() => setLoadingTrade(false));
+  }, []);
+
+  // Group contractors by inferred trade (client-side, no extra API call)
+  const tradeGroups = useMemo(() => {
+    if (!allData) return null;
+    const groups = {};
+    for (const sub of allData.subcontractors) {
+      const trade = inferContractorTrade(sub.name);
+      if (!groups[trade]) groups[trade] = [];
+      groups[trade].push(sub);
     }
-  }, [view]);
+    // Sort alphabetically, "General Contractor" last
+    return Object.fromEntries(
+      Object.entries(groups).sort(([a], [b]) => {
+        if (a === "General Contractor") return 1;
+        if (b === "General Contractor") return -1;
+        return a.localeCompare(b);
+      })
+    );
+  }, [allData]);
 
   const btnStyle = (active) => ({
     padding: "5px 12px",
@@ -1043,8 +1088,6 @@ function PermitContractorsSection() {
     cursor: "pointer",
     fontFamily: "'DM Sans', sans-serif",
   });
-
-  const loading = view === "all" ? loadingAll : loadingTrade;
 
   const emptyState = (
     <div style={{ textAlign: "center", padding: 32, color: C.textMuted, border: `1px dashed ${C.border}`, borderRadius: 10, fontSize: 13 }}>
@@ -1081,15 +1124,15 @@ function PermitContractorsSection() {
         )
       )}
 
-      {!loading && view === "by-trade" && tradeData && (
-        Object.keys(tradeData.trades).length === 0 ? emptyState : (
+      {!loading && view === "by-trade" && tradeGroups && (
+        Object.keys(tradeGroups).length === 0 ? emptyState : (
           <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-            {Object.entries(tradeData.trades).map(([trade, subs]) => (
+            {Object.entries(tradeGroups).map(([trade, subs]) => (
               <div key={trade}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                  <span style={{ fontSize: 16 }}>{catIcons[trade] || "📋"}</span>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: C.text, textTransform: "capitalize" }}>
-                    {trade.replace(/-/g, " ")}
+                  <span style={{ fontSize: 16 }}>{TRADE_ICONS[trade] || "📋"}</span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
+                    {trade}
                   </span>
                   <span style={{
                     fontSize: 11, fontWeight: 700, color: C.blue,
