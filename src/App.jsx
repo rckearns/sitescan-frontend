@@ -748,6 +748,23 @@ function ProfileTab({ onCriteriaChange, lastScanAt, onScan }) {
                   {" "}<span style={{ color: connResult.scbo.via_zenrows ? "#4c4" : "#e44" }}>(via: {connResult.scbo.via_zenrows ? "ZenRows ✓" : "direct — no key!"})</span>
                 </div>
               )}
+              {connResult.arcgis && (
+                <div style={{ marginBottom: 6 }}>
+                  <span style={{ color: connResult.arcgis.error || connResult.arcgis.layer20_error ? "#e44" : "#4c4" }}>
+                    {connResult.arcgis.error || connResult.arcgis.layer20_error ? "✗" : "✓"} ArcGIS
+                  </span>
+                  {connResult.arcgis.error
+                    ? <span style={{ color: "#e44" }}> Error: {connResult.arcgis.error}</span>
+                    : <span>
+                        {" "}L20: {connResult.arcgis.layer20_features ?? "?"} feats
+                        {connResult.arcgis.layer20_error && <span style={{ color: "#e44" }}> ({JSON.stringify(connResult.arcgis.layer20_error)})</span>}
+                        {" "}| L21: {connResult.arcgis.layer21_features ?? "?"} feats
+                        {connResult.arcgis.layer21_error && <span style={{ color: "#e44" }}> ({JSON.stringify(connResult.arcgis.layer21_error)})</span>}
+                        {connResult.arcgis.layer21_sample_statuses?.length > 0 && <span style={{ color: C.textMuted }}> [{connResult.arcgis.layer21_sample_statuses.join(", ")}]</span>}
+                      </span>
+                  }
+                </div>
+              )}
               {connResult.energov && (
                 <div>
                   <span style={{ color: connResult.energov.contractors?.length > 0 ? "#4c4" : "#e44" }}>
