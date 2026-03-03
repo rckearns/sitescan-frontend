@@ -572,6 +572,8 @@ function ProfileTab({ onCriteriaChange, lastScanAt, onScan }) {
   const [savedMsg, setSavedMsg] = useState("");
   const [scanning, setScanning] = useState(false);
   const [scanMsg, setScanMsg] = useState("");
+  const [connTesting, setConnTesting] = useState(false);
+  const [connResult, setConnResult] = useState(null);
 
   useEffect(() => {
     api("/auth/me").then((data) => {
@@ -615,6 +617,18 @@ function ProfileTab({ onCriteriaChange, lastScanAt, onScan }) {
     }
     setScanning(false);
     setTimeout(() => setScanMsg(""), 6000);
+  };
+
+  const doConnTest = async () => {
+    setConnTesting(true);
+    setConnResult(null);
+    try {
+      const data = await api("/scan/connectivity");
+      setConnResult(data);
+    } catch (e) {
+      setConnResult({ error: e.message });
+    }
+    setConnTesting(false);
   };
 
   const chipStyle = (active, color) => ({
@@ -701,10 +715,48 @@ function ProfileTab({ onCriteriaChange, lastScanAt, onScan }) {
         Scans run automatically every 24 hours.
         {lastScanAt && <span> Last scan: <strong style={{ color: C.text }}>{fmtDate(lastScanAt)}</strong></span>}
       </p>
-      <button onClick={doScan} disabled={scanning} style={{ ...styles.authBtn, background: C.navy, maxWidth: 180 }}>
-        {scanning ? "Scanning..." : "⚡ Run Scan Now"}
-      </button>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <button onClick={doScan} disabled={scanning} style={{ ...styles.authBtn, background: C.navy, maxWidth: 180 }}>
+          {scanning ? "Scanning..." : "⚡ Run Scan Now"}
+        </button>
+        <button onClick={doConnTest} disabled={connTesting} style={{ ...styles.authBtn, background: "transparent", border: `1px solid ${C.border}`, color: C.textSub, maxWidth: 180 }}>
+          {connTesting ? "Testing..." : "Test Connectivity"}
+        </button>
+      </div>
       {scanMsg && <div style={{ color: C.orange, fontSize: 12, marginTop: 12 }}>{scanMsg}</div>}
+      {connResult && (
+        <div style={{ marginTop: 16, padding: 14, background: C.surface, borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 12, fontFamily: "monospace" }}>
+          {connResult.error ? (
+            <div style={{ color: "#e05" }}>Error: {connResult.error}</div>
+          ) : (
+            <>
+              <div style={{ marginBottom: 8, color: C.textSub, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: 1 }}>Connectivity Test</div>
+              {connResult.scbo && (
+                <div style={{ marginBottom: 10 }}>
+                  <span style={{ color: connResult.scbo.has_project_markers ? "#4c4" : "#e44" }}>
+                    {connResult.scbo.has_project_markers ? "✓" : "✗"} SCBO
+                  </span>
+                  {" — "}{connResult.scbo.response_bytes?.toLocaleString()} bytes
+                  {connResult.scbo.project_count != null && `, ${connResult.scbo.project_count} projects`}
+                  {connResult.scbo.error && <span style={{ color: "#e44" }}> Error: {connResult.scbo.error}</span>}
+                  {" "}<span style={{ color: C.textMuted }}>(curl_cffi: {String(connResult.scbo.curl_cffi_available)})</span>
+                </div>
+              )}
+              {connResult.energov && (
+                <div>
+                  <span style={{ color: connResult.energov.contractors?.length > 0 ? "#4c4" : "#e44" }}>
+                    {connResult.energov.contractors?.length > 0 ? "✓" : "✗"} EnerGov
+                  </span>
+                  {connResult.energov.error
+                    ? <span style={{ color: "#e44" }}> Error: {connResult.energov.error}</span>
+                    : <span> — {connResult.energov.contacts_found} contacts, contractors: [{connResult.energov.contractors?.join(", ") || "none"}]</span>
+                  }
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
