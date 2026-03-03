@@ -78,13 +78,32 @@ function isSubpermit(project) {
 
 function getWorkClass(project) {
   if (project.source_id !== "charleston-permits") return null;
-  // New description format: "description | work_class | permit_type"
-  const parts = project.description.split(" | ");
+  // Description format: "description | work_class | permit_type"
+  const parts = (project.description || "").split(" | ");
   if (parts.length >= 2) {
     const wc = parts[1].trim();
     if (wc) return wc;
   }
   return null;
+}
+
+function getDisplayTitle(project) {
+  if (project.source_id !== "charleston-permits") return project.title;
+  const wc = getWorkClass(project);
+  const cat = project.category;
+  if (!cat || cat === "residential") return project.title;
+  const catLabel = cat.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return wc ? `${catLabel} — ${wc}` : catLabel;
+}
+
+function getDescSnippet(project) {
+  if (!project.description) return null;
+  let text = project.description;
+  if (project.source_id === "charleston-permits") {
+    text = project.description.split(" | ")[0].trim();
+  }
+  if (!text || text.length < 5) return null;
+  return text.length > 120 ? text.slice(0, 117) + "…" : text;
 }
 
 function groupByAddress(projects) {
@@ -336,7 +355,8 @@ function StatusPill({ status }) {
 function ProjectRow({ project, onSave, saved, inGroup = false, isLast = false, isSubRow = false }) {
   const [expanded, setExpanded] = useState(false);
   const p = project;
-  const workClass = getWorkClass(p);
+  const displayTitle = getDisplayTitle(p);
+  const descSnippet = getDescSnippet(p);
 
   const addr = cleanAddress(p.address);
   const hood = getNeighborhood(p.latitude, p.longitude);
@@ -363,29 +383,18 @@ function ProjectRow({ project, onSave, saved, inGroup = false, isLast = false, i
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={styles.projectTitle}>
             <span style={{ marginRight: 8 }}>{catIcons[p.category] || "📋"}</span>
-            {p.title}
+            {displayTitle}
           </div>
+          {descSnippet && (
+            <div style={{ fontSize: 12, color: C.textMuted, marginTop: 3, paddingLeft: 26, lineHeight: 1.4 }}>
+              {descSnippet}
+            </div>
+          )}
           <div style={styles.projectMeta}>
-            <span style={{
-              fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 3,
-              background: `${C.blue}18`, color: C.blue, textTransform: "capitalize",
-              letterSpacing: "0.03em", flexShrink: 0,
-            }}>
-              {p.category.replace(/-/g, " ")}
-            </span>
-            {workClass && (
-              <span style={{
-                marginLeft: 5, fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 3,
-                background: "#ffffff0a", color: C.textMuted, textTransform: "capitalize",
-                letterSpacing: "0.03em", flexShrink: 0,
-              }}>
-                {workClass}
-              </span>
-            )}
-            {locationLine && <span style={{ marginLeft: 10, color: C.textSub }}>{locationLine}</span>}
+            {locationLine && <span style={{ color: C.textSub }}>{locationLine}</span>}
             {p.agency && <span style={{ marginLeft: locationLine ? 12 : 0 }}>🏢 {p.agency}</span>}
-            {p.contractor && <span style={{ marginLeft: 12, color: C.textMuted }}>👷 {p.contractor}</span>}
-            <span style={{ marginLeft: 12 }}>
+            {p.contractor && <span style={{ marginLeft: locationLine ? 12 : 0, color: C.textMuted }}>👷 {p.contractor}</span>}
+            <span style={{ marginLeft: 8 }}>
               <span style={{ fontSize: 9, padding: "1px 6px", background: "#ffffff08", borderRadius: 3, color: "#888" }}>
                 {sourceLabels[p.source_id] || p.source_id}
               </span>
@@ -486,13 +495,8 @@ function ProjectRow({ project, onSave, saved, inGroup = false, isLast = false, i
 function AddressGroup({ group, onSave, savedIds, animDelay }) {
   const { displayAddress, lat, lng, projects } = group;
   const [open, setOpen] = useState(true);
-  const [subsOpen, setSubsOpen] = useState(false);
   const hood   = getNeighborhood(lat, lng);
-
-  // Separate main permits from sub-permits
-  const mainProjects = projects.filter((p) => !isSubpermit(p));
-  const subProjects  = projects.filter((p) =>  isSubpermit(p));
-  const displayProjects = mainProjects.length ? mainProjects : projects;
+  const displayProjects = projects;
 
   const total$ = projects.reduce((s, p) => s + (p.value || 0), 0);
   const topScore = Math.max(...projects.map((p) => p.match_score));
@@ -568,39 +572,9 @@ function AddressGroup({ group, onSave, savedIds, animDelay }) {
               onSave={onSave}
               saved={savedIds.has(p.id)}
               inGroup
-              isLast={i === displayProjects.length - 1 && subProjects.length === 0}
+              isLast={i === displayProjects.length - 1}
             />
           ))}
-          {subProjects.length > 0 && (
-            <>
-              <div
-                onClick={(e) => { e.stopPropagation(); setSubsOpen((v) => !v); }}
-                style={{
-                  padding: "7px 20px",
-                  background: "#ffffff05",
-                  borderTop: `1px solid ${C.border}`,
-                  display: "flex", alignItems: "center", gap: 8,
-                  cursor: "pointer",
-                }}
-              >
-                <span style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, letterSpacing: "0.05em" }}>
-                  SUB-PERMITS ({subProjects.length})
-                </span>
-                <span style={{ fontSize: 9, color: C.textMuted }}>{subsOpen ? "▲" : "▼"}</span>
-              </div>
-              {subsOpen && subProjects.map((p, i) => (
-                <ProjectRow
-                  key={p.id}
-                  project={p}
-                  onSave={onSave}
-                  saved={savedIds.has(p.id)}
-                  inGroup
-                  isSubRow
-                  isLast={i === subProjects.length - 1}
-                />
-              ))}
-            </>
-          )}
         </div>
       )}
     </div>
@@ -2056,7 +2030,7 @@ export default function SiteScanApp() {
               </div>
             ) : (
               <div>
-                {groupByAddress(projects).map((group, i) => (
+                {groupByAddress(projects.filter((p) => !isSubpermit(p))).map((group, i) => (
                   <AddressGroup
                     key={group.address ?? `noaddr-${i}`}
                     group={group}
