@@ -1058,7 +1058,6 @@ function PermitContractorCard({ sub }) {
 }
 
 function PermitContractorsSection() {
-  const [view, setView] = useState("by-trade");
   const [allData, setAllData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -1119,18 +1118,6 @@ function PermitContractorsSection() {
     );
   }, [filteredSubs, loading]);
 
-  const btnStyle = (active) => ({
-    padding: "5px 12px",
-    background: active ? `${C.blue}20` : "transparent",
-    border: `1px solid ${active ? C.blue : C.border}`,
-    borderRadius: 6,
-    color: active ? C.blue : C.textSub,
-    fontSize: 11,
-    fontWeight: 700,
-    cursor: "pointer",
-    fontFamily: "'DM Sans', sans-serif",
-  });
-
   const emptyState = (
     <div style={{ textAlign: "center", padding: 32, color: C.textMuted, border: `1px dashed ${C.border}`, borderRadius: 10, fontSize: 13 }}>
       No contractor data found in permit records.
@@ -1157,14 +1144,7 @@ function PermitContractorsSection() {
 
   return (
     <div>
-      <div style={{ fontSize: 20, fontWeight: 700, color: C.text, marginBottom: 4 }}>
-        Charleston Permit Contractors
-      </div>
-      <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 20 }}>
-        Contractors active on building permits · from ArcGIS permit records
-      </div>
-
-      {/* Search + sort + view toggle */}
+      {/* Search + sort */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 20 }}>
         <input
           placeholder="Search contractors…"
@@ -1177,10 +1157,6 @@ function PermitContractorsSection() {
           <option value="project_count">Sort: Project Count</option>
           <option value="name">Sort: Name A–Z</option>
         </select>
-        <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
-          <button style={btnStyle(view === "by-trade")} onClick={() => setView("by-trade")}>By Trade</button>
-          <button style={btnStyle(view === "all")} onClick={() => setView("all")}>All</button>
-        </div>
       </div>
 
       {loading && (
@@ -1195,15 +1171,7 @@ function PermitContractorsSection() {
         ) : emptyState
       )}
 
-      {!loading && view === "all" && filteredSubs.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {filteredSubs.map((sub) => (
-            <PermitContractorCard key={sub.name} sub={sub} />
-          ))}
-        </div>
-      )}
-
-      {!loading && view === "by-trade" && Object.keys(tradeGroups).length > 0 && (
+      {!loading && Object.keys(tradeGroups).length > 0 && (
         <div style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill, minmax(460px, 1fr))",
