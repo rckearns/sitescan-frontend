@@ -69,6 +69,24 @@ function cleanAddress(address) {
 // Group a sorted project list by normalised address.
 // Returns an array of { address, displayAddress, lat, lng, projects[] } objects.
 // Single-project "groups" are included — callers decide how to render them.
+// Charleston permit helpers
+function isSubpermit(project) {
+  if (project.source_id !== "charleston-permits") return false;
+  const text = `${project.title} ${project.description}`.toLowerCase();
+  return text.includes("subpermit") || text.includes("sub-permit") || text.includes("sub permit");
+}
+
+function getWorkClass(project) {
+  if (project.source_id !== "charleston-permits") return null;
+  // New description format: "description | work_class | permit_type"
+  const parts = project.description.split(" | ");
+  if (parts.length >= 2) {
+    const wc = parts[1].trim();
+    if (wc) return wc;
+  }
+  return null;
+}
+
 function groupByAddress(projects) {
   const order = [];
   const map = new Map();
@@ -315,9 +333,10 @@ function StatusPill({ status }) {
 
 // ─── PROJECT ROW ────────────────────────────────────────────────────────────
 
-function ProjectRow({ project, onSave, saved, inGroup = false, isLast = false }) {
+function ProjectRow({ project, onSave, saved, inGroup = false, isLast = false, isSubRow = false }) {
   const [expanded, setExpanded] = useState(false);
   const p = project;
+  const workClass = getWorkClass(p);
 
   const addr = cleanAddress(p.address);
   const hood = getNeighborhood(p.latitude, p.longitude);
@@ -328,12 +347,13 @@ function ProjectRow({ project, onSave, saved, inGroup = false, isLast = false })
 
   const rowStyle = inGroup
     ? {
-        background: C.surface,
-        borderLeft: `3px solid ${matchColor(p.match_score)}`,
+        background: isSubRow ? "#ffffff03" : C.surface,
+        borderLeft: `3px solid ${isSubRow ? C.border : matchColor(p.match_score)}`,
         borderBottom: isLast ? "none" : `1px solid ${C.border}`,
-        padding: "14px 20px",
+        padding: isSubRow ? "10px 20px 10px 28px" : "14px 20px",
         cursor: "pointer",
         transition: "background 0.15s",
+        opacity: isSubRow ? 0.75 : 1,
       }
     : { ...styles.projectRow, borderLeft: `3px solid ${matchColor(p.match_score)}` };
 
@@ -353,6 +373,15 @@ function ProjectRow({ project, onSave, saved, inGroup = false, isLast = false })
             }}>
               {p.category.replace(/-/g, " ")}
             </span>
+            {workClass && (
+              <span style={{
+                marginLeft: 5, fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 3,
+                background: "#ffffff0a", color: C.textMuted, textTransform: "capitalize",
+                letterSpacing: "0.03em", flexShrink: 0,
+              }}>
+                {workClass}
+              </span>
+            )}
             {locationLine && <span style={{ marginLeft: 10, color: C.textSub }}>{locationLine}</span>}
             {p.agency && <span style={{ marginLeft: locationLine ? 12 : 0 }}>🏢 {p.agency}</span>}
             {p.contractor && <span style={{ marginLeft: 12, color: C.textMuted }}>👷 {p.contractor}</span>}
@@ -457,7 +486,14 @@ function ProjectRow({ project, onSave, saved, inGroup = false, isLast = false })
 function AddressGroup({ group, onSave, savedIds, animDelay }) {
   const { displayAddress, lat, lng, projects } = group;
   const [open, setOpen] = useState(true);
+  const [subsOpen, setSubsOpen] = useState(false);
   const hood   = getNeighborhood(lat, lng);
+
+  // Separate main permits from sub-permits
+  const mainProjects = projects.filter((p) => !isSubpermit(p));
+  const subProjects  = projects.filter((p) =>  isSubpermit(p));
+  const displayProjects = mainProjects.length ? mainProjects : projects;
+
   const total$ = projects.reduce((s, p) => s + (p.value || 0), 0);
   const topScore = Math.max(...projects.map((p) => p.match_score));
 
@@ -525,16 +561,46 @@ function AddressGroup({ group, onSave, savedIds, animDelay }) {
           borderRadius: "0 0 10px 10px",
           overflow: "hidden",
         }}>
-          {projects.map((p, i) => (
+          {displayProjects.map((p, i) => (
             <ProjectRow
               key={p.id}
               project={p}
               onSave={onSave}
               saved={savedIds.has(p.id)}
               inGroup
-              isLast={i === projects.length - 1}
+              isLast={i === displayProjects.length - 1 && subProjects.length === 0}
             />
           ))}
+          {subProjects.length > 0 && (
+            <>
+              <div
+                onClick={(e) => { e.stopPropagation(); setSubsOpen((v) => !v); }}
+                style={{
+                  padding: "7px 20px",
+                  background: "#ffffff05",
+                  borderTop: `1px solid ${C.border}`,
+                  display: "flex", alignItems: "center", gap: 8,
+                  cursor: "pointer",
+                }}
+              >
+                <span style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, letterSpacing: "0.05em" }}>
+                  SUB-PERMITS ({subProjects.length})
+                </span>
+                <span style={{ fontSize: 9, color: C.textMuted }}>{subsOpen ? "▲" : "▼"}</span>
+              </div>
+              {subsOpen && subProjects.map((p, i) => (
+                <ProjectRow
+                  key={p.id}
+                  project={p}
+                  onSave={onSave}
+                  saved={savedIds.has(p.id)}
+                  inGroup
+                  isSubRow
+                  isLast={i === subProjects.length - 1}
+                />
+              ))}
+            </>
+          )}
         </div>
       )}
     </div>
