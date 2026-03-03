@@ -93,7 +93,7 @@ function getDisplayTitle(project) {
   const cat = project.category;
   if (!cat || cat === "residential") return project.title;
   const catLabel = cat.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  return wc ? `${catLabel} — ${wc}` : catLabel;
+  return wc ? `${catLabel} ${wc}` : catLabel;
 }
 
 function getDescSnippet(project) {
@@ -356,7 +356,7 @@ function ProjectRow({ project, onSave, saved, inGroup = false, isLast = false, i
   const [expanded, setExpanded] = useState(false);
   const p = project;
   const displayTitle = getDisplayTitle(p);
-  const descSnippet = getDescSnippet(p);
+  const workClass = getWorkClass(p);
 
   const addr = cleanAddress(p.address);
   const hood = getNeighborhood(p.latitude, p.longitude);
@@ -367,13 +367,12 @@ function ProjectRow({ project, onSave, saved, inGroup = false, isLast = false, i
 
   const rowStyle = inGroup
     ? {
-        background: isSubRow ? "#ffffff03" : C.surface,
-        borderLeft: `3px solid ${isSubRow ? C.border : matchColor(p.match_score)}`,
+        background: C.surface,
+        borderLeft: `3px solid ${matchColor(p.match_score)}`,
         borderBottom: isLast ? "none" : `1px solid ${C.border}`,
-        padding: isSubRow ? "10px 20px 10px 28px" : "14px 20px",
+        padding: "14px 20px",
         cursor: "pointer",
         transition: "background 0.15s",
-        opacity: isSubRow ? 0.75 : 1,
       }
     : { ...styles.projectRow, borderLeft: `3px solid ${matchColor(p.match_score)}` };
 
@@ -385,13 +384,26 @@ function ProjectRow({ project, onSave, saved, inGroup = false, isLast = false, i
             <span style={{ marginRight: 8 }}>{catIcons[p.category] || "📋"}</span>
             {displayTitle}
           </div>
-          {descSnippet && (
-            <div style={{ fontSize: 12, color: C.textMuted, marginTop: 3, paddingLeft: 26, lineHeight: 1.4 }}>
-              {descSnippet}
-            </div>
-          )}
           <div style={styles.projectMeta}>
-            {locationLine && <span style={{ color: C.textSub }}>{locationLine}</span>}
+            {p.category && (
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 3,
+                background: `${C.blue}18`, color: C.blue, textTransform: "capitalize",
+                letterSpacing: "0.03em", flexShrink: 0,
+              }}>
+                {p.category.replace(/-/g, " ")}
+              </span>
+            )}
+            {workClass && (
+              <span style={{
+                marginLeft: 5, fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 3,
+                background: "#ffffff0a", color: C.textMuted, textTransform: "capitalize",
+                letterSpacing: "0.03em", flexShrink: 0,
+              }}>
+                {workClass}
+              </span>
+            )}
+            {locationLine && <span style={{ marginLeft: 10, color: C.textSub }}>{locationLine}</span>}
             {p.agency && <span style={{ marginLeft: locationLine ? 12 : 0 }}>🏢 {p.agency}</span>}
             {p.contractor && <span style={{ marginLeft: locationLine ? 12 : 0, color: C.textMuted }}>👷 {p.contractor}</span>}
             <span style={{ marginLeft: 8 }}>
