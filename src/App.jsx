@@ -947,16 +947,30 @@ function SavedTab({ saved, onUnsave }) {
 // ─── PERMIT CONTRACTOR DATA ──────────────────────────────────────────────────
 
 const TRADE_RULES = [
-  { trade: "Roofing",           keywords: ["roof", "roofing"] },
-  { trade: "Masonry & Concrete", keywords: ["mason", "masonry", "brick", "stone", "concrete", "cement", "tuckpoint"] },
+  { trade: "Demolition",        keywords: ["demo", "demolition"] },
+  { trade: "Sitework",          keywords: ["excavat", "grading", "earthwork", "sitework", "paving", "asphalt"] },
   { trade: "Structural Steel",  keywords: ["steel", "ironwork", "iron work"] },
-  { trade: "Electrical",        keywords: ["electric", "electrical"] },
+  { trade: "Masonry & Concrete", keywords: ["mason", "masonry", "brick", "stone", "concrete", "cement", "tuckpoint"] },
+  { trade: "Roofing",           keywords: ["roof", "roofing"] },
+  { trade: "Windows & Glazing", keywords: ["window", "glass", "glazing", "curtain wall", "storefront"] },
   { trade: "Plumbing",          keywords: ["plumb", "plumbing"] },
   { trade: "HVAC / Mechanical", keywords: ["hvac", "mechanical", "heating", "cooling", "air condition"] },
-  { trade: "Sitework",          keywords: ["excavat", "grading", "earthwork", "sitework", "paving", "asphalt"] },
-  { trade: "Windows & Glazing", keywords: ["window", "glass", "glazing", "curtain wall", "storefront"] },
+  { trade: "Electrical",        keywords: ["electric", "electrical"] },
   { trade: "Painting",          keywords: ["paint", "painting", "coating", "stucco"] },
-  { trade: "Demolition",        keywords: ["demo", "demolition"] },
+];
+
+const TRADE_SEQUENCE = [
+  "General Contractor",
+  "Demolition",
+  "Sitework",
+  "Structural Steel",
+  "Masonry & Concrete",
+  "Roofing",
+  "Windows & Glazing",
+  "Plumbing",
+  "HVAC / Mechanical",
+  "Electrical",
+  "Painting",
 ];
 
 const TRADE_ICONS = {
@@ -1049,6 +1063,14 @@ function PermitContractorsSection() {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("total_scope_value");
+  const [collapsedTrades, setCollapsedTrades] = useState(new Set());
+
+  const toggleTrade = (trade) => setCollapsedTrades((prev) => {
+    const next = new Set(prev);
+    if (next.has(trade)) next.delete(trade);
+    else next.add(trade);
+    return next;
+  });
 
   useEffect(() => {
     if (!allData && !loading) {
@@ -1084,12 +1106,15 @@ function PermitContractorsSection() {
       if (!groups[trade]) groups[trade] = [];
       groups[trade].push(sub);
     }
-    // Sort trade names alphabetically, "General Contractor" last
+    // Sort by construction sequence; unknown trades go after the known list
     return Object.fromEntries(
       Object.entries(groups).sort(([a], [b]) => {
-        if (a === "General Contractor") return 1;
-        if (b === "General Contractor") return -1;
-        return a.localeCompare(b);
+        const ai = TRADE_SEQUENCE.indexOf(a);
+        const bi = TRADE_SEQUENCE.indexOf(b);
+        if (ai === -1 && bi === -1) return a.localeCompare(b);
+        if (ai === -1) return 1;
+        if (bi === -1) return -1;
+        return ai - bi;
       })
     );
   }, [filteredSubs, loading]);
@@ -1179,29 +1204,57 @@ function PermitContractorsSection() {
       )}
 
       {!loading && view === "by-trade" && Object.keys(tradeGroups).length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-          {Object.entries(tradeGroups).map(([trade, subs]) => (
-            <div key={trade}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                <span style={{ fontSize: 16 }}>{TRADE_ICONS[trade] || "📋"}</span>
-                <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
-                  {trade}
-                </span>
-                <span style={{
-                  fontSize: 11, fontWeight: 700, color: C.blue,
-                  background: `${C.blue}18`, border: `1px solid ${C.blue}30`,
-                  borderRadius: 10, padding: "2px 8px",
-                }}>
-                  {subs.length} contractor{subs.length !== 1 ? "s" : ""}
-                </span>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(460px, 1fr))",
+          gap: 24,
+          alignItems: "start",
+        }}>
+          {Object.entries(tradeGroups).map(([trade, subs]) => {
+            const isOpen = !collapsedTrades.has(trade);
+            return (
+              <div key={trade} style={{
+                background: C.surface,
+                border: `1px solid ${C.border}`,
+                borderRadius: 12,
+                overflow: "hidden",
+              }}>
+                <div
+                  onClick={() => toggleTrade(trade)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    padding: "12px 16px",
+                    cursor: "pointer",
+                    borderBottom: isOpen ? `1px solid ${C.border}` : "none",
+                    background: isOpen ? `${C.navy}40` : "transparent",
+                    userSelect: "none",
+                  }}
+                >
+                  <span style={{ fontSize: 16 }}>{TRADE_ICONS[trade] || "📋"}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: C.text, flex: 1 }}>
+                    {trade}
+                  </span>
+                  <span style={{
+                    fontSize: 11, fontWeight: 700, color: C.blue,
+                    background: `${C.blue}18`, border: `1px solid ${C.blue}30`,
+                    borderRadius: 10, padding: "2px 8px",
+                  }}>
+                    {subs.length}
+                  </span>
+                  <span style={{ color: C.textMuted, fontSize: 11, marginLeft: 4 }}>
+                    {isOpen ? "▲" : "▼"}
+                  </span>
+                </div>
+                {isOpen && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                    {subs.map((sub) => (
+                      <PermitContractorCard key={sub.name} sub={sub} />
+                    ))}
+                  </div>
+                )}
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {subs.map((sub) => (
-                  <PermitContractorCard key={sub.name} sub={sub} />
-                ))}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -1455,11 +1508,7 @@ function ContractorsTab() {
     return <div style={{ textAlign: "center", padding: 60, color: C.textMuted }}>Loading…</div>;
   }
 
-  return (
-    <div>
-      <PermitContractorsSection />
-    </div>
-  );
+  return <PermitContractorsSection />;
 }
 
 
