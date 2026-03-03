@@ -96,14 +96,30 @@ function getDisplayTitle(project) {
   return wc ? `${catLabel} ${wc}` : catLabel;
 }
 
-function getDescSnippet(project) {
+function getDescText(project) {
   if (!project.description) return null;
   let text = project.description;
   if (project.source_id === "charleston-permits") {
     text = project.description.split(" | ")[0].trim();
   }
-  if (!text || text.length < 5) return null;
-  return text.length > 120 ? text.slice(0, 117) + "…" : text;
+  return text && text.length > 4 ? text : null;
+}
+
+// Category priority for picking the most informative permit from a group
+const _CAT_PRIORITY = [
+  "office", "hotel", "multi-family", "restaurant", "industrial",
+  "institutional", "retail", "mixed-use", "commercial",
+  "structural", "masonry", "historic-restoration", "government",
+];
+
+function getPrimaryPermit(projects) {
+  const withValue = [...projects].sort((a, b) => (b.value || 0) - (a.value || 0));
+  if (withValue[0]?.value) return withValue[0];
+  return [...projects].sort((a, b) => {
+    const ai = _CAT_PRIORITY.indexOf(a.category);
+    const bi = _CAT_PRIORITY.indexOf(b.category);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  })[0];
 }
 
 function groupByAddress(projects) {
@@ -352,243 +368,144 @@ function StatusPill({ status }) {
 
 // ─── PROJECT ROW ────────────────────────────────────────────────────────────
 
-function ProjectRow({ project, onSave, saved, inGroup = false, isLast = false, isSubRow = false }) {
+// ─── PROJECT CARD ─────────────────────────────────────────────────────────────
+// One card per project (address group). Shows the most informative permit.
+
+function ProjectCard({ group, onSave, savedIds, animDelay }) {
+  const { lat, lng, projects } = group;
   const [expanded, setExpanded] = useState(false);
-  const p = project;
-  const displayTitle = getDisplayTitle(p);
-  const workClass = getWorkClass(p);
 
-  const addr = cleanAddress(p.address);
-  const hood = getNeighborhood(p.latitude, p.longitude);
-  // When inside a group the address is shown in the header — only show neighbourhood
-  const locationLine = inGroup
-    ? hood
-    : [addr, hood].filter(Boolean).join("  ·  ") || p.location || "—";
-
-  const rowStyle = inGroup
-    ? {
-        background: C.surface,
-        borderLeft: `3px solid ${matchColor(p.match_score)}`,
-        borderBottom: isLast ? "none" : `1px solid ${C.border}`,
-        padding: "14px 20px",
-        cursor: "pointer",
-        transition: "background 0.15s",
-      }
-    : { ...styles.projectRow, borderLeft: `3px solid ${matchColor(p.match_score)}` };
-
-  return (
-    <div style={rowStyle} onClick={() => setExpanded(!expanded)}>
-      <div style={styles.projectHeader}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={styles.projectTitle}>
-            <span style={{ marginRight: 8 }}>{catIcons[p.category] || "📋"}</span>
-            {displayTitle}
-          </div>
-          <div style={styles.projectMeta}>
-            {p.category && (
-              <span style={{
-                fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 3,
-                background: `${C.blue}18`, color: C.blue, textTransform: "capitalize",
-                letterSpacing: "0.03em", flexShrink: 0,
-              }}>
-                {p.category.replace(/-/g, " ")}
-              </span>
-            )}
-            {workClass && (
-              <span style={{
-                marginLeft: 5, fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 3,
-                background: "#ffffff0a", color: C.textMuted, textTransform: "capitalize",
-                letterSpacing: "0.03em", flexShrink: 0,
-              }}>
-                {workClass}
-              </span>
-            )}
-            {locationLine && <span style={{ marginLeft: 10, color: C.textSub }}>{locationLine}</span>}
-            {p.agency && <span style={{ marginLeft: locationLine ? 12 : 0 }}>🏢 {p.agency}</span>}
-            {p.contractor && <span style={{ marginLeft: locationLine ? 12 : 0, color: C.textMuted }}>👷 {p.contractor}</span>}
-            <span style={{ marginLeft: 8 }}>
-              <span style={{ fontSize: 9, padding: "1px 6px", background: "#ffffff08", borderRadius: 3, color: "#888" }}>
-                {sourceLabels[p.source_id] || p.source_id}
-              </span>
-            </span>
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-          <div style={{ width: 64, display: "flex", justifyContent: "center" }}>
-            <MatchBadge score={p.match_score} />
-          </div>
-          <div style={{ width: 80, textAlign: "right" }}>
-            <div style={{ color: C.orange, fontWeight: 700, fontSize: 14, fontFamily: "'JetBrains Mono', monospace" }}>
-              {fmt$(p.value)}
-            </div>
-          </div>
-          <div style={{ width: 110, display: "flex", justifyContent: "flex-end" }}>
-            <StatusPill status={p.status} />
-          </div>
-        </div>
-      </div>
-      {expanded && (
-        <div style={styles.projectExpanded}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
-            <div>
-              <div style={styles.detailLabel}>Category</div>
-              <div style={styles.detailValue}>{catIcons[p.category]} {p.category}</div>
-            </div>
-            <div>
-              <div style={styles.detailLabel}>Posted</div>
-              <div style={styles.detailValue}>{fmtDate(p.posted_date)}</div>
-            </div>
-            <div>
-              <div style={styles.detailLabel}>Deadline</div>
-              <div style={styles.detailValue}>{fmtDate(p.deadline)}</div>
-            </div>
-            {p.permit_number && (
-              <div>
-                <div style={styles.detailLabel}>Permit #</div>
-                <div style={styles.detailValue}>{p.permit_number}</div>
-              </div>
-            )}
-            {p.solicitation_number && (
-              <div>
-                <div style={styles.detailLabel}>Solicitation #</div>
-                <div style={styles.detailValue}>{p.solicitation_number}</div>
-              </div>
-            )}
-            {p.contractor && (
-              <div>
-                <div style={styles.detailLabel}>Contractor</div>
-                <div style={styles.detailValue}>{p.contractor}</div>
-              </div>
-            )}
-            {p.naics_code && (
-              <div>
-                <div style={styles.detailLabel}>NAICS</div>
-                <div style={styles.detailValue}>{p.naics_code}</div>
-              </div>
-            )}
-          </div>
-          {p.description && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={styles.detailLabel}>Description</div>
-              <div style={{ color: "#aaa", fontSize: 13, lineHeight: 1.5, maxHeight: 120, overflow: "auto" }}>
-                {p.description}
-              </div>
-            </div>
-          )}
-          <div style={{ display: "flex", gap: 8 }}>
-            {p.source_url && (
-              <a
-                href={p.source_url}
-                target="_blank"
-                rel="noopener"
-                style={styles.linkBtn}
-                onClick={(e) => e.stopPropagation()}
-              >
-                View Source →
-              </a>
-            )}
-            {!saved && (
-              <button
-                style={styles.saveBtn}
-                onClick={(e) => { e.stopPropagation(); onSave(p.id); }}
-              >
-                ★ Save
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── ADDRESS GROUP ───────────────────────────────────────────────────────────
-
-function AddressGroup({ group, onSave, savedIds, animDelay }) {
-  const { displayAddress, lat, lng, projects } = group;
-  const [open, setOpen] = useState(true);
-  const hood   = getNeighborhood(lat, lng);
-  const displayProjects = projects;
-
-  const total$ = projects.reduce((s, p) => s + (p.value || 0), 0);
+  const primary = getPrimaryPermit(projects);
+  const displayTitle = getDisplayTitle(primary);
+  const workClass = getWorkClass(primary);
+  const hood = getNeighborhood(lat, lng);
+  const maxValue = Math.max(...projects.map((p) => p.value || 0)) || null;
   const topScore = Math.max(...projects.map((p) => p.match_score));
+  const isSaved = savedIds.has(primary.id);
+  const descText = getDescText(primary);
 
-  if (projects.length === 1) {
-    // Single permit at this address — render a plain row (no group chrome)
-    return (
-      <div style={{ animation: `fadeIn 0.3s ease ${animDelay}s both` }}>
-        <ProjectRow
-          project={projects[0]}
-          onSave={onSave}
-          saved={savedIds.has(projects[0].id)}
-        />
-      </div>
-    );
-  }
+  // Location: neighborhood for CHS permits, else agency/location
+  const locationTag = primary.source_id === "charleston-permits"
+    ? hood
+    : primary.location || hood;
 
   return (
-    <div style={{ marginBottom: 8, animation: `fadeIn 0.3s ease ${animDelay}s both` }}>
-      {/* Address header */}
+    <div style={{ marginBottom: 6, animation: `fadeIn 0.3s ease ${animDelay}s both` }}>
       <div
-        onClick={() => setOpen((v) => !v)}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "10px 20px",
-          background: C.surfaceHi,
-          border: `1px solid ${C.borderHi}`,
-          borderRadius: open ? "10px 10px 0 0" : 10,
-          borderLeft: `3px solid ${matchColor(topScore)}`,
-          cursor: "pointer",
-          transition: "border-radius 0.15s",
-        }}
+        onClick={() => setExpanded(!expanded)}
+        style={{ ...styles.projectRow, borderLeft: `3px solid ${matchColor(topScore)}` }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: C.text, whiteSpace: "nowrap" }}>
-            {displayAddress}
-          </span>
-          {hood && (
-            <span style={{ fontSize: 11, color: C.textMuted, whiteSpace: "nowrap" }}>· {hood}</span>
-          )}
-          <span style={{
-            fontSize: 10, fontWeight: 700, color: C.blue,
-            background: `${C.blue}18`, border: `1px solid ${C.blue}30`,
-            borderRadius: 4, padding: "2px 7px", whiteSpace: "nowrap",
-          }}>
-            {projects.length} permits
-          </span>
+        <div style={styles.projectHeader}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={styles.projectTitle}>
+              <span style={{ marginRight: 8 }}>{catIcons[primary.category] || "📋"}</span>
+              {displayTitle}
+            </div>
+            <div style={styles.projectMeta}>
+              {primary.category && (
+                <span style={{
+                  fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 3,
+                  background: `${C.blue}18`, color: C.blue, textTransform: "capitalize",
+                  letterSpacing: "0.03em", flexShrink: 0,
+                }}>
+                  {primary.category.replace(/-/g, " ")}
+                </span>
+              )}
+              {workClass && (
+                <span style={{
+                  marginLeft: 5, fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 3,
+                  background: "#ffffff0a", color: C.textMuted, textTransform: "capitalize",
+                  letterSpacing: "0.03em", flexShrink: 0,
+                }}>
+                  {workClass}
+                </span>
+              )}
+              {locationTag && (
+                <span style={{ marginLeft: 10, color: C.textSub }}>{locationTag}</span>
+              )}
+              {primary.contractor && (
+                <span style={{ marginLeft: 12, color: C.textMuted }}>👷 {primary.contractor}</span>
+              )}
+              {primary.agency && (
+                <span style={{ marginLeft: locationTag ? 12 : 0 }}>🏢 {primary.agency}</span>
+              )}
+              <span style={{ marginLeft: 8 }}>
+                <span style={{ fontSize: 9, padding: "1px 6px", background: "#ffffff08", borderRadius: 3, color: "#888" }}>
+                  {sourceLabels[primary.source_id] || primary.source_id}
+                </span>
+              </span>
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+            <div style={{ width: 64, display: "flex", justifyContent: "center" }}>
+              <MatchBadge score={topScore} />
+            </div>
+            <div style={{ width: 80, textAlign: "right" }}>
+              <div style={{ color: C.orange, fontWeight: 700, fontSize: 14, fontFamily: "'JetBrains Mono', monospace" }}>
+                {fmt$(maxValue)}
+              </div>
+            </div>
+            <div style={{ width: 110, display: "flex", justifyContent: "flex-end" }}>
+              <StatusPill status={primary.status} />
+            </div>
+          </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
-          {total$ > 0 && (
-            <span style={{ fontSize: 13, color: C.orange, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>
-              {fmt$(total$)}
-            </span>
-          )}
-          <span style={{ fontSize: 10, color: C.textMuted }}>{open ? "▲" : "▼"}</span>
-        </div>
-      </div>
 
-      {/* Permit rows */}
-      {open && (
-        <div style={{
-          border: `1px solid ${C.borderHi}`,
-          borderTop: "none",
-          borderRadius: "0 0 10px 10px",
-          overflow: "hidden",
-        }}>
-          {displayProjects.map((p, i) => (
-            <ProjectRow
-              key={p.id}
-              project={p}
-              onSave={onSave}
-              saved={savedIds.has(p.id)}
-              inGroup
-              isLast={i === displayProjects.length - 1}
-            />
-          ))}
-        </div>
-      )}
+        {expanded && (
+          <div style={styles.projectExpanded}>
+            {descText && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={styles.detailLabel}>Description</div>
+                <div style={{ color: "#aaa", fontSize: 13, lineHeight: 1.6 }}>{descText}</div>
+              </div>
+            )}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
+              <div>
+                <div style={styles.detailLabel}>Posted</div>
+                <div style={styles.detailValue}>{fmtDate(primary.posted_date)}</div>
+              </div>
+              {primary.deadline && (
+                <div>
+                  <div style={styles.detailLabel}>Deadline</div>
+                  <div style={styles.detailValue}>{fmtDate(primary.deadline)}</div>
+                </div>
+              )}
+              {primary.permit_number && (
+                <div>
+                  <div style={styles.detailLabel}>Permit #</div>
+                  <div style={styles.detailValue}>{primary.permit_number}</div>
+                </div>
+              )}
+              {primary.solicitation_number && (
+                <div>
+                  <div style={styles.detailLabel}>Solicitation #</div>
+                  <div style={styles.detailValue}>{primary.solicitation_number}</div>
+                </div>
+              )}
+              {primary.contractor && (
+                <div>
+                  <div style={styles.detailLabel}>Contractor</div>
+                  <div style={styles.detailValue}>{primary.contractor}</div>
+                </div>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              {primary.source_url && (
+                <a href={primary.source_url} target="_blank" rel="noopener"
+                  style={styles.linkBtn} onClick={(e) => e.stopPropagation()}>
+                  View Source →
+                </a>
+              )}
+              {!isSaved && (
+                <button style={styles.saveBtn}
+                  onClick={(e) => { e.stopPropagation(); onSave(primary.id); }}>
+                  ★ Save
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -2043,7 +1960,7 @@ export default function SiteScanApp() {
             ) : (
               <div>
                 {groupByAddress(projects.filter((p) => !isSubpermit(p))).map((group, i) => (
-                  <AddressGroup
+                  <ProjectCard
                     key={group.address ?? `noaddr-${i}`}
                     group={group}
                     onSave={saveProject}
