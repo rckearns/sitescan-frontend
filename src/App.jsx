@@ -1062,9 +1062,9 @@ function PermitContractorsSection() {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("total_scope_value");
-  const [collapsedTrades, setCollapsedTrades] = useState(new Set());
+  const [openTrades, setOpenTrades] = useState(new Set());
 
-  const toggleTrade = (trade) => setCollapsedTrades((prev) => {
+  const toggleTrade = (trade) => setOpenTrades((prev) => {
     const next = new Set(prev);
     if (next.has(trade)) next.delete(trade);
     else next.add(trade);
@@ -1179,7 +1179,7 @@ function PermitContractorsSection() {
           alignItems: "start",
         }}>
           {Object.entries(tradeGroups).map(([trade, subs]) => {
-            const isOpen = !collapsedTrades.has(trade);
+            const isOpen = openTrades.has(trade);
             return (
               <div key={trade} style={{
                 background: C.surface,
@@ -2129,7 +2129,7 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     minHeight: "100vh",
-    minWidth: "100vw",
+    minWidth: "100%",
     background: `radial-gradient(ellipse at 50% 40%, #0e2040 0%, ${C.bg} 65%)`,
     padding: "40px 16px",
     boxSizing: "border-box",
