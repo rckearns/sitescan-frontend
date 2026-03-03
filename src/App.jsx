@@ -574,6 +574,7 @@ function ProfileTab({ onCriteriaChange, lastScanAt, onScan }) {
   const [scanMsg, setScanMsg] = useState("");
   const [connTesting, setConnTesting] = useState(false);
   const [connResult, setConnResult] = useState(null);
+  const [dbResult, setDbResult] = useState(null);
 
   useEffect(() => {
     api("/auth/me").then((data) => {
@@ -622,6 +623,7 @@ function ProfileTab({ onCriteriaChange, lastScanAt, onScan }) {
   const doConnTest = async () => {
     setConnTesting(true);
     setConnResult(null);
+    setDbResult(null);
     try {
       const data = await api("/scan/connectivity");
       setConnResult(data);
@@ -755,6 +757,22 @@ function ProfileTab({ onCriteriaChange, lastScanAt, onScan }) {
               )}
             </>
           )}
+        </div>
+      )}
+      <button onClick={async () => { const d = await api("/scan/debug-permits?address=CALHOUN"); setDbResult(d); }} style={{ marginTop: 10, background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, fontSize: 11, padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+        Check Emanuel DB State
+      </button>
+      {dbResult && (
+        <div style={{ marginTop: 10, padding: 12, background: C.surface, borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 11, fontFamily: "monospace", maxHeight: 220, overflowY: "auto" }}>
+          {dbResult.map((p, i) => (
+            <div key={i} style={{ marginBottom: 6, borderBottom: `1px solid ${C.border}`, paddingBottom: 4 }}>
+              <span style={{ color: p.contractor !== "(empty)" ? "#4c4" : "#e44" }}>{p.contractor !== "(empty)" ? "✓" : "✗"}</span>
+              {" "}<span style={{ color: C.text }}>{p.address}</span>
+              {" "}<span style={{ color: C.textMuted }}>contractor: {p.contractor}</span>
+              {" "}<span style={{ color: C.textMuted }}>[active:{String(p.is_active)}, cat:{p.category}]</span>
+            </div>
+          ))}
+          {dbResult.length === 0 && <span style={{ color: "#e44" }}>No Calhoun permits found in DB</span>}
         </div>
       )}
     </div>
