@@ -1556,7 +1556,16 @@ function ContractorsTab() {
 
 // ─── SCAN HISTORY TAB ───────────────────────────────────────────────────────
 
-function HistoryTab({ history }) {
+function HistoryTab({ history, onRefresh }) {
+  const hasRunning = history.some((h) => !h.finished_at || h.status === "running");
+
+  // Poll every 15s while any scan is in-progress
+  useEffect(() => {
+    if (!hasRunning) return;
+    const t = setInterval(onRefresh, 15000);
+    return () => clearInterval(t);
+  }, [hasRunning, onRefresh]);
+
   if (!history.length) {
     return (
       <div style={{ textAlign: "center", padding: 60, color: "#555" }}>
@@ -1566,6 +1575,17 @@ function HistoryTab({ history }) {
   }
   return (
     <div style={{ overflow: "auto" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        {hasRunning && (
+          <span style={{ fontSize: 12, color: "#eab308" }}>⟳ Scan in progress…</span>
+        )}
+        <button
+          onClick={onRefresh}
+          style={{ marginLeft: "auto", fontSize: 11, padding: "4px 10px", background: "transparent", border: "1px solid #333", borderRadius: 4, color: "#aaa", cursor: "pointer" }}
+        >
+          Refresh
+        </button>
+      </div>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
           <tr>
@@ -1589,7 +1609,7 @@ function HistoryTab({ history }) {
               <td style={styles.td}>
                 {h.finished_at
                   ? `${((new Date(h.finished_at) - new Date(h.started_at)) / 1000).toFixed(1)}s`
-                  : "..."}
+                  : "running…"}
               </td>
             </tr>
           ))}
@@ -2008,6 +2028,26 @@ export default function SiteScanApp() {
     loadHistory();
   }, [authed]);
 
+  // Poll history every 30s — if the most recent entry has no finished_at, a scan
+  // is in progress; reload projects/stats too once it completes.
+  const prevRunningRef = useRef(false);
+  useEffect(() => {
+    if (!authed) return;
+    const t = setInterval(async () => {
+      const data = await api("/scan/history?limit=30").catch(() => null);
+      if (!data) return;
+      setHistory(Array.isArray(data) ? data : []);
+      const isRunning = data.some((h) => !h.finished_at || h.status === "running");
+      if (prevRunningRef.current && !isRunning) {
+        // Scan just finished — reload projects and stats
+        loadProjects();
+        loadStats();
+      }
+      prevRunningRef.current = isRunning;
+    }, 30000);
+    return () => clearInterval(t);
+  }, [authed]);
+
   useEffect(() => {
     if (!authed) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -2138,7 +2178,7 @@ export default function SiteScanApp() {
         )}
         {tab === "saved" && <SavedTab saved={saved} onUnsave={unsaveProject} />}
         {tab === "contractors" && <ContractorsTab />}
-        {tab === "history" && <HistoryTab history={history} />}
+        {tab === "history" && <HistoryTab history={history} onRefresh={loadHistory} />}
         {tab === "profile" && (
           <ProfileTab
             onCriteriaChange={handleCriteriaChange}
