@@ -124,7 +124,14 @@ const catIcons = {
   structural: "🏗️",
   government: "⚖️",
   commercial: "🏢",
-  residential: "🏠",
+  hotel: "🏨",
+  "multi-family": "🏘️",
+  "mixed-use": "🏙️",
+  office: "🖥️",
+  restaurant: "🍽️",
+  retail: "🛍️",
+  industrial: "🏭",
+  institutional: "🏫",
 };
 
 const sourceLabels = {
@@ -557,12 +564,19 @@ function StatsBar({ stats }) {
 // ─── PROFILE TAB ────────────────────────────────────────────────────────────
 
 const ALL_CATEGORIES = [
-  { id: "commercial", label: "Commercial" },
+  { id: "hotel", label: "Hotel" },
+  { id: "multi-family", label: "Multi-Family" },
+  { id: "mixed-use", label: "Mixed Use" },
+  { id: "office", label: "Office" },
+  { id: "restaurant", label: "Restaurant" },
+  { id: "retail", label: "Retail" },
+  { id: "industrial", label: "Industrial" },
+  { id: "institutional", label: "Institutional" },
   { id: "government", label: "Government" },
-  { id: "residential", label: "Residential" },
-  { id: "structural", label: "Structural" },
   { id: "historic-restoration", label: "Historic Restoration" },
   { id: "masonry", label: "Masonry" },
+  { id: "structural", label: "Structural" },
+  { id: "commercial", label: "Commercial" },
 ];
 const ALL_STATUSES = ["Open", "Active", "Accepting Bids", "Issued", "In Review", "Finaled"];
 const ALL_SOURCES = [
