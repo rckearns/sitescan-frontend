@@ -1047,6 +1047,8 @@ function PermitContractorsSection() {
   const [view, setView] = useState("by-trade");
   const [allData, setAllData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState("total_scope_value");
 
   useEffect(() => {
     if (!allData && !loading) {
@@ -1058,16 +1060,31 @@ function PermitContractorsSection() {
     }
   }, []);
 
-  // Group contractors by inferred trade (client-side, no extra API call)
+  // Filter by search, then sort
+  const filteredSubs = useMemo(() => {
+    if (!allData) return [];
+    let subs = allData.subcontractors;
+    if (search) {
+      const q = search.toLowerCase();
+      subs = subs.filter((s) => s.name.toLowerCase().includes(q));
+    }
+    return [...subs].sort((a, b) => {
+      if (sortBy === "name") return a.name.localeCompare(b.name);
+      if (sortBy === "project_count") return b.project_count - a.project_count;
+      return (b.total_scope_value || 0) - (a.total_scope_value || 0);
+    });
+  }, [allData, search, sortBy]);
+
+  // Group by inferred trade from filtered+sorted list
   const tradeGroups = useMemo(() => {
-    if (!allData) return null;
+    if (!filteredSubs.length && !loading) return {};
     const groups = {};
-    for (const sub of allData.subcontractors) {
+    for (const sub of filteredSubs) {
       const trade = inferContractorTrade(sub.name);
       if (!groups[trade]) groups[trade] = [];
       groups[trade].push(sub);
     }
-    // Sort alphabetically, "General Contractor" last
+    // Sort trade names alphabetically, "General Contractor" last
     return Object.fromEntries(
       Object.entries(groups).sort(([a], [b]) => {
         if (a === "General Contractor") return 1;
@@ -1075,7 +1092,7 @@ function PermitContractorsSection() {
         return a.localeCompare(b);
       })
     );
-  }, [allData]);
+  }, [filteredSubs, loading]);
 
   const btnStyle = (active) => ({
     padding: "5px 12px",
@@ -1095,18 +1112,49 @@ function PermitContractorsSection() {
     </div>
   );
 
+  const inputStyle = {
+    padding: "7px 12px",
+    background: C.surface,
+    border: `1px solid ${C.border}`,
+    borderRadius: 7,
+    color: C.text,
+    fontSize: 13,
+    outline: "none",
+    fontFamily: "'DM Sans', sans-serif",
+    minWidth: 200,
+  };
+
+  const selectStyle = {
+    ...inputStyle,
+    minWidth: 160,
+    cursor: "pointer",
+  };
+
   return (
-    <div style={{ marginTop: 36, paddingTop: 28, borderTop: `1px solid ${C.border}` }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 10 }}>
-        <div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>Active on Charleston Permits</div>
-          <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
-            General contractors from permit data · sorted by total scope value
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 6 }}>
+    <div>
+      <div style={{ fontSize: 20, fontWeight: 700, color: C.text, marginBottom: 4 }}>
+        Charleston Permit Contractors
+      </div>
+      <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 20 }}>
+        Contractors active on building permits · from ArcGIS permit records
+      </div>
+
+      {/* Search + sort + view toggle */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 20 }}>
+        <input
+          placeholder="Search contractors…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={inputStyle}
+        />
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={selectStyle}>
+          <option value="total_scope_value">Sort: Total Value</option>
+          <option value="project_count">Sort: Project Count</option>
+          <option value="name">Sort: Name A–Z</option>
+        </select>
+        <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
           <button style={btnStyle(view === "by-trade")} onClick={() => setView("by-trade")}>By Trade</button>
-          <button style={btnStyle(view === "all")} onClick={() => setView("all")}>All Contractors</button>
+          <button style={btnStyle(view === "all")} onClick={() => setView("all")}>All</button>
         </div>
       </div>
 
@@ -1114,43 +1162,47 @@ function PermitContractorsSection() {
         <div style={{ textAlign: "center", padding: 40, color: C.textMuted }}>Loading…</div>
       )}
 
-      {!loading && view === "all" && allData && (
-        allData.total_subcontractors === 0 ? emptyState : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {allData.subcontractors.map((sub) => (
-              <PermitContractorCard key={sub.name} sub={sub} />
-            ))}
+      {!loading && filteredSubs.length === 0 && allData && (
+        search ? (
+          <div style={{ textAlign: "center", padding: 32, color: C.textMuted, fontSize: 13 }}>
+            No contractors matching "{search}"
           </div>
-        )
+        ) : emptyState
       )}
 
-      {!loading && view === "by-trade" && tradeGroups && (
-        Object.keys(tradeGroups).length === 0 ? emptyState : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-            {Object.entries(tradeGroups).map(([trade, subs]) => (
-              <div key={trade}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                  <span style={{ fontSize: 16 }}>{TRADE_ICONS[trade] || "📋"}</span>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
-                    {trade}
-                  </span>
-                  <span style={{
-                    fontSize: 11, fontWeight: 700, color: C.blue,
-                    background: `${C.blue}18`, border: `1px solid ${C.blue}30`,
-                    borderRadius: 10, padding: "2px 8px",
-                  }}>
-                    {subs.length} contractor{subs.length !== 1 ? "s" : ""}
-                  </span>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {subs.map((sub) => (
-                    <PermitContractorCard key={sub.name} sub={sub} />
-                  ))}
-                </div>
+      {!loading && view === "all" && filteredSubs.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {filteredSubs.map((sub) => (
+            <PermitContractorCard key={sub.name} sub={sub} />
+          ))}
+        </div>
+      )}
+
+      {!loading && view === "by-trade" && Object.keys(tradeGroups).length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+          {Object.entries(tradeGroups).map(([trade, subs]) => (
+            <div key={trade}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <span style={{ fontSize: 16 }}>{TRADE_ICONS[trade] || "📋"}</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
+                  {trade}
+                </span>
+                <span style={{
+                  fontSize: 11, fontWeight: 700, color: C.blue,
+                  background: `${C.blue}18`, border: `1px solid ${C.blue}30`,
+                  borderRadius: 10, padding: "2px 8px",
+                }}>
+                  {subs.length} contractor{subs.length !== 1 ? "s" : ""}
+                </span>
               </div>
-            ))}
-          </div>
-        )
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {subs.map((sub) => (
+                  <PermitContractorCard key={sub.name} sub={sub} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -1405,28 +1457,6 @@ function ContractorsTab() {
 
   return (
     <div>
-      <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 6 }}>Contractors</h2>
-      <p style={{ color: C.textSub, fontSize: 13, marginBottom: 28 }}>
-        Track general contractors and subcontractors you work with or want to pursue.
-      </p>
-      <div style={{ display: "flex", gap: 28, alignItems: "flex-start", flexWrap: "wrap" }}>
-        <ContractorSection
-          type="gc"
-          label="General Contractors"
-          contractors={contractors}
-          onAdd={handleAdd}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-        />
-        <ContractorSection
-          type="sub"
-          label="Subcontractors"
-          contractors={contractors}
-          onAdd={handleAdd}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-        />
-      </div>
       <PermitContractorsSection />
     </div>
   );
