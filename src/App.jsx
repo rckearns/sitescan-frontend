@@ -735,13 +735,17 @@ function ProfileTab({ onCriteriaChange, lastScanAt, onScan }) {
               <div style={{ marginBottom: 8, color: C.textSub, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: 1 }}>Connectivity Test</div>
               {connResult.scbo && (
                 <div style={{ marginBottom: 10 }}>
-                  <span style={{ color: connResult.scbo.has_project_markers ? "#4c4" : "#e44" }}>
-                    {connResult.scbo.has_project_markers ? "✓" : "✗"} SCBO
+                  <span style={{ color: connResult.scbo.parsed_project_count > 0 ? "#4c4" : "#e44" }}>
+                    {connResult.scbo.parsed_project_count > 0 ? "✓" : "✗"} SCBO
                   </span>
-                  {" — "}{connResult.scbo.response_bytes?.toLocaleString()} bytes
-                  {connResult.scbo.project_count != null && `, ${connResult.scbo.project_count} projects`}
-                  {connResult.scbo.error && <span style={{ color: "#e44" }}> Error: {connResult.scbo.error}</span>}
-                  {" "}<span style={{ color: C.textMuted }}>(via: {connResult.scbo.via_zenrows ? "ZenRows" : "direct"})</span>
+                  {connResult.scbo.error
+                    ? <span style={{ color: "#e44" }}> Error: {connResult.scbo.error}</span>
+                    : <span>
+                        {" — "}{connResult.scbo.response_bytes?.toLocaleString()} bytes
+                        {connResult.scbo.raw_marker_count != null && `, ${connResult.scbo.raw_marker_count} raw / ${connResult.scbo.parsed_project_count ?? "?"} parsed`}
+                      </span>
+                  }
+                  {" "}<span style={{ color: connResult.scbo.via_zenrows ? "#4c4" : "#e44" }}>(via: {connResult.scbo.via_zenrows ? "ZenRows ✓" : "direct — no key!"})</span>
                 </div>
               )}
               {connResult.energov && (
