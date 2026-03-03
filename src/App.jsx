@@ -341,6 +341,7 @@ function ProjectRow({ project, onSave, saved, inGroup = false, isLast = false })
           <div style={styles.projectMeta}>
             {locationLine && <span style={{ color: C.textSub }}>{locationLine}</span>}
             {p.agency && <span style={{ marginLeft: locationLine ? 12 : 0 }}>🏢 {p.agency}</span>}
+            {p.contractor && <span style={{ marginLeft: 12, color: C.textMuted }}>👷 {p.contractor}</span>}
             <span style={{ marginLeft: 12 }}>
               <span style={{ fontSize: 9, padding: "1px 6px", background: "#ffffff08", borderRadius: 3, color: "#888" }}>
                 {sourceLabels[p.source_id] || p.source_id}
@@ -953,6 +954,176 @@ function SavedTab({ saved, onUnsave }) {
   );
 }
 
+// ─── PERMIT CONTRACTOR DATA ──────────────────────────────────────────────────
+
+function PermitContractorCard({ sub }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
+      <div
+        style={{ padding: "14px 18px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: C.text }}>{sub.name}</div>
+          <div style={{ fontSize: 12, color: C.textSub, marginTop: 3, display: "flex", flexWrap: "wrap", gap: "2px 14px" }}>
+            <span>{sub.project_count} permit{sub.project_count !== 1 ? "s" : ""}</span>
+            {sub.total_scope_value > 0 && (
+              <span style={{ color: C.orange, fontFamily: "'JetBrains Mono', monospace" }}>
+                {fmt$(sub.total_scope_value)} total
+              </span>
+            )}
+            {sub.median_project_value != null && sub.median_project_value > 0 && (
+              <span style={{ color: C.textMuted }}>{fmt$(sub.median_project_value)} median</span>
+            )}
+          </div>
+        </div>
+        <span style={{ color: C.textMuted, fontSize: 11, flexShrink: 0 }}>{open ? "▲" : "▼"}</span>
+      </div>
+      {open && (
+        <div style={{ borderTop: `1px solid ${C.border}` }}>
+          {sub.projects.map((p, i) => (
+            <div
+              key={p.id}
+              style={{
+                padding: "10px 18px",
+                borderBottom: i < sub.projects.length - 1 ? `1px solid ${C.border}33` : "none",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: 12,
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, color: C.text, fontWeight: 600, marginBottom: 2 }}>{p.title}</div>
+                <div style={{ fontSize: 11, color: C.textSub, display: "flex", flexWrap: "wrap", gap: "2px 10px" }}>
+                  {p.address && <span>{cleanAddress(p.address)}</span>}
+                  {p.permit_number && <span>Permit {p.permit_number}</span>}
+                  <span style={{ fontSize: 10, padding: "1px 5px", background: "#ffffff08", borderRadius: 3, color: "#888" }}>
+                    {catIcons[p.category] || "📋"} {p.category}
+                  </span>
+                </div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ color: C.orange, fontWeight: 700, fontSize: 13, fontFamily: "'JetBrains Mono', monospace" }}>
+                  {fmt$(p.value)}
+                </div>
+                <div style={{ fontSize: 11, color: C.textMuted, marginTop: 1 }}>{fmtDate(p.posted_date)}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PermitContractorsSection() {
+  const [view, setView] = useState("by-trade");
+  const [allData, setAllData] = useState(null);
+  const [tradeData, setTradeData] = useState(null);
+  const [loadingAll, setLoadingAll] = useState(false);
+  const [loadingTrade, setLoadingTrade] = useState(false);
+
+  useEffect(() => {
+    if (view === "all" && !allData && !loadingAll) {
+      setLoadingAll(true);
+      api("/projects/subcontractors?source=charleston-permits")
+        .then((d) => setAllData(d))
+        .catch(() => {})
+        .finally(() => setLoadingAll(false));
+    }
+    if (view === "by-trade" && !tradeData && !loadingTrade) {
+      setLoadingTrade(true);
+      api("/projects/subcontractors/by-trade")
+        .then((d) => setTradeData(d))
+        .catch(() => {})
+        .finally(() => setLoadingTrade(false));
+    }
+  }, [view]);
+
+  const btnStyle = (active) => ({
+    padding: "5px 12px",
+    background: active ? `${C.blue}20` : "transparent",
+    border: `1px solid ${active ? C.blue : C.border}`,
+    borderRadius: 6,
+    color: active ? C.blue : C.textSub,
+    fontSize: 11,
+    fontWeight: 700,
+    cursor: "pointer",
+    fontFamily: "'DM Sans', sans-serif",
+  });
+
+  const loading = view === "all" ? loadingAll : loadingTrade;
+
+  const emptyState = (
+    <div style={{ textAlign: "center", padding: 32, color: C.textMuted, border: `1px dashed ${C.border}`, borderRadius: 10, fontSize: 13 }}>
+      No contractor data found in permit records.
+    </div>
+  );
+
+  return (
+    <div style={{ marginTop: 36, paddingTop: 28, borderTop: `1px solid ${C.border}` }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>Active on Charleston Permits</div>
+          <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
+            General contractors from permit data · sorted by total scope value
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button style={btnStyle(view === "by-trade")} onClick={() => setView("by-trade")}>By Trade</button>
+          <button style={btnStyle(view === "all")} onClick={() => setView("all")}>All Contractors</button>
+        </div>
+      </div>
+
+      {loading && (
+        <div style={{ textAlign: "center", padding: 40, color: C.textMuted }}>Loading…</div>
+      )}
+
+      {!loading && view === "all" && allData && (
+        allData.total_subcontractors === 0 ? emptyState : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {allData.subcontractors.map((sub) => (
+              <PermitContractorCard key={sub.name} sub={sub} />
+            ))}
+          </div>
+        )
+      )}
+
+      {!loading && view === "by-trade" && tradeData && (
+        Object.keys(tradeData.trades).length === 0 ? emptyState : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+            {Object.entries(tradeData.trades).map(([trade, subs]) => (
+              <div key={trade}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                  <span style={{ fontSize: 16 }}>{catIcons[trade] || "📋"}</span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: C.text, textTransform: "capitalize" }}>
+                    {trade.replace(/-/g, " ")}
+                  </span>
+                  <span style={{
+                    fontSize: 11, fontWeight: 700, color: C.blue,
+                    background: `${C.blue}18`, border: `1px solid ${C.blue}30`,
+                    borderRadius: 10, padding: "2px 8px",
+                  }}>
+                    {subs.length} contractor{subs.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {subs.map((sub) => (
+                    <PermitContractorCard key={sub.name} sub={sub} />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+
 // ─── CONTRACTORS TAB ────────────────────────────────────────────────────────
 
 const BLANK_FORM = { name: "", specialty: "", phone: "", email: "", website: "", notes: "" };
@@ -1223,6 +1394,7 @@ function ContractorsTab() {
           onDelete={handleDelete}
         />
       </div>
+      <PermitContractorsSection />
     </div>
   );
 }
