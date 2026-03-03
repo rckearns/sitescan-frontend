@@ -43,6 +43,55 @@ const matchColor = (s) => {
   return C.textMuted;
 };
 
+// Return a neighbourhood name from lat/lng using Charleston bounding boxes
+function getNeighborhood(lat, lng) {
+  if (!lat || !lng) return null;
+  if (lat >= 32.755 && lat <= 32.810 && lng >= -79.975 && lng <= -79.900) return "Downtown";
+  if (lat >= 32.730 && lat <= 32.790 && lng >= -80.075 && lng <= -79.970) return "West Ashley";
+  if (lat >= 32.700 && lat <= 32.762 && lng >= -80.005 && lng <= -79.910) return "James Island";
+  if (lat >= 32.830 && lat <= 32.960 && lng >= -80.110 && lng <= -79.870) return "North Charleston";
+  if (lat >= 32.775 && lat <= 32.920 && lng >= -79.910 && lng <= -79.730) return "Mt Pleasant";
+  if (lat >= 32.620 && lat <= 32.740 && lng >= -80.130 && lng <= -79.940) return "Johns Island";
+  if (lat >= 32.835 && lat <= 32.880 && lng >= -79.935 && lng <= -79.865) return "Daniel Island";
+  if (lat >= 32.640 && lat <= 32.680 && lng >= -79.975 && lng <= -79.920) return "Folly Beach";
+  return null;
+}
+
+// Strip trailing city/state from a raw address string
+function cleanAddress(address) {
+  if (!address) return null;
+  return address
+    .replace(/,?\s*charleston,?\s*sc\b.*$/i, "")
+    .replace(/,?\s*south carolina\b.*$/i, "")
+    .trim() || null;
+}
+
+// Group a sorted project list by normalised address.
+// Returns an array of { address, displayAddress, lat, lng, projects[] } objects.
+// Single-project "groups" are included — callers decide how to render them.
+function groupByAddress(projects) {
+  const order = [];
+  const map = new Map();
+
+  for (const p of projects) {
+    const raw = (p.address || "").trim();
+    const key = raw.toUpperCase().replace(/\s+/g, " ");
+    if (key.length > 3) {
+      if (map.has(key)) {
+        map.get(key).projects.push(p);
+      } else {
+        const grp = { address: key, displayAddress: raw, lat: p.latitude, lng: p.longitude, projects: [p] };
+        map.set(key, grp);
+        order.push(grp);
+      }
+    } else {
+      // No usable address — treat as its own group with null address
+      order.push({ address: null, displayAddress: null, lat: p.latitude, lng: p.longitude, projects: [p] });
+    }
+  }
+  return order;
+}
+
 // ─── PARCEL OPPORTUNITY HELPERS ───────────────────────────────────────────────
 
 // Score 0–100: how underimproved is this parcel relative to its land value?
@@ -259,12 +308,30 @@ function StatusPill({ status }) {
 
 // ─── PROJECT ROW ────────────────────────────────────────────────────────────
 
-function ProjectRow({ project, onSave, saved }) {
+function ProjectRow({ project, onSave, saved, inGroup = false, isLast = false }) {
   const [expanded, setExpanded] = useState(false);
   const p = project;
 
+  const addr = cleanAddress(p.address);
+  const hood = getNeighborhood(p.latitude, p.longitude);
+  // When inside a group the address is shown in the header — only show neighbourhood
+  const locationLine = inGroup
+    ? hood
+    : [addr, hood].filter(Boolean).join("  ·  ") || p.location || "—";
+
+  const rowStyle = inGroup
+    ? {
+        background: C.surface,
+        borderLeft: `3px solid ${matchColor(p.match_score)}`,
+        borderBottom: isLast ? "none" : `1px solid ${C.border}`,
+        padding: "14px 20px",
+        cursor: "pointer",
+        transition: "background 0.15s",
+      }
+    : { ...styles.projectRow, borderLeft: `3px solid ${matchColor(p.match_score)}` };
+
   return (
-    <div style={{ ...styles.projectRow, borderLeft: `3px solid ${matchColor(p.match_score)}` }} onClick={() => setExpanded(!expanded)}>
+    <div style={rowStyle} onClick={() => setExpanded(!expanded)}>
       <div style={styles.projectHeader}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={styles.projectTitle}>
@@ -272,8 +339,8 @@ function ProjectRow({ project, onSave, saved }) {
             {p.title}
           </div>
           <div style={styles.projectMeta}>
-            <span>📍 {p.location || "—"}</span>
-            {p.agency && <span style={{ marginLeft: 12 }}>🏢 {p.agency}</span>}
+            {locationLine && <span style={{ color: C.textSub }}>{locationLine}</span>}
+            {p.agency && <span style={{ marginLeft: locationLine ? 12 : 0 }}>🏢 {p.agency}</span>}
             <span style={{ marginLeft: 12 }}>
               <span style={{ fontSize: 9, padding: "1px 6px", background: "#ffffff08", borderRadius: 3, color: "#888" }}>
                 {sourceLabels[p.source_id] || p.source_id}
@@ -369,6 +436,96 @@ function ProjectRow({ project, onSave, saved }) {
     </div>
   );
 }
+
+// ─── ADDRESS GROUP ───────────────────────────────────────────────────────────
+
+function AddressGroup({ group, onSave, savedIds, animDelay }) {
+  const { displayAddress, lat, lng, projects } = group;
+  const [open, setOpen] = useState(true);
+  const hood   = getNeighborhood(lat, lng);
+  const total$ = projects.reduce((s, p) => s + (p.value || 0), 0);
+  const topScore = Math.max(...projects.map((p) => p.match_score));
+
+  if (projects.length === 1) {
+    // Single permit at this address — render a plain row (no group chrome)
+    return (
+      <div style={{ animation: `fadeIn 0.3s ease ${animDelay}s both` }}>
+        <ProjectRow
+          project={projects[0]}
+          onSave={onSave}
+          saved={savedIds.has(projects[0].id)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginBottom: 8, animation: `fadeIn 0.3s ease ${animDelay}s both` }}>
+      {/* Address header */}
+      <div
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "10px 20px",
+          background: C.surfaceHi,
+          border: `1px solid ${C.borderHi}`,
+          borderRadius: open ? "10px 10px 0 0" : 10,
+          borderLeft: `3px solid ${matchColor(topScore)}`,
+          cursor: "pointer",
+          transition: "border-radius 0.15s",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: C.text, whiteSpace: "nowrap" }}>
+            {displayAddress}
+          </span>
+          {hood && (
+            <span style={{ fontSize: 11, color: C.textMuted, whiteSpace: "nowrap" }}>· {hood}</span>
+          )}
+          <span style={{
+            fontSize: 10, fontWeight: 700, color: C.blue,
+            background: `${C.blue}18`, border: `1px solid ${C.blue}30`,
+            borderRadius: 4, padding: "2px 7px", whiteSpace: "nowrap",
+          }}>
+            {projects.length} permits
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
+          {total$ > 0 && (
+            <span style={{ fontSize: 13, color: C.orange, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>
+              {fmt$(total$)}
+            </span>
+          )}
+          <span style={{ fontSize: 10, color: C.textMuted }}>{open ? "▲" : "▼"}</span>
+        </div>
+      </div>
+
+      {/* Permit rows */}
+      {open && (
+        <div style={{
+          border: `1px solid ${C.borderHi}`,
+          borderTop: "none",
+          borderRadius: "0 0 10px 10px",
+          overflow: "hidden",
+        }}>
+          {projects.map((p, i) => (
+            <ProjectRow
+              key={p.id}
+              project={p}
+              onSave={onSave}
+              saved={savedIds.has(p.id)}
+              inGroup
+              isLast={i === projects.length - 1}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 // ─── STATS BAR ──────────────────────────────────────────────────────────────
 
@@ -1364,17 +1521,14 @@ export default function SiteScanApp() {
               </div>
             ) : (
               <div>
-                {projects.map((p, i) => (
-                  <div
-                    key={p.id}
-                    style={{ animation: `fadeIn 0.3s ease ${Math.min(i, 25) * 0.03}s both` }}
-                  >
-                    <ProjectRow
-                      project={p}
-                      onSave={saveProject}
-                      saved={savedIds.has(p.id)}
-                    />
-                  </div>
+                {groupByAddress(projects).map((group, i) => (
+                  <AddressGroup
+                    key={group.address ?? `noaddr-${i}`}
+                    group={group}
+                    onSave={saveProject}
+                    savedIds={savedIds}
+                    animDelay={Math.min(i, 25) * 0.03}
+                  />
                 ))}
               </div>
             )}
