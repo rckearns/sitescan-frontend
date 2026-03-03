@@ -739,7 +739,7 @@ function ProfileTab({ onCriteriaChange, lastScanAt, onScan }) {
                   {" — "}{connResult.scbo.response_bytes?.toLocaleString()} bytes
                   {connResult.scbo.project_count != null && `, ${connResult.scbo.project_count} projects`}
                   {connResult.scbo.error && <span style={{ color: "#e44" }}> Error: {connResult.scbo.error}</span>}
-                  {" "}<span style={{ color: C.textMuted }}>(curl_cffi: {String(connResult.scbo.curl_cffi_available)})</span>
+                  {" "}<span style={{ color: C.textMuted }}>(via: {connResult.scbo.via_zenrows ? "ZenRows" : "direct"})</span>
                 </div>
               )}
               {connResult.energov && (
