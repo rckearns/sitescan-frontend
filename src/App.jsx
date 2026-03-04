@@ -803,18 +803,55 @@ function ProfileTab({ onCriteriaChange, lastScanAt, onScan }) {
 // ─── CITY SELECTOR ──────────────────────────────────────────────────────────
 
 const CITIES = [
-  { id: "charleston-sc", label: "Charleston, SC", icon: "🌊", active: true },
-  { id: "charlotte-nc",  label: "Charlotte, NC",  icon: "🏙️" },
-  { id: "columbia-sc",   label: "Columbia, SC",   icon: "🏛️" },
-  { id: "atlanta-ga",    label: "Atlanta, GA",    icon: "🍑" },
-  { id: "raleigh-nc",    label: "Raleigh, NC",    icon: "🔬" },
-  { id: "nashville-tn",  label: "Nashville, TN",  icon: "🎸" },
-  { id: "miami-fl",      label: "Miami, FL",      icon: "🌴" },
-  { id: "houston-tx",    label: "Houston, TX",    icon: "⭐" },
-  { id: "dallas-tx",     label: "Dallas, TX",     icon: "🤠" },
-  { id: "denver-co",     label: "Denver, CO",     icon: "⛰️" },
-  { id: "seattle-wa",    label: "Seattle, WA",    icon: "☕" },
-  { id: "phoenix-az",    label: "Phoenix, AZ",    icon: "☀️" },
+  // Southeast
+  { id: "charleston-sc",  label: "Charleston, SC",   icon: "🌊", active: true },
+  { id: "columbia-sc",    label: "Columbia, SC",     icon: "🏛️" },
+  { id: "greenville-sc",  label: "Greenville, SC",   icon: "🌿" },
+  { id: "charlotte-nc",   label: "Charlotte, NC",    icon: "🏙️" },
+  { id: "raleigh-nc",     label: "Raleigh, NC",      icon: "🔬" },
+  { id: "atlanta-ga",     label: "Atlanta, GA",      icon: "🍑" },
+  { id: "savannah-ga",    label: "Savannah, GA",     icon: "🌳" },
+  { id: "jacksonville-fl",label: "Jacksonville, FL", icon: "🌞" },
+  { id: "orlando-fl",     label: "Orlando, FL",      icon: "🎡" },
+  { id: "tampa-fl",       label: "Tampa, FL",        icon: "⚡" },
+  { id: "miami-fl",       label: "Miami, FL",        icon: "🌴" },
+  { id: "nashville-tn",   label: "Nashville, TN",    icon: "🎸" },
+  { id: "memphis-tn",     label: "Memphis, TN",      icon: "🎵" },
+  { id: "birmingham-al",  label: "Birmingham, AL",   icon: "🔩" },
+  { id: "new-orleans-la", label: "New Orleans, LA",  icon: "🎷" },
+  // Northeast
+  { id: "new-york-ny",    label: "New York, NY",     icon: "🗽" },
+  { id: "boston-ma",      label: "Boston, MA",       icon: "🦞" },
+  { id: "philadelphia-pa",label: "Philadelphia, PA", icon: "🔔" },
+  { id: "washington-dc",  label: "Washington, DC",   icon: "🏛️" },
+  { id: "baltimore-md",   label: "Baltimore, MD",    icon: "🦀" },
+  // Midwest
+  { id: "chicago-il",     label: "Chicago, IL",      icon: "🌬️" },
+  { id: "detroit-mi",     label: "Detroit, MI",      icon: "🚗" },
+  { id: "columbus-oh",    label: "Columbus, OH",     icon: "🌰" },
+  { id: "indianapolis-in",label: "Indianapolis, IN", icon: "🏎️" },
+  { id: "minneapolis-mn", label: "Minneapolis, MN",  icon: "❄️" },
+  { id: "kansas-city-mo", label: "Kansas City, MO",  icon: "🥩" },
+  { id: "st-louis-mo",    label: "St. Louis, MO",    icon: "⚾" },
+  // South / Southwest
+  { id: "dallas-tx",      label: "Dallas, TX",       icon: "🤠" },
+  { id: "houston-tx",     label: "Houston, TX",      icon: "⭐" },
+  { id: "san-antonio-tx", label: "San Antonio, TX",  icon: "🌵" },
+  { id: "austin-tx",      label: "Austin, TX",       icon: "🎶" },
+  { id: "oklahoma-city-ok",label:"Oklahoma City, OK",icon: "🌪️" },
+  { id: "phoenix-az",     label: "Phoenix, AZ",      icon: "☀️" },
+  { id: "tucson-az",      label: "Tucson, AZ",       icon: "🌵" },
+  { id: "las-vegas-nv",   label: "Las Vegas, NV",    icon: "🎰" },
+  { id: "albuquerque-nm", label: "Albuquerque, NM",  icon: "🎈" },
+  // West
+  { id: "los-angeles-ca", label: "Los Angeles, CA",  icon: "🎬" },
+  { id: "san-diego-ca",   label: "San Diego, CA",    icon: "🌮" },
+  { id: "san-francisco-ca",label:"San Francisco, CA",icon: "🌉" },
+  { id: "sacramento-ca",  label: "Sacramento, CA",   icon: "🌾" },
+  { id: "portland-or",    label: "Portland, OR",     icon: "🌲" },
+  { id: "seattle-wa",     label: "Seattle, WA",      icon: "☕" },
+  { id: "denver-co",      label: "Denver, CO",       icon: "⛰️" },
+  { id: "salt-lake-city-ut",label:"Salt Lake City, UT",icon:"⛷️" },
 ];
 
 function CitySelector() {
@@ -857,13 +894,15 @@ function CitySelector() {
         <div style={{
           position: "absolute",
           top: "calc(100% + 6px)",
-          left: 0,
+          right: 0,
           background: C.surface,
           border: `1px solid ${C.border}`,
           borderRadius: 10,
           padding: "6px",
           zIndex: 300,
-          minWidth: 210,
+          minWidth: 220,
+          maxHeight: 360,
+          overflowY: "auto",
           boxShadow: "0 12px 40px rgba(0,0,0,0.6)",
         }}>
           <div style={{ padding: "4px 10px 8px", fontSize: 10, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600, borderBottom: `1px solid ${C.border}`, marginBottom: 4 }}>
@@ -2655,18 +2694,15 @@ export default function SiteScanApp() {
         .leaflet-control-zoom a { background: #0c1524 !important; color: #e8f0fa !important; border-color: #1a2f50 !important; }
         .leaflet-control-zoom a:hover { background: #101d30 !important; }
         /* ── Responsive layout ── */
-        .header-wrap { width: 100%; max-width: 1400px; margin: 0 auto; }
-        .header-top  { display: flex; justify-content: space-between; align-items: center; }
-        .app-nav { display: flex; gap: 2px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; padding-top: 6px; }
+        .header-wrap { width: 100%; max-width: 1400px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
+        .app-nav { display: flex; gap: 2px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; flex: 1; }
         .app-nav::-webkit-scrollbar { display: none; }
         .app-nav button { white-space: nowrap; flex-shrink: 0; }
         .app-main { max-width: 1400px; margin: 0 auto; padding: 20px 32px; box-sizing: border-box; width: 100%; }
         .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
-        @media (min-width: 900px) {
-          .header-wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-          .app-nav { padding-top: 0; flex: 1; }
-        }
         @media (max-width: 899px) {
+          .header-wrap { flex-wrap: wrap; }
+          .app-nav { order: 3; width: 100%; }
           .app-main { padding: 16px; }
           .stats-grid { grid-template-columns: repeat(2, 1fr); }
         }
@@ -2679,22 +2715,16 @@ export default function SiteScanApp() {
       {/* HEADER */}
       <header style={styles.header}>
         <div className="header-wrap">
-          <div className="header-top">
-            <div style={styles.logo}>
-              <span style={{ color: C.text, fontFamily: "'DM Sans', sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: -0.5 }}>
-                Ya
-              </span>
-              <span style={{ color: C.orange, fontFamily: "'DM Sans', sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: -0.5 }}>
-                bodle
-              </span>
-              <span style={{ fontSize: 9, color: C.textMuted, marginLeft: 8, fontFamily: "'Space Mono', monospace", letterSpacing: 1, textTransform: "uppercase" }}>
-                beta
-              </span>
-            </div>
-            <div style={styles.headerRight}>
-              <CitySelector />
-              <button style={styles.logoutBtn} onClick={logout}>Sign Out</button>
-            </div>
+          <div style={styles.logo}>
+            <span style={{ color: C.text, fontFamily: "'DM Sans', sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: -0.5 }}>
+              Ya
+            </span>
+            <span style={{ color: C.orange, fontFamily: "'DM Sans', sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: -0.5 }}>
+              bodle
+            </span>
+            <span style={{ fontSize: 9, color: C.textMuted, marginLeft: 8, fontFamily: "'Space Mono', monospace", letterSpacing: 1, textTransform: "uppercase" }}>
+              beta
+            </span>
           </div>
           <nav className="app-nav">
             {[
@@ -2715,6 +2745,10 @@ export default function SiteScanApp() {
               </button>
             ))}
           </nav>
+          <div style={styles.headerRight}>
+            <CitySelector />
+            <button style={styles.logoutBtn} onClick={logout}>Sign Out</button>
+          </div>
         </div>
       </header>
 
