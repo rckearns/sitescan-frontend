@@ -1984,7 +1984,7 @@ function ProfileSection({ id, openSection, onToggle, title, icon, children }) {
         <span style={{ fontWeight: 700, fontSize: 15, color: C.text }}>{icon} {title}</span>
         <span style={{ color: C.textMuted, fontSize: 12 }}>{openSection === id ? "▲" : "▼"}</span>
       </div>
-      {openSection === id && <div style={{ padding: 18 }}>{children}</div>}
+      <div style={{ padding: 18, display: openSection === id ? "block" : "none" }}>{children}</div>
     </div>
   );
 }
