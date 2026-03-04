@@ -1977,6 +1977,18 @@ function SOQSection({ org }) {
   );
 }
 
+function ProfileSection({ id, openSection, onToggle, title, icon, children }) {
+  return (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 16, overflow: "hidden" }}>
+      <div style={{ padding: "14px 18px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: openSection === id ? `1px solid ${C.border}` : "none" }} onClick={() => onToggle(id)}>
+        <span style={{ fontWeight: 700, fontSize: 15, color: C.text }}>{icon} {title}</span>
+        <span style={{ color: C.textMuted, fontSize: 12 }}>{openSection === id ? "▲" : "▼"}</span>
+      </div>
+      {openSection === id && <div style={{ padding: 18 }}>{children}</div>}
+    </div>
+  );
+}
+
 function CompanyTab() {
   const [org, setOrg] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1994,23 +2006,13 @@ function CompanyTab() {
 
   const toggle = (id) => setOpenSection((s) => s === id ? null : id);
 
-  const Section = ({ id, title, icon, children }) => (
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 16, overflow: "hidden" }}>
-      <div style={{ padding: "14px 18px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: openSection === id ? `1px solid ${C.border}` : "none" }} onClick={() => toggle(id)}>
-        <span style={{ fontWeight: 700, fontSize: 15, color: C.text }}>{icon} {title}</span>
-        <span style={{ color: C.textMuted, fontSize: 12 }}>{openSection === id ? "▲" : "▼"}</span>
-      </div>
-      {openSection === id && <div style={{ padding: 18 }}>{children}</div>}
-    </div>
-  );
-
   return (
     <div style={{ maxWidth: 860, margin: "0 auto", padding: "24px 16px" }}>
-      <Section id="info"       title="Company Info"        icon="🏢"><OrgInfoForm       org={org} onSaved={loadOrg}   /></Section>
-      <Section id="principals" title="Principals"          icon="👤"><PrincipalsSection org={org} onChanged={loadOrg} /></Section>
-      <Section id="projects"   title="Project References"  icon="📋"><ProjectRefsSection org={org} onChanged={loadOrg} /></Section>
-      <Section id="personnel"  title="Key Personnel"       icon="🧑‍💼"><PersonnelSection  org={org} onChanged={loadOrg} /></Section>
-      <Section id="soq"        title="Generate SOQ"        icon="📄"><SOQSection         org={org} /></Section>
+      <ProfileSection id="info"       openSection={openSection} onToggle={toggle} title="Company Info"        icon="🏢"><OrgInfoForm       org={org} onSaved={loadOrg}   /></ProfileSection>
+      <ProfileSection id="principals" openSection={openSection} onToggle={toggle} title="Principals"          icon="👤"><PrincipalsSection org={org} onChanged={loadOrg} /></ProfileSection>
+      <ProfileSection id="projects"   openSection={openSection} onToggle={toggle} title="Project References"  icon="📋"><ProjectRefsSection org={org} onChanged={loadOrg} /></ProfileSection>
+      <ProfileSection id="personnel"  openSection={openSection} onToggle={toggle} title="Key Personnel"       icon="🧑‍💼"><PersonnelSection  org={org} onChanged={loadOrg} /></ProfileSection>
+      <ProfileSection id="soq"        openSection={openSection} onToggle={toggle} title="Generate SOQ"        icon="📄"><SOQSection         org={org} /></ProfileSection>
     </div>
   );
 }
@@ -2579,7 +2581,7 @@ export default function SiteScanApp() {
               { id: "map",          label: "Map",                        icon: "🗺️" },
               { id: "saved",        label: `Saved (${saved.length})`,    icon: "★" },
               { id: "contractors",  label: "Contractors",                icon: "🤝" },
-              { id: "company",      label: "Company",                    icon: "🏢" },
+              { id: "company",      label: "Profile",                    icon: "🏢" },
               { id: "history",      label: "History",                    icon: "📊" },
               { id: "profile",      label: "Match Filter",               icon: "⚙" },
             ].map((t) => (
