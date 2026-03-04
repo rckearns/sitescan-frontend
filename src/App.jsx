@@ -1081,8 +1081,29 @@ const TRADE_ICONS = {
   "General Contractor": "🏗️",
 };
 
-function inferContractorTrade(name) {
-  const lower = name.toLowerCase();
+// Map backend permit categories → frontend trade bucket names
+const CATEGORY_TO_TRADE = {
+  "fire-sprinkler": "Fire / Sprinkler",
+  "electrical":     "Electrical",
+  "plumbing":       "Plumbing",
+  "mechanical":     "HVAC / Mechanical",
+  "roofing":        "Roofing",
+};
+
+function inferContractorTrade(sub) {
+  // Primary: use the most common permit category across the contractor's projects
+  if (sub.projects && sub.projects.length > 0) {
+    const counts = {};
+    for (const p of sub.projects) {
+      const mapped = CATEGORY_TO_TRADE[p.category];
+      if (mapped) counts[mapped] = (counts[mapped] || 0) + 1;
+    }
+    if (Object.keys(counts).length > 0) {
+      return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+    }
+  }
+  // Fallback: keyword match on company name
+  const lower = sub.name.toLowerCase();
   for (const { trade, keywords } of TRADE_RULES) {
     if (keywords.some((k) => lower.includes(k))) return trade;
   }
@@ -1195,7 +1216,7 @@ function PermitContractorsSection() {
     if (!filteredSubs.length && !loading) return {};
     const groups = {};
     for (const sub of filteredSubs) {
-      const trade = inferContractorTrade(sub.name);
+      const trade = inferContractorTrade(sub);
       if (!groups[trade]) groups[trade] = [];
       groups[trade].push(sub);
     }
