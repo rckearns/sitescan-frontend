@@ -1998,12 +1998,12 @@ function BidAssistSection() {
   const [copied,    setCopied]    = useState(false);
   const fileRef = useRef(null);
 
-  const uploadPdf = async (file) => {
+  const uploadPdf = async (fileList) => {
     setParsing(true); setErr("");
     try {
       const token = localStorage.getItem("sitescan_token");
       const form = new FormData();
-      form.append("file", file);
+      Array.from(fileList).forEach((f) => form.append("files", f));
       const res = await fetch(`${API}/profile/bid-assist/parse-pdf`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
@@ -2046,10 +2046,10 @@ function BidAssistSection() {
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
         <button onClick={() => fileRef.current?.click()} disabled={parsing} style={ghostBtn({ opacity: parsing ? 0.7 : 1 })}>
-          {parsing ? "Parsing PDF…" : "📎 Upload PDF"}
+          {parsing ? "Parsing PDFs…" : "📎 Upload PDF(s)"}
         </button>
-        <input ref={fileRef} type="file" accept=".pdf" style={{ display: "none" }}
-          onChange={(e) => { if (e.target.files[0]) uploadPdf(e.target.files[0]); e.target.value = ""; }} />
+        <input ref={fileRef} type="file" accept=".pdf" multiple style={{ display: "none" }}
+          onChange={(e) => { if (e.target.files?.length) uploadPdf(e.target.files); e.target.value = ""; }} />
         {rfqText && <button onClick={() => { setRfqText(""); setNarrative(""); }} style={ghostBtn({ color: C.textMuted })}>Clear</button>}
       </div>
       <textarea
