@@ -1993,11 +1993,31 @@ function BidAssistSection() {
   const [rfqText,   setRfqText]   = useState("");
   const [narrative, setNarrative] = useState("");
   const [loading,   setLoading]   = useState(false);
+  const [parsing,   setParsing]   = useState(false);
   const [err,       setErr]       = useState("");
   const [copied,    setCopied]    = useState(false);
+  const fileRef = useRef(null);
+
+  const uploadPdf = async (file) => {
+    setParsing(true); setErr("");
+    try {
+      const token = localStorage.getItem("sitescan_token");
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(`${API}/profile/bid-assist/parse-pdf`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "PDF parsing failed");
+      setRfqText(data.text);
+    } catch (e) { setErr(e.message || "PDF parsing failed"); }
+    setParsing(false);
+  };
 
   const generate = async () => {
-    if (!rfqText.trim()) { setErr("Paste an RFQ or project description first."); return; }
+    if (!rfqText.trim()) { setErr("Paste an RFQ or upload a PDF first."); return; }
     setLoading(true); setErr(""); setNarrative("");
     try {
       const data = await api("/profile/bid-assist", {
@@ -2017,11 +2037,20 @@ function BidAssistSection() {
   };
 
   const ta  = { padding: "10px 12px", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 14, width: "100%", fontFamily: "'DM Sans', sans-serif", boxSizing: "border-box", resize: "vertical" };
+  const ghostBtn = (extra) => ({ padding: "9px 18px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", color: C.text, ...extra });
 
   return (
     <div>
       <div style={{ fontSize: 13, color: C.textSub, marginBottom: 12 }}>
-        Paste an RFQ, solicitation scope, or project description. Claude will write a tailored bid narrative using your company profile.
+        Paste an RFQ or upload a PDF — Claude will write a tailored bid narrative using your company profile.
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        <button onClick={() => fileRef.current?.click()} disabled={parsing} style={ghostBtn({ opacity: parsing ? 0.7 : 1 })}>
+          {parsing ? "Parsing PDF…" : "📎 Upload PDF"}
+        </button>
+        <input ref={fileRef} type="file" accept=".pdf" style={{ display: "none" }}
+          onChange={(e) => { if (e.target.files[0]) uploadPdf(e.target.files[0]); e.target.value = ""; }} />
+        {rfqText && <button onClick={() => { setRfqText(""); setNarrative(""); }} style={ghostBtn({ color: C.textMuted })}>Clear</button>}
       </div>
       <textarea
         style={{ ...ta, minHeight: 160 }}
@@ -2032,8 +2061,8 @@ function BidAssistSection() {
       {err && <div style={{ color: "#e05050", fontSize: 13, margin: "8px 0" }}>{err}</div>}
       <button
         onClick={generate}
-        disabled={loading}
-        style={{ marginTop: 12, padding: "11px 28px", background: C.orange, color: "#000", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", opacity: loading ? 0.7 : 1 }}
+        disabled={loading || parsing}
+        style={{ marginTop: 12, padding: "11px 28px", background: C.orange, color: "#000", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", opacity: (loading || parsing) ? 0.7 : 1 }}
       >
         {loading ? "Generating…" : "✨ Generate Narrative"}
       </button>
