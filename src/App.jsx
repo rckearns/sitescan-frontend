@@ -807,7 +807,7 @@ const CITIES = [
   { id: "charleston-sc",  label: "Charleston, SC",   icon: "🌊", active: true },
   { id: "columbia-sc",    label: "Columbia, SC",     icon: "🏛️" },
   { id: "greenville-sc",  label: "Greenville, SC",   icon: "🌿" },
-  { id: "charlotte-nc",   label: "Charlotte, NC",    icon: "🏙️" },
+  { id: "charlotte-nc",   label: "Charlotte, NC",    icon: "🏙️", active: true },
   { id: "raleigh-nc",     label: "Raleigh, NC",      icon: "🔬" },
   { id: "atlanta-ga",     label: "Atlanta, GA",      icon: "🍑" },
   { id: "savannah-ga",    label: "Savannah, GA",     icon: "🌳" },
