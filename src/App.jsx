@@ -2703,14 +2703,15 @@ const styles = {
   },
   // Auth
   authWrap: {
+    position: "fixed",
+    inset: 0,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    minHeight: "100vh",
-    minWidth: "100%",
     background: `radial-gradient(ellipse at 50% 40%, #0e2040 0%, ${C.bg} 65%)`,
     padding: "40px 16px",
     boxSizing: "border-box",
+    overflowY: "auto",
   },
   authCard: {
     background: C.surface,
