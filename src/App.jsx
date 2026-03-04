@@ -1990,6 +1990,7 @@ function CompanyTab() {
   useEffect(() => { loadOrg(); }, []);
 
   if (loading) return <div style={{ textAlign: "center", padding: 60, color: C.textMuted }}>Loading…</div>;
+  if (!org || org.detail) return <div style={{ textAlign: "center", padding: 60, color: C.textMuted }}>Could not load company profile. Please refresh.</div>;
 
   const toggle = (id) => setOpenSection((s) => s === id ? null : id);
 
