@@ -516,7 +516,7 @@ function ProjectCard({ group, onSave, savedIds, animDelay }) {
 function StatsBar({ stats }) {
   if (!stats) return null;
   return (
-    <div style={styles.statsBar}>
+    <div className="stats-grid">
       <div style={{ ...styles.statBox, borderLeft: `3px solid ${C.blue}` }}>
         <div style={styles.statNumber}>{stats.total_projects}</div>
         <div style={styles.statLabel}>Active Projects</div>
@@ -2559,23 +2559,49 @@ export default function SiteScanApp() {
         .leaflet-control-attribution a { color: #4a9fd4 !important; }
         .leaflet-control-zoom a { background: #0c1524 !important; color: #e8f0fa !important; border-color: #1a2f50 !important; }
         .leaflet-control-zoom a:hover { background: #101d30 !important; }
+        /* ── Responsive layout ── */
+        .header-wrap { width: 100%; max-width: 1400px; margin: 0 auto; }
+        .header-top  { display: flex; justify-content: space-between; align-items: center; }
+        .app-nav { display: flex; gap: 2px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; padding-top: 6px; }
+        .app-nav::-webkit-scrollbar { display: none; }
+        .app-nav button { white-space: nowrap; flex-shrink: 0; }
+        .app-main { max-width: 1400px; margin: 0 auto; padding: 20px 32px; box-sizing: border-box; width: 100%; }
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+        @media (min-width: 900px) {
+          .header-wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+          .app-nav { padding-top: 0; flex: 1; }
+        }
+        @media (max-width: 899px) {
+          .app-main { padding: 16px; }
+          .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 480px) {
+          .app-main { padding: 12px; }
+          .stats-grid { gap: 8px; }
+        }
       `}</style>
 
       {/* HEADER */}
       <header style={styles.header}>
-        <div style={styles.headerLeft}>
-          <div style={styles.logo}>
-            <span style={{ color: C.text, fontFamily: "'DM Sans', sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: -0.5 }}>
-              Ya
-            </span>
-            <span style={{ color: C.orange, fontFamily: "'DM Sans', sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: -0.5 }}>
-              bodle
-            </span>
-            <span style={{ fontSize: 9, color: C.textMuted, marginLeft: 8, fontFamily: "'Space Mono', monospace", letterSpacing: 1, textTransform: "uppercase" }}>
-              beta
-            </span>
+        <div className="header-wrap">
+          <div className="header-top">
+            <div style={styles.logo}>
+              <span style={{ color: C.text, fontFamily: "'DM Sans', sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: -0.5 }}>
+                Ya
+              </span>
+              <span style={{ color: C.orange, fontFamily: "'DM Sans', sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: -0.5 }}>
+                bodle
+              </span>
+              <span style={{ fontSize: 9, color: C.textMuted, marginLeft: 8, fontFamily: "'Space Mono', monospace", letterSpacing: 1, textTransform: "uppercase" }}>
+                beta
+              </span>
+            </div>
+            <div style={styles.headerRight}>
+              <CitySelector />
+              <button style={styles.logoutBtn} onClick={logout}>Sign Out</button>
+            </div>
           </div>
-          <nav style={styles.nav}>
+          <nav className="app-nav">
             {[
               { id: "scanner",      label: "Scanner",                    icon: "⚡" },
               { id: "map",          label: "Map",                        icon: "🗺️" },
@@ -2595,14 +2621,10 @@ export default function SiteScanApp() {
             ))}
           </nav>
         </div>
-        <div style={styles.headerRight}>
-          <CitySelector />
-          <button style={styles.logoutBtn} onClick={logout}>Sign Out</button>
-        </div>
       </header>
 
       {/* MAIN */}
-      <main style={styles.main}>
+      <main className="app-main">
         {tab === "scanner" && (
           <>
             <StatsBar stats={liveStats} />
