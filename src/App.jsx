@@ -1989,6 +1989,71 @@ function ProfileSection({ id, openSection, onToggle, title, icon, children }) {
   );
 }
 
+function BidAssistSection() {
+  const [rfqText,   setRfqText]   = useState("");
+  const [narrative, setNarrative] = useState("");
+  const [loading,   setLoading]   = useState(false);
+  const [err,       setErr]       = useState("");
+  const [copied,    setCopied]    = useState(false);
+
+  const generate = async () => {
+    if (!rfqText.trim()) { setErr("Paste an RFQ or project description first."); return; }
+    setLoading(true); setErr(""); setNarrative("");
+    try {
+      const data = await api("/profile/bid-assist", {
+        method: "POST",
+        body: JSON.stringify({ rfq_text: rfqText }),
+      });
+      if (data.detail) throw new Error(data.detail);
+      setNarrative(data.narrative);
+    } catch (e) { setErr(e.message || "Generation failed"); }
+    setLoading(false);
+  };
+
+  const copy = () => {
+    navigator.clipboard.writeText(narrative);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const ta  = { padding: "10px 12px", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 14, width: "100%", fontFamily: "'DM Sans', sans-serif", boxSizing: "border-box", resize: "vertical" };
+
+  return (
+    <div>
+      <div style={{ fontSize: 13, color: C.textSub, marginBottom: 12 }}>
+        Paste an RFQ, solicitation scope, or project description. Claude will write a tailored bid narrative using your company profile.
+      </div>
+      <textarea
+        style={{ ...ta, minHeight: 160 }}
+        placeholder="Paste RFQ text, project scope, or solicitation description here…"
+        value={rfqText}
+        onChange={(e) => setRfqText(e.target.value)}
+      />
+      {err && <div style={{ color: "#e05050", fontSize: 13, margin: "8px 0" }}>{err}</div>}
+      <button
+        onClick={generate}
+        disabled={loading}
+        style={{ marginTop: 12, padding: "11px 28px", background: C.orange, color: "#000", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", opacity: loading ? 0.7 : 1 }}
+      >
+        {loading ? "Generating…" : "✨ Generate Narrative"}
+      </button>
+      {narrative && (
+        <div style={{ marginTop: 20 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Generated Narrative</span>
+            <button onClick={copy} style={{ padding: "5px 14px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: 6, color: copied ? "#4caf50" : C.textSub, fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+              {copied ? "✓ Copied" : "Copy"}
+            </button>
+          </div>
+          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "16px 18px", fontSize: 14, color: C.text, lineHeight: 1.75, whiteSpace: "pre-wrap" }}>
+            {narrative}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CompanyTab() {
   const [org, setOrg] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -2013,6 +2078,7 @@ function CompanyTab() {
       <ProfileSection id="projects"   openSection={openSection} onToggle={toggle} title="Project References"  icon="📋"><ProjectRefsSection org={org} onChanged={loadOrg} /></ProfileSection>
       <ProfileSection id="personnel"  openSection={openSection} onToggle={toggle} title="Key Personnel"       icon="🧑‍💼"><PersonnelSection  org={org} onChanged={loadOrg} /></ProfileSection>
       <ProfileSection id="soq"        openSection={openSection} onToggle={toggle} title="Generate SOQ"        icon="📄"><SOQSection         org={org} /></ProfileSection>
+      <ProfileSection id="bid-assist" openSection={openSection} onToggle={toggle} title="Bid Assist"          icon="✨"><BidAssistSection /></ProfileSection>
     </div>
   );
 }
