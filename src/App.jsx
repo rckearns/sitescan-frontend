@@ -1047,6 +1047,7 @@ const TRADE_RULES = [
   { trade: "Plumbing",          keywords: ["plumb", "plumbing"] },
   { trade: "HVAC / Mechanical", keywords: ["hvac", "mechanical", "heating", "cooling", "air condition"] },
   { trade: "Electrical",        keywords: ["electric", "electrical"] },
+  { trade: "Fire / Sprinkler",  keywords: ["sprinkler", "fire suppression", "fire protection", "fire alarm", "suppression"] },
   { trade: "Painting",          keywords: ["paint", "painting", "coating", "stucco"] },
 ];
 
@@ -1061,6 +1062,7 @@ const TRADE_SEQUENCE = [
   "Plumbing",
   "HVAC / Mechanical",
   "Electrical",
+  "Fire / Sprinkler",
   "Painting",
 ];
 
@@ -1075,6 +1077,7 @@ const TRADE_ICONS = {
   "Windows & Glazing": "🪟",
   "Painting": "🎨",
   "Demolition": "💥",
+  "Fire / Sprinkler": "🔥",
   "General Contractor": "🏗️",
 };
 
