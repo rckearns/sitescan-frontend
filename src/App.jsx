@@ -1607,6 +1607,414 @@ function ContractorsTab() {
 }
 
 
+// ─── COMPANY PROFILE TAB ─────────────────────────────────────────────────────
+
+function OrgInfoForm({ org, onSaved }) {
+  const [form, setForm] = useState({
+    legal_name: org.legal_name || "",
+    entity_type: org.entity_type || "",
+    address_street: org.address_street || "",
+    address_city: org.address_city || "",
+    address_state: org.address_state || "SC",
+    address_zip: org.address_zip || "",
+    phone: org.phone || "",
+    fax: org.fax || "",
+    email: org.email || "",
+    website: org.website || "",
+    contractor_license_number: org.contractor_license_number || "",
+    license_classifications: (org.license_classifications || []).join(", "),
+    insurance_company: org.insurance_company || "",
+    insurance_agent_name: org.insurance_agent_name || "",
+    insurance_agent_phone: org.insurance_agent_phone || "",
+    bonding_company: org.bonding_company || "",
+    bonding_agent_name: org.bonding_agent_name || "",
+    bonding_agent_phone: org.bonding_agent_phone || "",
+    bonding_capacity: org.bonding_capacity || "",
+    emr: org.emr || "",
+    safety_meeting_frequency: org.safety_meeting_frequency || "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const save = async () => {
+    setSaving(true);
+    const payload = { ...form, license_classifications: form.license_classifications.split(",").map((s) => s.trim()).filter(Boolean) };
+    await api("/profile/org", { method: "PUT", body: JSON.stringify(payload) });
+    setSaving(false);
+    setMsg("✓ Saved");
+    setTimeout(() => setMsg(""), 3000);
+    onSaved();
+  };
+
+  const inp = { width: "100%", padding: "10px 12px", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 14, outline: "none", fontFamily: "'DM Sans', sans-serif", boxSizing: "border-box" };
+  const lbl = { fontSize: 12, color: C.textSub, marginBottom: 4, display: "block" };
+  const grp = { marginBottom: 14 };
+  const g2 = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 };
+  const g3 = { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 };
+  const g4 = { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12 };
+  const divider = { borderTop: `1px solid ${C.border}`, marginTop: 4, paddingTop: 14, marginBottom: 14 };
+  const sectionLabel = { fontSize: 12, color: C.textMuted, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 };
+
+  return (
+    <div>
+      <div style={g2}>
+        <div style={grp}><label style={lbl}>Legal Business Name</label><input style={inp} value={form.legal_name} onChange={set("legal_name")} /></div>
+        <div style={grp}><label style={lbl}>Entity Type</label><input style={inp} value={form.entity_type} onChange={set("entity_type")} placeholder="Corporation, LLC, etc." /></div>
+      </div>
+      <div style={grp}><label style={lbl}>Street Address</label><input style={inp} value={form.address_street} onChange={set("address_street")} /></div>
+      <div style={g3}>
+        <div style={grp}><label style={lbl}>City</label><input style={inp} value={form.address_city} onChange={set("address_city")} /></div>
+        <div style={grp}><label style={lbl}>State</label><input style={inp} value={form.address_state} onChange={set("address_state")} /></div>
+        <div style={grp}><label style={lbl}>ZIP</label><input style={inp} value={form.address_zip} onChange={set("address_zip")} /></div>
+      </div>
+      <div style={g2}>
+        <div style={grp}><label style={lbl}>Phone</label><input style={inp} value={form.phone} onChange={set("phone")} /></div>
+        <div style={grp}><label style={lbl}>Fax</label><input style={inp} value={form.fax} onChange={set("fax")} /></div>
+      </div>
+      <div style={g2}>
+        <div style={grp}><label style={lbl}>Email</label><input style={inp} value={form.email} onChange={set("email")} /></div>
+        <div style={grp}><label style={lbl}>Website</label><input style={inp} value={form.website} onChange={set("website")} /></div>
+      </div>
+      <div style={g2}>
+        <div style={grp}><label style={lbl}>SC License Number</label><input style={inp} value={form.contractor_license_number} onChange={set("contractor_license_number")} /></div>
+        <div style={grp}><label style={lbl}>Classifications (comma-separated)</label><input style={inp} value={form.license_classifications} onChange={set("license_classifications")} placeholder="General, Mechanical, etc." /></div>
+      </div>
+      <div style={divider}>
+        <div style={sectionLabel}>Insurance</div>
+        <div style={g3}>
+          <div style={grp}><label style={lbl}>Company</label><input style={inp} value={form.insurance_company} onChange={set("insurance_company")} /></div>
+          <div style={grp}><label style={lbl}>Agent Name</label><input style={inp} value={form.insurance_agent_name} onChange={set("insurance_agent_name")} /></div>
+          <div style={grp}><label style={lbl}>Agent Phone</label><input style={inp} value={form.insurance_agent_phone} onChange={set("insurance_agent_phone")} /></div>
+        </div>
+      </div>
+      <div style={divider}>
+        <div style={sectionLabel}>Bonding</div>
+        <div style={g4}>
+          <div style={grp}><label style={lbl}>Company</label><input style={inp} value={form.bonding_company} onChange={set("bonding_company")} /></div>
+          <div style={grp}><label style={lbl}>Agent Name</label><input style={inp} value={form.bonding_agent_name} onChange={set("bonding_agent_name")} /></div>
+          <div style={grp}><label style={lbl}>Agent Phone</label><input style={inp} value={form.bonding_agent_phone} onChange={set("bonding_agent_phone")} /></div>
+          <div style={grp}><label style={lbl}>Capacity</label><input style={inp} value={form.bonding_capacity} onChange={set("bonding_capacity")} placeholder="$5,000,000" /></div>
+        </div>
+      </div>
+      <div style={g2}>
+        <div style={grp}><label style={lbl}>EMR</label><input style={inp} value={form.emr} onChange={set("emr")} placeholder="0.85" /></div>
+        <div style={grp}><label style={lbl}>Safety Meeting Frequency</label><input style={inp} value={form.safety_meeting_frequency} onChange={set("safety_meeting_frequency")} placeholder="Weekly" /></div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 4 }}>
+        <button onClick={save} disabled={saving} style={{ padding: "10px 24px", background: C.orange, color: "#000", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+          {saving ? "Saving…" : "Save"}
+        </button>
+        {msg && <span style={{ color: C.sky, fontSize: 14 }}>{msg}</span>}
+      </div>
+    </div>
+  );
+}
+
+function PrincipalsSection({ org, onChanged }) {
+  const blank = { name: "", title: "", other_businesses: "", order: 0 };
+  const [form, setForm] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const save = async () => {
+    setSaving(true);
+    if (form.id) await api(`/profile/org/principals/${form.id}`, { method: "PATCH", body: JSON.stringify(form) });
+    else await api("/profile/org/principals", { method: "POST", body: JSON.stringify(form) });
+    setSaving(false); setForm(null); onChanged();
+  };
+
+  const del = async (id) => { await api(`/profile/org/principals/${id}`, { method: "DELETE" }); onChanged(); };
+
+  const inp = { width: "100%", padding: "9px 11px", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 14, outline: "none", fontFamily: "'DM Sans', sans-serif", boxSizing: "border-box" };
+  const lbl = { fontSize: 12, color: C.textSub, marginBottom: 4, display: "block" };
+  const btn = (primary) => ({ padding: "8px 20px", background: primary ? C.orange : "none", color: primary ? "#000" : C.textSub, border: primary ? "none" : `1px solid ${C.border}`, borderRadius: 8, fontWeight: primary ? 700 : 400, fontSize: 14, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" });
+
+  return (
+    <div>
+      {!(org.principals || []).length && !form && <div style={{ color: C.textMuted, fontSize: 14, marginBottom: 12 }}>No principals added yet.</div>}
+      {(org.principals || []).map((p) => (
+        <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: C.bg, borderRadius: 8, marginBottom: 8 }}>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>{p.name || "(no name)"}</div>
+            <div style={{ fontSize: 12, color: C.textSub }}>{p.title}</div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => setForm({ ...p })} style={{ background: "none", border: "none", color: C.textSub, cursor: "pointer", fontSize: 16 }}>✏️</button>
+            <button onClick={() => del(p.id)} style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: 16 }}>🗑️</button>
+          </div>
+        </div>
+      ))}
+      {form !== null ? (
+        <div style={{ background: C.bg, border: `1px solid ${C.borderHi}`, borderRadius: 8, padding: 16, marginBottom: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <div><label style={lbl}>Name</label><input style={inp} value={form.name} onChange={set("name")} /></div>
+            <div><label style={lbl}>Title</label><input style={inp} value={form.title} onChange={set("title")} /></div>
+          </div>
+          <div style={{ marginBottom: 12 }}><label style={lbl}>Other Businesses</label><textarea style={{ ...inp, resize: "vertical", minHeight: 60 }} value={form.other_businesses} onChange={set("other_businesses")} /></div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={save} disabled={saving} style={btn(true)}>{saving ? "Saving…" : form.id ? "Update" : "Add"}</button>
+            <button onClick={() => setForm(null)} style={btn(false)}>Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setForm({ ...blank })} style={{ padding: "8px 16px", background: "none", border: `1px solid ${C.border}`, borderRadius: 8, color: C.sky, cursor: "pointer", fontSize: 13, fontFamily: "'DM Sans', sans-serif" }}>+ Add Principal</button>
+      )}
+    </div>
+  );
+}
+
+function ProjectRefsSection({ org, onChanged }) {
+  const blank = { project_name: "", owner_name: "", owner_contact: "", owner_phone: "", contract_value: "", completion_date: "", scope_of_work: "", description: "", your_role: "", ref_type: "general" };
+  const [form, setForm] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const save = async () => {
+    setSaving(true);
+    const payload = { ...form, contract_value: form.contract_value ? parseFloat(form.contract_value) : null };
+    if (form.id) await api(`/profile/org/projects/${form.id}`, { method: "PATCH", body: JSON.stringify(payload) });
+    else await api("/profile/org/projects", { method: "POST", body: JSON.stringify(payload) });
+    setSaving(false); setForm(null); onChanged();
+  };
+
+  const del = async (id) => { await api(`/profile/org/projects/${id}`, { method: "DELETE" }); onChanged(); };
+
+  const inp = { width: "100%", padding: "9px 11px", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 14, outline: "none", fontFamily: "'DM Sans', sans-serif", boxSizing: "border-box" };
+  const lbl = { fontSize: 12, color: C.textSub, marginBottom: 4, display: "block" };
+  const btn = (primary) => ({ padding: "8px 20px", background: primary ? C.orange : "none", color: primary ? "#000" : C.textSub, border: primary ? "none" : `1px solid ${C.border}`, borderRadius: 8, fontWeight: primary ? 700 : 400, fontSize: 14, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" });
+
+  const RefList = ({ type, label }) => {
+    const items = (org.project_refs || []).filter((r) => r.ref_type === type);
+    return (
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>{label}</div>
+        {!items.length && <div style={{ color: C.textMuted, fontSize: 14, marginBottom: 8 }}>None added yet.</div>}
+        {items.map((r) => (
+          <div key={r.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: C.bg, borderRadius: 8, marginBottom: 8 }}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>{r.project_name || "(no name)"}</div>
+              <div style={{ fontSize: 12, color: C.textSub }}>{r.owner_name}{r.contract_value ? ` · $${Number(r.contract_value).toLocaleString()}` : ""}{r.completion_date ? ` · ${r.completion_date}` : ""}</div>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setForm({ ...r, contract_value: r.contract_value || "" })} style={{ background: "none", border: "none", color: C.textSub, cursor: "pointer", fontSize: 16 }}>✏️</button>
+              <button onClick={() => del(r.id)} style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: 16 }}>🗑️</button>
+            </div>
+          </div>
+        ))}
+        {!form && <button onClick={() => setForm({ ...blank, ref_type: type })} style={{ padding: "8px 16px", background: "none", border: `1px solid ${C.border}`, borderRadius: 8, color: C.sky, cursor: "pointer", fontSize: 13, fontFamily: "'DM Sans', sans-serif" }}>+ Add {type === "state" ? "State" : "General"} Project</button>}
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      <RefList type="general" label="General Projects" />
+      <RefList type="state" label="State Agency Projects" />
+      {form !== null && (
+        <div style={{ background: C.bg, border: `1px solid ${C.borderHi}`, borderRadius: 8, padding: 16, marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.sky, marginBottom: 12 }}>{form.id ? "Edit" : "Add"} {form.ref_type === "state" ? "State Agency" : "General"} Project</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <div><label style={lbl}>Project Name</label><input style={inp} value={form.project_name} onChange={set("project_name")} /></div>
+            <div><label style={lbl}>Owner Name</label><input style={inp} value={form.owner_name} onChange={set("owner_name")} /></div>
+            <div><label style={lbl}>Owner Contact</label><input style={inp} value={form.owner_contact} onChange={set("owner_contact")} /></div>
+            <div><label style={lbl}>Owner Phone</label><input style={inp} value={form.owner_phone} onChange={set("owner_phone")} /></div>
+            <div><label style={lbl}>Contract Value ($)</label><input style={inp} type="number" value={form.contract_value} onChange={set("contract_value")} /></div>
+            <div><label style={lbl}>Completion Date</label><input style={inp} value={form.completion_date} onChange={set("completion_date")} placeholder="March 2024" /></div>
+            <div><label style={lbl}>Your Role</label><input style={inp} value={form.your_role} onChange={set("your_role")} placeholder="GC, Prime, Sub" /></div>
+          </div>
+          <div style={{ marginBottom: 12 }}><label style={lbl}>Scope of Work</label><textarea style={{ ...inp, resize: "vertical", minHeight: 60 }} value={form.scope_of_work} onChange={set("scope_of_work")} /></div>
+          <div style={{ marginBottom: 12 }}><label style={lbl}>Description</label><textarea style={{ ...inp, resize: "vertical", minHeight: 60 }} value={form.description} onChange={set("description")} /></div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={save} disabled={saving} style={btn(true)}>{saving ? "Saving…" : form.id ? "Update" : "Add"}</button>
+            <button onClick={() => setForm(null)} style={btn(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PersonnelSection({ org, onChanged }) {
+  const blank = { name: "", role: "pm", resume_summary: "", projects: [] };
+  const [editing, setEditing] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const set = (k) => (e) => setEditing((f) => ({ ...f, [k]: e.target.value }));
+
+  const save = async () => {
+    setSaving(true);
+    if (editing.id) await api(`/profile/org/personnel/${editing.id}`, { method: "PATCH", body: JSON.stringify(editing) });
+    else await api("/profile/org/personnel", { method: "POST", body: JSON.stringify(editing) });
+    setSaving(false); setEditing(null); onChanged();
+  };
+
+  const del = async (id) => { await api(`/profile/org/personnel/${id}`, { method: "DELETE" }); onChanged(); };
+
+  const inp = { width: "100%", padding: "9px 11px", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 14, outline: "none", fontFamily: "'DM Sans', sans-serif", boxSizing: "border-box" };
+  const lbl = { fontSize: 12, color: C.textSub, marginBottom: 4, display: "block" };
+  const btn = (primary) => ({ padding: "8px 20px", background: primary ? C.orange : "none", color: primary ? "#000" : C.textSub, border: primary ? "none" : `1px solid ${C.border}`, borderRadius: 8, fontWeight: primary ? 700 : 400, fontSize: 14, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" });
+
+  const RoleCard = ({ role, roleLabel }) => {
+    const people = (org.personnel || []).filter((p) => p.role === role);
+    return (
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>{roleLabel}</div>
+        {!people.length && <div style={{ color: C.textMuted, fontSize: 14, marginBottom: 8 }}>Not added yet.</div>}
+        {people.map((p) => (
+          <div key={p.id} style={{ background: C.bg, borderRadius: 8, padding: "12px 14px", marginBottom: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>{p.name || "(no name)"}</div>
+                {p.resume_summary && <div style={{ fontSize: 12, color: C.textSub, marginTop: 4, maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.resume_summary}</div>}
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => setEditing({ ...p })} style={{ background: "none", border: "none", color: C.textSub, cursor: "pointer", fontSize: 16 }}>✏️</button>
+                <button onClick={() => del(p.id)} style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: 16 }}>🗑️</button>
+              </div>
+            </div>
+          </div>
+        ))}
+        {!editing && <button onClick={() => setEditing({ ...blank, role })} style={{ padding: "8px 16px", background: "none", border: `1px solid ${C.border}`, borderRadius: 8, color: C.sky, cursor: "pointer", fontSize: 13, fontFamily: "'DM Sans', sans-serif" }}>+ Add {roleLabel}</button>}
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginBottom: editing ? 16 : 0 }}>
+        <RoleCard role="pm" roleLabel="Project Manager" />
+        <RoleCard role="super" roleLabel="Superintendent" />
+      </div>
+      {editing !== null && (
+        <div style={{ background: C.bg, border: `1px solid ${C.borderHi}`, borderRadius: 8, padding: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.sky, marginBottom: 12 }}>{editing.id ? "Edit" : "Add"} {editing.role === "pm" ? "Project Manager" : "Superintendent"}</div>
+          <div style={{ marginBottom: 12 }}><label style={lbl}>Name</label><input style={inp} value={editing.name} onChange={set("name")} /></div>
+          <div style={{ marginBottom: 12 }}><label style={lbl}>Resume Summary</label><textarea style={{ ...inp, resize: "vertical", minHeight: 80 }} value={editing.resume_summary} onChange={set("resume_summary")} /></div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={save} disabled={saving} style={btn(true)}>{saving ? "Saving…" : editing.id ? "Update" : "Add"}</button>
+            <button onClick={() => setEditing(null)} style={btn(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SOQSection({ org }) {
+  const pms    = (org.personnel || []).filter((p) => p.role === "pm");
+  const supers = (org.personnel || []).filter((p) => p.role === "super");
+  const genProjects   = (org.project_refs || []).filter((r) => r.ref_type === "general");
+  const stateProjects = (org.project_refs || []).filter((r) => r.ref_type === "state");
+
+  const [pmId,      setPmId]      = useState(pms[0]?.id    || "");
+  const [superId,   setSuperId]   = useState(supers[0]?.id || "");
+  const [genIds,    setGenIds]    = useState([]);
+  const [stateIds,  setStateIds]  = useState([]);
+  const [generating, setGenerating] = useState(false);
+  const [err, setErr] = useState("");
+
+  const toggleCheck = (list, setList, id, max) => setList((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : prev.length < max ? [...prev, id] : prev);
+
+  const generate = async () => {
+    if (!pmId || !superId) { setErr("Select a Project Manager and Superintendent first."); return; }
+    setGenerating(true); setErr("");
+    try {
+      const token = localStorage.getItem("sitescan_token");
+      const res = await fetch(`${API}/profile/soq/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ pm_id: Number(pmId), super_id: Number(superId), general_project_ids: genIds, state_project_ids: stateIds }),
+      });
+      if (!res.ok) { const j = await res.json(); throw new Error(j.detail || "Generation failed"); }
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href = url; a.download = `SOQ_${(org.legal_name || "Company").replace(/\s+/g, "_")}.docx`; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) { setErr(e.message); }
+    setGenerating(false);
+  };
+
+  const sel = { padding: "10px 12px", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 14, width: "100%", fontFamily: "'DM Sans', sans-serif" };
+  const lbl = { fontSize: 12, color: C.textSub, marginBottom: 4, display: "block" };
+  const sectionLbl = { fontSize: 12, color: C.textMuted, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 };
+
+  const CheckList = ({ items, selected, onToggle, max, label }) => (
+    <div style={{ marginBottom: 20 }}>
+      <div style={sectionLbl}>{label} <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(select up to {max})</span></div>
+      {!items.length && <div style={{ color: C.textMuted, fontSize: 13 }}>No project references added yet.</div>}
+      {items.map((r) => (
+        <label key={r.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", background: selected.includes(r.id) ? C.surfaceHi : C.bg, borderRadius: 8, marginBottom: 6, cursor: "pointer", border: `1px solid ${selected.includes(r.id) ? C.borderHi : C.border}` }}>
+          <input type="checkbox" checked={selected.includes(r.id)} onChange={() => onToggle(r.id)} style={{ accentColor: C.orange }} disabled={!selected.includes(r.id) && selected.length >= max} />
+          <div>
+            <div style={{ fontSize: 14, color: C.text, fontWeight: 600 }}>{r.project_name || "(no name)"}</div>
+            <div style={{ fontSize: 12, color: C.textSub }}>{r.owner_name}{r.contract_value ? ` · $${Number(r.contract_value).toLocaleString()}` : ""}</div>
+          </div>
+        </label>
+      ))}
+    </div>
+  );
+
+  return (
+    <div>
+      {(!pms.length || !supers.length) && (
+        <div style={{ background: C.surfaceHi, border: `1px solid ${C.border}`, borderRadius: 8, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: C.textSub }}>
+          Add a Project Manager and Superintendent under Key Personnel before generating.
+        </div>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+        <div><label style={lbl}>Project Manager</label><select style={sel} value={pmId} onChange={(e) => setPmId(e.target.value)}><option value="">— Select PM —</option>{pms.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+        <div><label style={lbl}>Superintendent</label><select style={sel} value={superId} onChange={(e) => setSuperId(e.target.value)}><option value="">— Select Superintendent —</option>{supers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+      </div>
+      <CheckList items={genProjects}   selected={genIds}   onToggle={(id) => toggleCheck(genIds,   setGenIds,   id, 3)} max={3} label="General Projects" />
+      <CheckList items={stateProjects} selected={stateIds} onToggle={(id) => toggleCheck(stateIds, setStateIds, id, 3)} max={3} label="State Agency Projects" />
+      {err && <div style={{ color: "#e05050", fontSize: 13, marginBottom: 12 }}>{err}</div>}
+      <button onClick={generate} disabled={generating} style={{ padding: "11px 28px", background: C.orange, color: "#000", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+        {generating ? "Generating…" : "⬇ Download SOQ .docx"}
+      </button>
+    </div>
+  );
+}
+
+function CompanyTab() {
+  const [org, setOrg] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [openSection, setOpenSection] = useState("info");
+
+  const loadOrg = async () => {
+    try { const data = await api("/profile/org"); setOrg(data); } catch (e) { /* ignore */ }
+    setLoading(false);
+  };
+
+  useEffect(() => { loadOrg(); }, []);
+
+  if (loading) return <div style={{ textAlign: "center", padding: 60, color: C.textMuted }}>Loading…</div>;
+
+  const toggle = (id) => setOpenSection((s) => s === id ? null : id);
+
+  const Section = ({ id, title, icon, children }) => (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 16, overflow: "hidden" }}>
+      <div style={{ padding: "14px 18px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: openSection === id ? `1px solid ${C.border}` : "none" }} onClick={() => toggle(id)}>
+        <span style={{ fontWeight: 700, fontSize: 15, color: C.text }}>{icon} {title}</span>
+        <span style={{ color: C.textMuted, fontSize: 12 }}>{openSection === id ? "▲" : "▼"}</span>
+      </div>
+      {openSection === id && <div style={{ padding: 18 }}>{children}</div>}
+    </div>
+  );
+
+  return (
+    <div style={{ maxWidth: 860, margin: "0 auto", padding: "24px 16px" }}>
+      <Section id="info"       title="Company Info"        icon="🏢"><OrgInfoForm       org={org} onSaved={loadOrg}   /></Section>
+      <Section id="principals" title="Principals"          icon="👤"><PrincipalsSection org={org} onChanged={loadOrg} /></Section>
+      <Section id="projects"   title="Project References"  icon="📋"><ProjectRefsSection org={org} onChanged={loadOrg} /></Section>
+      <Section id="personnel"  title="Key Personnel"       icon="🧑‍💼"><PersonnelSection  org={org} onChanged={loadOrg} /></Section>
+      <Section id="soq"        title="Generate SOQ"        icon="📄"><SOQSection         org={org} /></Section>
+    </div>
+  );
+}
+
+
 // ─── SCAN HISTORY TAB ───────────────────────────────────────────────────────
 
 function HistoryTab({ history, onRefresh }) {
@@ -2170,6 +2578,7 @@ export default function SiteScanApp() {
               { id: "map",          label: "Map",                        icon: "🗺️" },
               { id: "saved",        label: `Saved (${saved.length})`,    icon: "★" },
               { id: "contractors",  label: "Contractors",                icon: "🤝" },
+              { id: "company",      label: "Company",                    icon: "🏢" },
               { id: "history",      label: "History",                    icon: "📊" },
               { id: "profile",      label: "Match Filter",               icon: "⚙" },
             ].map((t) => (
@@ -2231,6 +2640,7 @@ export default function SiteScanApp() {
         )}
         {tab === "saved" && <SavedTab saved={saved} onUnsave={unsaveProject} />}
         {tab === "contractors" && <ContractorsTab />}
+        {tab === "company" && <CompanyTab />}
         {tab === "history" && <HistoryTab history={history} onRefresh={loadHistory} />}
         {tab === "profile" && (
           <ProfileTab
