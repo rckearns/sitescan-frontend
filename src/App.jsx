@@ -190,8 +190,14 @@ const catIcons = {
 const sourceLabels = {
   "sam-gov": "SAM.gov",
   "charleston-permits": "CHS Permits",
+  "north-charleston-permits": "N. Charleston",
+  "mt-pleasant-permits": "Mt. Pleasant",
   scbo: "SCBO",
   "charleston-city-bids": "CHS Bids",
+  "charlotte-permits": "Charlotte",
+  "charlotte-land-dev": "CLT Land Dev",
+  "charlotte-cip": "CLT CIP",
+  "charlotte-ncdot": "CLT NCDOT",
 };
 
 const statusColors = {
@@ -558,8 +564,14 @@ const ALL_STATUSES = ["Open", "Active", "Accepting Bids", "Issued", "In Review",
 const ALL_SOURCES = [
   { id: "sam-gov", label: "SAM.gov" },
   { id: "charleston-permits", label: "CHS Permits" },
+  { id: "north-charleston-permits", label: "N. Charleston" },
+  { id: "mt-pleasant-permits", label: "Mt. Pleasant" },
   { id: "scbo", label: "SCBO" },
   { id: "charleston-city-bids", label: "CHS City Bids" },
+  { id: "charlotte-permits", label: "Charlotte" },
+  { id: "charlotte-land-dev", label: "CLT Land Dev" },
+  { id: "charlotte-cip", label: "CLT CIP" },
+  { id: "charlotte-ncdot", label: "CLT NCDOT" },
 ];
 
 function ProfileTab({ onCriteriaChange, lastScanAt, onScan }) {
@@ -1087,10 +1099,10 @@ const TRADE_RULES = [
   { trade: "Windows & Glazing", keywords: ["window", "glass", "glazing", "curtain wall", "storefront"] },
   { trade: "Drywall",           keywords: ["drywall", "gypsum", "sheetrock", "wallboard"] },
   { trade: "Plumbing",          keywords: ["plumb", "plumbing"] },
-  { trade: "HVAC / Mechanical", keywords: ["hvac", "mechanical", "heating", "cooling", "air condition"] },
+  { trade: "HVAC / Mechanical", keywords: ["hvac", "mechanical", "heating", "cooling", "air condition", "controls", "building automation", "lennox"] },
   { trade: "Electrical",        keywords: ["electric", "electrical"] },
-  { trade: "Low Voltage",       keywords: ["low voltage", "low-voltage", "data", "cabling", "security system", "access control", "camera", "cctv", "av ", "audio visual", "audiovisual"] },
-  { trade: "Fire / Sprinkler",  keywords: ["sprinkler", "fire suppression", "fire protection", "fire alarm", "suppression"] },
+  { trade: "Low Voltage",       keywords: ["low voltage", "low-voltage", "data", "cabling", "security system", "access control", "camera", "cctv", "av ", "audio visual", "audiovisual", "fire & security", "fire and security", "integrated security", "security integrat"] },
+  { trade: "Fire / Sprinkler",  keywords: ["sprinkler", "fire suppression", "fire protection", "fire alarm", "suppression", "ansul"] },
   { trade: "Painting",          keywords: ["paint", "painting", "coating", "stucco"] },
 ];
 
@@ -1132,6 +1144,22 @@ const TRADE_ICONS = {
   "General Contractor": "🏗️",
 };
 
+// Exact-prefix overrides for well-known companies whose names don't contain
+// clear trade keywords. Matched case-insensitively against the start of the name.
+const TRADE_OVERRIDES = {
+  "vsc":              "Fire / Sprinkler", // VSC fire alarm
+  "johnson controls": "Low Voltage",
+  "siemens":          "Low Voltage",
+  "honeywell":        "Low Voltage",
+  "carrier":          "HVAC / Mechanical",
+  "trane":            "HVAC / Mechanical",
+  "york ":            "HVAC / Mechanical",
+  "daikin":           "HVAC / Mechanical",
+  "tyco":             "Fire / Sprinkler",
+  "simplex":          "Fire / Sprinkler",
+  "kidde":            "Fire / Sprinkler",
+};
+
 // Map backend permit categories → frontend trade bucket names
 const CATEGORY_TO_TRADE = {
   "fire-sprinkler": "Fire / Sprinkler",
@@ -1141,8 +1169,36 @@ const CATEGORY_TO_TRADE = {
   "roofing":        "Roofing",
 };
 
+// Map SC LLR classification codes → frontend trade bucket names
+const LLR_CLASS_TO_TRADE = {
+  "CT":  "Concrete",
+  "CP":  "Concrete",
+  "MS":  "Masonry",
+  "SF":  "Structural Steel",
+  "WF":  "Framing",
+  "NR":  "Drywall",
+  "GD":  "Sitework",
+  "RF":  "Roofing",
+  "GG":  "Windows & Glazing",
+  "AC":  "HVAC / Mechanical",
+  "HT":  "HVAC / Mechanical",
+  "EL":  "Electrical",
+  "PB":  "Plumbing",
+  "MM":  "Structural Steel",
+  "AP":  "Sitework",
+};
+
 function inferContractorTrade(sub) {
-  // Primary: use the most common permit category across the contractor's projects
+  const lower = sub.name.toLowerCase().trim();
+
+  // 0. Company-name overrides (well-known companies with non-obvious names)
+  for (const [prefix, trade] of Object.entries(TRADE_OVERRIDES)) {
+    if (lower === prefix || lower.startsWith(prefix + " ") || lower.startsWith(prefix + ",")) {
+      return trade;
+    }
+  }
+
+  // 1. Primary: use the most common permit category across the contractor's projects
   if (sub.projects && sub.projects.length > 0) {
     const counts = {};
     for (const p of sub.projects) {
@@ -1153,36 +1209,98 @@ function inferContractorTrade(sub) {
       return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
     }
   }
-  // Fallback: keyword match on company name
-  const lower = sub.name.toLowerCase();
+
+  // 2. Fallback: keyword match on company name
   for (const { trade, keywords } of TRADE_RULES) {
     if (keywords.some((k) => lower.includes(k))) return trade;
   }
   return "General Contractor";
 }
 
-function PermitContractorCard({ sub }) {
+// Card for a contractor that exists only in the SC LLR license directory,
+// not yet observed in permit data.
+function DirectoryBadgeCard({ entry }) {
+  return (
+    <div style={{
+      padding: "10px 16px",
+      borderTop: `1px solid ${C.border}`,
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      opacity: 0.8,
+    }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: C.textSub, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {entry.company_name}
+        </div>
+        {entry.city && (
+          <div style={{ fontSize: 11, color: C.textMuted, marginTop: 1 }}>
+            {entry.city}, SC
+          </div>
+        )}
+      </div>
+      <div style={{
+        fontSize: 10,
+        fontWeight: 700,
+        color: C.blue,
+        background: `${C.blue}18`,
+        border: `1px solid ${C.blue}30`,
+        borderRadius: 8,
+        padding: "2px 7px",
+        whiteSpace: "nowrap",
+        flexShrink: 0,
+      }}>
+        LLR Licensed
+      </div>
+    </div>
+  );
+}
+
+function PermitContractorCard({ sub, marketShare, tradeTotal }) {
   const [open, setOpen] = useState(false);
+  const pct = marketShare != null ? marketShare : 0;
+  const shareColor = pct >= 25 ? C.orange : pct >= 10 ? C.blue : C.textMuted;
+  const hasMedian = sub.median_project_value != null && sub.median_project_value > 0;
   return (
     <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
       <div
-        style={{ padding: "14px 18px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}
+        style={{ padding: "13px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}
         onClick={() => setOpen((v) => !v)}
       >
+        {/* Left: name + stats */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, color: C.text }}>{sub.name}</div>
-          <div style={{ fontSize: 12, color: C.textSub, marginTop: 3, display: "flex", flexWrap: "wrap", gap: "2px 14px" }}>
-            <span>{sub.project_count} permit{sub.project_count !== 1 ? "s" : ""}</span>
+          <div style={{ fontWeight: 700, fontSize: 13, color: C.text, marginBottom: 5 }}>{sub.name}</div>
+
+          {/* Market share bar */}
+          {tradeTotal > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <div style={{ flex: 1, height: 4, background: `${C.border}`, borderRadius: 2, overflow: "hidden" }}>
+                <div style={{ width: `${Math.min(pct, 100)}%`, height: "100%", background: shareColor, borderRadius: 2, transition: "width 0.4s ease" }} />
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, color: shareColor, fontFamily: "'JetBrains Mono', monospace", minWidth: 38, textAlign: "right" }}>
+                {pct.toFixed(1)}%
+              </span>
+            </div>
+          )}
+
+          {/* Stats row: median (primary) · permits · total */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 16px", fontSize: 12 }}>
+            {hasMedian && (
+              <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>
+                {fmt$(sub.median_project_value)} <span style={{ color: C.textMuted, fontWeight: 400, fontFamily: "'DM Sans', sans-serif" }}>median</span>
+              </span>
+            )}
+            <span style={{ color: C.textMuted }}>
+              {sub.project_count} permit{sub.project_count !== 1 ? "s" : ""}
+            </span>
             {sub.total_scope_value > 0 && (
-              <span style={{ color: C.orange, fontFamily: "'JetBrains Mono', monospace" }}>
+              <span style={{ color: C.textMuted, fontFamily: "'JetBrains Mono', monospace" }}>
                 {fmt$(sub.total_scope_value)} total
               </span>
             )}
-            {sub.median_project_value != null && sub.median_project_value > 0 && (
-              <span style={{ color: C.textMuted }}>{fmt$(sub.median_project_value)} median</span>
-            )}
           </div>
         </div>
+
         <span style={{ color: C.textMuted, fontSize: 11, flexShrink: 0 }}>{open ? "▲" : "▼"}</span>
       </div>
       {open && (
@@ -1223,11 +1341,25 @@ function PermitContractorCard({ sub }) {
   );
 }
 
+const MEDIAN_THRESHOLDS = [
+  { label: "Any size",   value: 0 },
+  { label: "> $10K median",  value: 10000 },
+  { label: "> $25K median",  value: 25000 },
+  { label: "> $50K median",  value: 50000 },
+  { label: "> $100K median", value: 100000 },
+  { label: "> $250K median", value: 250000 },
+  { label: "> $500K median", value: 500000 },
+];
+
 function PermitContractorsSection() {
   const [allData, setAllData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [dirData, setDirData] = useState(null);      // SC LLR directory entries
+  const [dirStatus, setDirStatus] = useState(null);  // {has_api_key, total_entries}
+  const [dirRefreshing, setDirRefreshing] = useState(false);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("total_scope_value");
+  const [minMedian, setMinMedian] = useState(25000);
   const [openTrades, setOpenTrades] = useState(new Set());
 
   const toggleTrade = (trade) => setOpenTrades((prev) => {
@@ -1245,9 +1377,27 @@ function PermitContractorsSection() {
         .catch(() => {})
         .finally(() => setLoading(false));
     }
+    // Load directory status + data (silently — directory may be empty)
+    api("/directory/status").then((s) => setDirStatus(s)).catch(() => {});
+    api("/directory/contractors?active_only=true&limit=2000")
+      .then((entries) => setDirData(entries))
+      .catch(() => {});
   }, []);
 
-  // Filter by search, then sort
+  const triggerDirRefresh = () => {
+    if (dirRefreshing) return;
+    setDirRefreshing(true);
+    api("/directory/refresh", { method: "POST" })
+      .then(() => {
+        setTimeout(() => {
+          api("/directory/status").then(setDirStatus).catch(() => {});
+          setDirRefreshing(false);
+        }, 3000);
+      })
+      .catch(() => setDirRefreshing(false));
+  };
+
+  // Filter by search + min median, then sort
   const filteredSubs = useMemo(() => {
     if (!allData) return [];
     let subs = allData.subcontractors;
@@ -1255,22 +1405,48 @@ function PermitContractorsSection() {
       const q = search.toLowerCase();
       subs = subs.filter((s) => s.name.toLowerCase().includes(q));
     }
+    if (minMedian > 0) {
+      subs = subs.filter((s) => (s.median_project_value || 0) >= minMedian);
+    }
     return [...subs].sort((a, b) => {
       if (sortBy === "name") return a.name.localeCompare(b.name);
       if (sortBy === "project_count") return b.project_count - a.project_count;
+      if (sortBy === "median") return (b.median_project_value || 0) - (a.median_project_value || 0);
       return (b.total_scope_value || 0) - (a.total_scope_value || 0);
     });
-  }, [allData, search, sortBy]);
+  }, [allData, search, sortBy, minMedian]);
 
   // Group by inferred trade from filtered+sorted list
+  // Returns { trade: { subs: [...permitSubs], dirOnly: [...dirEntries] } }
   const tradeGroups = useMemo(() => {
-    if (!filteredSubs.length && !loading) return {};
+    if (!filteredSubs.length && !loading && (!dirData || !dirData.length)) return {};
+
+    // Build set of permit-contractor names (lowercased) for dedup
+    const permitNames = new Set(filteredSubs.map((s) => s.name.toLowerCase().trim()));
+
     const groups = {};
+    const ensureTrade = (trade) => {
+      if (!groups[trade]) groups[trade] = { subs: [], dirOnly: [] };
+    };
+
+    // Permit-based contractors
     for (const sub of filteredSubs) {
       const trade = inferContractorTrade(sub);
-      if (!groups[trade]) groups[trade] = [];
-      groups[trade].push(sub);
+      ensureTrade(trade);
+      groups[trade].subs.push(sub);
     }
+
+    // Directory-only entries (not already visible in permit data)
+    if (dirData && search === "") {
+      for (const entry of dirData) {
+        const nameLower = entry.company_name.toLowerCase().trim();
+        if (permitNames.has(nameLower)) continue; // already in permit results
+        const trade = LLR_CLASS_TO_TRADE[entry.classification] || "General Contractor";
+        ensureTrade(trade);
+        groups[trade].dirOnly.push(entry);
+      }
+    }
+
     // Sort by construction sequence; unknown trades go after the known list
     return Object.fromEntries(
       Object.entries(groups).sort(([a], [b]) => {
@@ -1282,7 +1458,7 @@ function PermitContractorsSection() {
         return ai - bi;
       })
     );
-  }, [filteredSubs, loading]);
+  }, [filteredSubs, dirData, loading, search]);
 
   const emptyState = (
     <div style={{ textAlign: "center", padding: 32, color: C.textMuted, border: `1px dashed ${C.border}`, borderRadius: 10, fontSize: 13 }}>
@@ -1310,7 +1486,42 @@ function PermitContractorsSection() {
 
   return (
     <div>
-      {/* Search + sort */}
+      {/* Directory status bar */}
+      {dirStatus && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10,
+          padding: "8px 14px", marginBottom: 14,
+          background: `${C.navy}30`, border: `1px solid ${C.border}`, borderRadius: 8,
+          fontSize: 12, color: C.textSub,
+        }}>
+          <span style={{ flex: 1 }}>
+            {dirStatus.total_entries > 0
+              ? `SC LLR directory: ${dirStatus.total_entries} licensed contractors`
+              : "SC LLR directory: not yet loaded"}
+          </span>
+          {dirStatus.has_api_key ? (
+            <button
+              onClick={triggerDirRefresh}
+              disabled={dirRefreshing}
+              style={{
+                padding: "4px 10px", fontSize: 11, cursor: "pointer",
+                background: dirRefreshing ? C.surface : C.blue,
+                color: dirRefreshing ? C.textMuted : "#fff",
+                border: `1px solid ${C.blue}`,
+                borderRadius: 6, fontFamily: "'DM Sans', sans-serif",
+              }}
+            >
+              {dirRefreshing ? "Refreshing…" : "Refresh LLR"}
+            </button>
+          ) : (
+            <span style={{ color: C.textMuted, fontSize: 11 }}>
+              Set TWOCAPTCHA_API_KEY to enable auto-refresh
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Search + sort + median filter */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 20 }}>
         <input
           placeholder="Search contractors…"
@@ -1318,9 +1529,15 @@ function PermitContractorsSection() {
           onChange={(e) => setSearch(e.target.value)}
           style={inputStyle}
         />
+        <select value={minMedian} onChange={(e) => setMinMedian(Number(e.target.value))} style={selectStyle}>
+          {MEDIAN_THRESHOLDS.map(({ label, value }) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
         <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={selectStyle}>
           <option value="total_scope_value">Sort: Total Value</option>
-          <option value="project_count">Sort: Project Count</option>
+          <option value="median">Sort: Median Size</option>
+          <option value="project_count">Sort: Permit Count</option>
           <option value="name">Sort: Name A–Z</option>
         </select>
       </div>
@@ -1344,8 +1561,11 @@ function PermitContractorsSection() {
           gap: 24,
           alignItems: "start",
         }}>
-          {Object.entries(tradeGroups).map(([trade, subs]) => {
+          {Object.entries(tradeGroups).map(([trade, group]) => {
+            const { subs, dirOnly } = group;
             const isOpen = openTrades.has(trade);
+            const tradeTotal = subs.reduce((sum, s) => sum + (s.total_scope_value || 0), 0);
+            const totalCount = subs.length + dirOnly.length;
             return (
               <div key={trade} style={{
                 background: C.surface,
@@ -1368,12 +1588,17 @@ function PermitContractorsSection() {
                   <span style={{ fontSize: 14, fontWeight: 700, color: C.text, flex: 1 }}>
                     {trade}
                   </span>
+                  {tradeTotal > 0 && (
+                    <span style={{ fontSize: 11, color: C.orange, fontFamily: "'JetBrains Mono', monospace", marginRight: 4 }}>
+                      {fmt$(tradeTotal)}
+                    </span>
+                  )}
                   <span style={{
                     fontSize: 11, fontWeight: 700, color: C.blue,
                     background: `${C.blue}18`, border: `1px solid ${C.blue}30`,
                     borderRadius: 10, padding: "2px 8px",
                   }}>
-                    {subs.length}
+                    {totalCount}
                   </span>
                   <span style={{ color: C.textMuted, fontSize: 11, marginLeft: 4 }}>
                     {isOpen ? "▲" : "▼"}
@@ -1381,9 +1606,24 @@ function PermitContractorsSection() {
                 </div>
                 {isOpen && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                    {subs.map((sub) => (
-                      <PermitContractorCard key={sub.name} sub={sub} />
-                    ))}
+                    {subs.map((sub) => {
+                      const marketShare = tradeTotal > 0 ? (sub.total_scope_value || 0) / tradeTotal * 100 : 0;
+                      return (
+                        <PermitContractorCard key={sub.name} sub={sub} marketShare={marketShare} tradeTotal={tradeTotal} />
+                      );
+                    })}
+                    {dirOnly.length > 0 && (
+                      <>
+                        {subs.length > 0 && (
+                          <div style={{ padding: "6px 16px", fontSize: 10, color: C.textMuted, background: `${C.navy}20`, borderTop: `1px solid ${C.border}`, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                            LLR Licensed — Not yet in permits
+                          </div>
+                        )}
+                        {dirOnly.map((entry) => (
+                          <DirectoryBadgeCard key={`${entry.id}-${entry.classification}`} entry={entry} />
+                        ))}
+                      </>
+                    )}
                   </div>
                 )}
               </div>
