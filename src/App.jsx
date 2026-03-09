@@ -1171,13 +1171,21 @@ const TRADE_OVERRIDES = {
   "kidde":            "Fire / Sprinkler",
   // GC firms with non-obvious names or mixed permit appearances
   "cf evans":         "General Contractor",
+  "trident":          "General Contractor",
   // Electrical firms whose names don't contain "electric"
   "feyen":            "Electrical",
+  // Plumbing firms
+  "horizon":          "Plumbing",
+  // HVAC / Mechanical firms (including those that also do plumbing)
+  "cr hipp":          "HVAC / Mechanical",
+  // Sitework firms
+  "anson":            "Sitework",
   // Fire/Sprinkler firms with non-obvious names
   "mt pleasant radio": "Fire / Sprinkler",
   "american repeater": "Fire / Sprinkler",
-  // Concrete firms
+  // Concrete firms (precast = concrete products, not masonry)
   "lithko":           "Concrete",
+  "gate precast":     "Concrete",
 };
 
 // Map backend permit categories → frontend trade bucket names
