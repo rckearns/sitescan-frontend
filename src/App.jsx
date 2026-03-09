@@ -1158,6 +1158,10 @@ const TRADE_OVERRIDES = {
   "tyco":             "Fire / Sprinkler",
   "simplex":          "Fire / Sprinkler",
   "kidde":            "Fire / Sprinkler",
+  // GC firms with non-obvious names or mixed permit appearances
+  "cf evans":         "General Contractor",
+  // Electrical firms whose names don't contain "electric"
+  "feyen":            "Electrical",
 };
 
 // Map backend permit categories → frontend trade bucket names
