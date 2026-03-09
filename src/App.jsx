@@ -1173,6 +1173,11 @@ const TRADE_OVERRIDES = {
   "cf evans":         "General Contractor",
   // Electrical firms whose names don't contain "electric"
   "feyen":            "Electrical",
+  // Fire/Sprinkler firms with non-obvious names
+  "mt pleasant radio": "Fire / Sprinkler",
+  "american repeater": "Fire / Sprinkler",
+  // Concrete firms
+  "lithko":           "Concrete",
 };
 
 // Map backend permit categories → frontend trade bucket names
@@ -1206,9 +1211,17 @@ const LLR_CLASS_TO_TRADE = {
 function inferContractorTrade(sub) {
   const lower = sub.name.toLowerCase().trim();
 
-  // 0. Company-name overrides (well-known companies with non-obvious names)
+  // 0. Company-name overrides (well-known companies with non-obvious names).
+  // Match on normalized name so punctuation/suffixes don't block matches,
+  // and accept any non-alphanumeric character (space, comma, slash, etc.)
+  // after the prefix so partial names don't spuriously match longer ones.
+  const normalized = normalizeName(sub.name);
   for (const [prefix, trade] of Object.entries(TRADE_OVERRIDES)) {
-    if (lower === prefix || lower.startsWith(prefix + " ") || lower.startsWith(prefix + ",")) {
+    const normPrefix = normalizeName(prefix);
+    if (
+      normalized === normPrefix ||
+      (normalized.startsWith(normPrefix) && !/[a-z0-9]/.test(normalized[normPrefix.length]))
+    ) {
       return trade;
     }
   }
