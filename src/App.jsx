@@ -2941,7 +2941,9 @@ export default function SiteScanApp() {
         .app-main { max-width: 1400px; margin: 0 auto; padding: 20px 32px; box-sizing: border-box; width: 100%; }
         .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
         @media (max-width: 899px) {
-          .header-wrap { flex-wrap: wrap; }
+          .header-wrap { flex-wrap: wrap; align-items: center; }
+          .header-logo { order: 1; flex-shrink: 0; }
+          .header-right { order: 2; margin-left: auto; }
           .app-nav { order: 3; width: 100%; }
           .app-main { padding: 16px; }
           .stats-grid { grid-template-columns: repeat(2, 1fr); }
@@ -2955,7 +2957,7 @@ export default function SiteScanApp() {
       {/* HEADER */}
       <header style={styles.header}>
         <div className="header-wrap">
-          <div style={styles.logo}>
+          <div className="header-logo" style={styles.logo}>
             <span style={{ color: C.text, fontFamily: "'DM Sans', sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: -0.5 }}>
               Ya
             </span>
@@ -2985,7 +2987,7 @@ export default function SiteScanApp() {
               </button>
             ))}
           </nav>
-          <div style={styles.headerRight}>
+          <div className="header-right" style={styles.headerRight}>
             <CitySelector />
             <button style={styles.logoutBtn} onClick={logout}>Sign Out</button>
           </div>
