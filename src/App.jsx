@@ -1088,6 +1088,17 @@ function SavedTab({ saved, onUnsave }) {
 
 // ─── PERMIT CONTRACTOR DATA ──────────────────────────────────────────────────
 
+// Normalize a company name for fuzzy LLR lookup: lowercase, strip legal
+// suffixes and punctuation, collapse whitespace.
+function normalizeName(name) {
+  return name
+    .toLowerCase()
+    .replace(/\b(llc|l\.l\.c\.?|inc\.?|corp\.?|co\.?|ltd\.?|lp|l\.p\.?|pc|p\.c\.?|lllp|dba|d\/b\/a)\b\.?/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 const TRADE_RULES = [
   { trade: "Demolition",        keywords: ["demo", "demolition"] },
   { trade: "Sitework",          keywords: ["excavat", "grading", "earthwork", "sitework", "paving", "asphalt"] },
@@ -1425,6 +1436,17 @@ function PermitContractorsSection() {
   const tradeGroups = useMemo(() => {
     if (!filteredSubs.length && !loading && (!dirData || !dirData.length)) return {};
 
+    // Build a normalized-name → trade map from SC LLR directory.
+    // This gives authoritative classification for any contractor whose name
+    // matches an LLR-licensed entry, bypassing permit-category inference.
+    const llrByName = new Map();
+    if (dirData) {
+      for (const entry of dirData) {
+        const trade = LLR_CLASS_TO_TRADE[entry.classification];
+        if (trade) llrByName.set(normalizeName(entry.company_name), trade);
+      }
+    }
+
     // Build set of permit-contractor names (lowercased) for dedup
     const permitNames = new Set(filteredSubs.map((s) => s.name.toLowerCase().trim()));
 
@@ -1433,9 +1455,10 @@ function PermitContractorsSection() {
       if (!groups[trade]) groups[trade] = { subs: [], dirOnly: [] };
     };
 
-    // Permit-based contractors
+    // Permit-based contractors — LLR match takes priority over inference
     for (const sub of filteredSubs) {
-      const trade = inferContractorTrade(sub);
+      const llrTrade = llrByName.get(normalizeName(sub.name));
+      const trade = llrTrade || inferContractorTrade(sub);
       ensureTrade(trade);
       groups[trade].subs.push(sub);
     }
