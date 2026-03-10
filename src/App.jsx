@@ -739,6 +739,11 @@ const LOWCOUNTRY_RE = /\b(charleston|mt\.?\s*pleasant|mount\s+pleasant|goose\s+c
 const LOWCOUNTRY_PERMIT_SOURCES = new Set([
   "charleston-permits", "north-charleston-permits", "mt-pleasant-permits", "charleston-city-bids",
 ]);
+const PERMIT_SOURCES = new Set([
+  "charleston-permits", "north-charleston-permits", "mt-pleasant-permits",
+  "charlotte-permits", "charlotte-land-dev",
+]);
+const THREE_YEARS_MS = 3 * 365 * 24 * 60 * 60 * 1000;
 const CHARLOTTE_SOURCES = new Set([
   "charlotte-permits", "charlotte-land-dev", "charlotte-cip", "charlotte-ncdot",
 ]);
@@ -3083,6 +3088,8 @@ export default function SiteScanApp() {
         }
         if ((filters.statuses || []).length && !filters.statuses.includes(p.status)) return false;
         if (filters.lowcountry && !projectInLowcountry(p)) return false;
+        if (PERMIT_SOURCES.has(p.source_id) && p.posted_date &&
+            (Date.now() - new Date(p.posted_date)) > THREE_YEARS_MS) return false;
         return true;
       });
       setProjects(filtered);
