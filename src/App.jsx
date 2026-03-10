@@ -149,7 +149,7 @@ function getDisplayTitle(project) {
     title = title.replace(/[.*]?\s*(ZONING CONDITIONS|TRC CONDITIONS|TRC CONDITION|CONDITIONS:)[^]*/i, "").trim();
     title = title.replace(/\.\s*TRC[^]*$/i, "").trim();
     // Strip administrative suffixes
-    title = title.replace(/\s*[\.\s]*Fire\s+District\s*[-–]\s*ALT\w+/i, "").trim();
+    title = title.replace(/\s*[.\s]*Fire\s+District\s*[-–]\s*ALT[\w-]+/i, "").trim();
     title = title.replace(/\s*\(Replaced\s+CA\w+\)/i, "").trim();
   }
 
