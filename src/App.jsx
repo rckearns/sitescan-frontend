@@ -87,13 +87,34 @@ function getWorkClass(project) {
   return null;
 }
 
+// Generic permit descriptions that carry no useful info beyond the category
+const _GENERIC_TITLE = /^(new construction|building permit|commercial|residential|renovation|tenant improvement|addition|alteration|remodel|repair|demolition|interior|exterior|miscellaneous|other)[\s.]*$/i;
+
 function getDisplayTitle(project) {
-  if (project.source_id !== "charleston-permits") return project.title;
-  const wc = getWorkClass(project);
-  const cat = project.category;
-  if (!cat || cat === "residential") return project.title;
-  const catLabel = cat.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  return wc ? `${catLabel} ${wc}` : catLabel;
+  if (!project.title) return project.title;
+
+  // For permit sources, strip the " — address" suffix the backend appends
+  // (address is already shown in the location tag)
+  const permitSources = new Set([
+    "charleston-permits","north-charleston-permits","mt-pleasant-permits",
+    "charlotte-permits","charlotte-land-dev",
+  ]);
+  let title = project.title;
+  if (permitSources.has(project.source_id)) {
+    title = title.split(" — ")[0].trim();
+  }
+
+  // Fall back to category+workclass only if the description is truly generic
+  if (_GENERIC_TITLE.test(title)) {
+    const wc = getWorkClass(project);
+    const cat = project.category;
+    if (cat && cat !== "residential") {
+      const catLabel = cat.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      return wc ? `${catLabel} — ${wc}` : catLabel;
+    }
+  }
+
+  return title;
 }
 
 function getDescText(project) {
