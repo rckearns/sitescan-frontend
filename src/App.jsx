@@ -386,7 +386,6 @@ function ProjectCard({ group, onSave, savedIds, animDelay }) {
   const workClass = getWorkClass(primary);
   const hood = getNeighborhood(lat, lng);
   const maxValue = Math.max(...projects.map((p) => p.value || 0)) || null;
-  const topScore = Math.max(...projects.map((p) => p.match_score));
   const isSaved = savedIds.has(primary.id);
   const descText = getDescText(primary);
 
@@ -399,7 +398,7 @@ function ProjectCard({ group, onSave, savedIds, animDelay }) {
     <div style={{ marginBottom: 6, animation: `fadeIn 0.3s ease ${animDelay}s both` }}>
       <div
         onClick={() => setExpanded(!expanded)}
-        style={{ ...styles.projectRow, borderLeft: `3px solid ${matchColor(topScore)}` }}
+        style={{ ...styles.projectRow, borderLeft: `3px solid ${C.border}` }}
       >
         <div style={styles.projectHeader}>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -443,9 +442,6 @@ function ProjectCard({ group, onSave, savedIds, animDelay }) {
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-            <div style={{ width: 64, display: "flex", justifyContent: "center" }}>
-              <MatchBadge score={topScore} />
-            </div>
             <div style={{ width: 80, textAlign: "right" }}>
               <div style={{ color: C.orange, fontWeight: 700, fontSize: 14, fontFamily: "'JetBrains Mono', monospace" }}>
                 {fmt$(maxValue)}
@@ -532,12 +528,12 @@ function StatsBar({ stats }) {
         <div style={styles.statLabel}>Pipeline Value</div>
       </div>
       <div style={{ ...styles.statBox, borderLeft: `3px solid ${C.sky}` }}>
-        <div style={{ ...styles.statNumber, color: C.sky }}>{stats.avg_match_score}%</div>
-        <div style={styles.statLabel}>Avg Match Score</div>
+        <div style={{ ...styles.statNumber, color: C.sky }}>{stats.new_this_week}</div>
+        <div style={styles.statLabel}>New This Week</div>
       </div>
       <div style={{ ...styles.statBox, borderLeft: `3px solid #22c55e` }}>
-        <div style={{ ...styles.statNumber, color: "#22c55e" }}>{stats.high_match_count}</div>
-        <div style={styles.statLabel}>High Match (80%+)</div>
+        <div style={{ ...styles.statNumber, color: "#22c55e" }}>{stats.bids_open}</div>
+        <div style={styles.statLabel}>Bids Open</div>
       </div>
     </div>
   );
@@ -574,58 +570,33 @@ const ALL_SOURCES = [
   { id: "charlotte-ncdot", label: "CLT NCDOT" },
 ];
 const CLIENT_TYPES = [
-  { id: "developer",  label: "Developer",   desc: "Private developers pulling permits" },
-  { id: "government", label: "Government",  desc: "Public agencies, municipalities, SCDOT" },
-  { id: "higher-ed",  label: "Higher Ed",   desc: "Universities, hospitals, health systems" },
-  { id: "broker",     label: "Broker",      desc: "Commercial brokers with TI or build-to-suit" },
+  { id: "developer",  label: "Developer" },
+  { id: "government", label: "Government" },
+  { id: "higher-ed",  label: "Higher Ed" },
+  { id: "broker",     label: "Broker" },
 ];
+const CLIENT_TYPE_SOURCES = {
+  developer:  new Set(["charleston-permits","north-charleston-permits","mt-pleasant-permits","charlotte-permits","charlotte-land-dev"]),
+  government: new Set(["sam-gov","scbo","charleston-city-bids","charlotte-cip","charlotte-ncdot"]),
+};
+const CLIENT_TYPE_CATEGORIES = {
+  "higher-ed": new Set(["institutional"]),
+  broker:      new Set(["commercial","office","retail"]),
+};
+function projectMatchesClientTypes(project, clientTypes) {
+  if (!clientTypes.length) return true;
+  return clientTypes.some(ct =>
+    CLIENT_TYPE_SOURCES[ct]?.has(project.source_id) ||
+    CLIENT_TYPE_CATEGORIES[ct]?.has(project.category)
+  );
+}
 
-function ProfileTab({ onCriteriaChange, lastScanAt, onScan }) {
-  const [profile, setProfile] = useState(null);
-  const [minValue, setMinValue] = useState(0);
-  const [categories, setCategories] = useState([]);
-  const [statuses, setStatuses] = useState([]);
-  const [sources, setSources] = useState([]);
-  const [clientTypes, setClientTypes] = useState([]);
-  const [saving, setSaving] = useState(false);
-  const [savedMsg, setSavedMsg] = useState("");
+function ProfileTab({ lastScanAt, onScan }) {
   const [scanning, setScanning] = useState(false);
   const [scanMsg, setScanMsg] = useState("");
   const [connTesting, setConnTesting] = useState(false);
   const [connResult, setConnResult] = useState(null);
   const [dbResult, setDbResult] = useState(null);
-
-  useEffect(() => {
-    api("/auth/me").then((data) => {
-      setProfile(data);
-      setMinValue(data.criteria_min_value || 0);
-      setCategories(data.criteria_categories || []);
-      setStatuses(data.criteria_statuses || []);
-      setSources(data.criteria_sources || []);
-      setClientTypes(data.criteria_client_types || []);
-    });
-  }, []);
-
-  const toggle = (arr, setArr, item) =>
-    setArr(arr.includes(item) ? arr.filter((x) => x !== item) : [...arr, item]);
-
-  const save = async () => {
-    setSaving(true);
-    await api("/auth/me", {
-      method: "PATCH",
-      body: JSON.stringify({
-        criteria_min_value: minValue || null,
-        criteria_categories: categories,
-        criteria_statuses: statuses,
-        criteria_sources: sources,
-        criteria_client_types: clientTypes,
-      }),
-    });
-    setSaving(false);
-    setSavedMsg("✓ Criteria saved — scores updated");
-    onCriteriaChange();
-    setTimeout(() => setSavedMsg(""), 4000);
-  };
 
   const doScan = async () => {
     setScanning(true);
@@ -654,95 +625,9 @@ function ProfileTab({ onCriteriaChange, lastScanAt, onScan }) {
     setConnTesting(false);
   };
 
-  const chipStyle = (active, color) => ({
-    padding: "8px 16px",
-    borderRadius: 8,
-    border: `1px solid ${active ? color : C.border}`,
-    background: active ? `${color}20` : "transparent",
-    color: active ? color : C.textSub,
-    fontSize: 13,
-    fontWeight: 600,
-    cursor: "pointer",
-    fontFamily: "'DM Sans', sans-serif",
-    transition: "all 0.15s",
-  });
-
   return (
     <div style={{ maxWidth: 620 }}>
-      <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 8 }}>Match Profile</h2>
-      <p style={{ color: C.textSub, fontSize: 13, lineHeight: 1.6, marginBottom: 32 }}>
-        Projects meeting <strong style={{ color: C.text }}>all</strong> your criteria score 100%.
-        Projects meeting some criteria are scored proportionally.
-        Projects meeting none score 0%.
-      </p>
-
-      {/* Client Types */}
-      <div style={{ marginBottom: 28 }}>
-        <div style={styles.criteriaLabel}>Client Type</div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {CLIENT_TYPES.map(({ id, label }) => (
-            <button key={id} onClick={() => toggle(clientTypes, setClientTypes, id)} style={chipStyle(clientTypes.includes(id), C.orange)}>
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Min Value */}
-      <div style={{ marginBottom: 28 }}>
-        <div style={styles.criteriaLabel}>Minimum Project Value</div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {[0, 100000, 500000, 1000000, 5000000].map((v) => (
-            <button key={v} onClick={() => setMinValue(v)} style={chipStyle(minValue === v, C.orange)}>
-              {v === 0 ? "Any" : v >= 1000000 ? `$${v / 1000000}M+` : `$${v / 1000}K+`}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Categories */}
-      <div style={{ marginBottom: 28 }}>
-        <div style={styles.criteriaLabel}>Project Type</div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {ALL_CATEGORIES.map(({ id, label }) => (
-            <button key={id} onClick={() => toggle(categories, setCategories, id)} style={chipStyle(categories.includes(id), C.blue)}>
-              {catIcons[id] || ""} {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Statuses */}
-      <div style={{ marginBottom: 28 }}>
-        <div style={styles.criteriaLabel}>Project Status</div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {ALL_STATUSES.map((s) => (
-            <button key={s} onClick={() => toggle(statuses, setStatuses, s)} style={chipStyle(statuses.includes(s), C.sky)}>
-              {s}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Sources */}
-      <div style={{ marginBottom: 36 }}>
-        <div style={styles.criteriaLabel}>Data Sources</div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {ALL_SOURCES.map(({ id, label }) => (
-            <button key={id} onClick={() => toggle(sources, setSources, id)} style={chipStyle(sources.includes(id), C.orange)}>
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <button onClick={save} disabled={saving} style={styles.authBtn}>
-        {saving ? "Saving..." : "Save Criteria"}
-      </button>
-      {savedMsg && <span style={{ color: C.orange, fontSize: 13, marginLeft: 16 }}>{savedMsg}</span>}
-
-      {/* Divider */}
-      <div style={{ borderTop: `1px solid ${C.border}`, margin: "40px 0 32px" }} />
+      <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 32 }}>Settings</h2>
 
       {/* Manual scan */}
       <h3 style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>Data Refresh</h3>
@@ -1019,6 +904,11 @@ function ScanButton({ onScan }) {
 function FilterBar({ filters, setFilters }) {
   const toggleDir = () =>
     setFilters((f) => ({ ...f, sortDir: f.sortDir === "desc" ? "asc" : "desc" }));
+  const toggleClientType = (id) =>
+    setFilters((f) => {
+      const ct = f.clientTypes || [];
+      return { ...f, clientTypes: ct.includes(id) ? ct.filter(x => x !== id) : [...ct, id] };
+    });
 
   const btnBase = {
     padding: "9px 11px",
@@ -1034,20 +924,39 @@ function FilterBar({ filters, setFilters }) {
     transition: "border-color 0.15s, color 0.15s",
   };
 
+  const ctChip = (active) => ({
+    padding: "7px 14px",
+    borderRadius: 8,
+    border: `1px solid ${active ? C.orange : C.border}`,
+    background: active ? `${C.orange}20` : "transparent",
+    color: active ? C.orange : C.textSub,
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: "pointer",
+    fontFamily: "'DM Sans', sans-serif",
+    transition: "all 0.15s",
+  });
+
   return (
-    <div style={styles.filterBar}>
+    <div style={{ ...styles.filterBar, flexWrap: "wrap", gap: 8 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", flex: "1 1 100%" }}>
+        {CLIENT_TYPES.map(({ id, label }) => (
+          <button key={id} onClick={() => toggleClientType(id)} style={ctChip((filters.clientTypes || []).includes(id))}>
+            {label}
+          </button>
+        ))}
+      </div>
       <input
-        style={styles.searchInput}
+        style={{ ...styles.searchInput, flex: "1 1 200px" }}
         placeholder="Search projects..."
         value={filters.search || ""}
         onChange={(e) => setFilters({ ...filters, search: e.target.value })}
       />
       <select
         style={styles.select}
-        value={filters.sortBy || "match_score"}
+        value={filters.sortBy || "posted_date"}
         onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
       >
-        <option value="match_score">Sort: Match</option>
         <option value="value">Sort: Value</option>
         <option value="posted_date">Sort: Recent</option>
       </select>
@@ -2844,7 +2753,7 @@ export default function SiteScanApp() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
-    search: "", category: "", source: "", minMatch: 0, sortBy: "match_score", sortDir: "desc",
+    search: "", category: "", source: "", clientTypes: [], sortBy: "posted_date", sortDir: "desc",
   });
   const [categories, setCategories] = useState([]);
   const [sources, setSources] = useState([]);
@@ -2857,15 +2766,16 @@ export default function SiteScanApp() {
         sort_by: filters.sortBy,
         sort_dir: filters.sortDir || "desc",
         limit: "1000",
-        min_match: String(filters.minMatch || 0),
       });
       if (filters.search) params.set("search", filters.search);
       if (filters.category) params.set("categories", filters.category);
       if (filters.source) params.set("sources", filters.source);
 
       const data = await api(`/projects?${params}`);
-      setProjects(data.projects || []);
-      setTotal(data.total || 0);
+      const allProjects = data.projects || [];
+      const filtered = allProjects.filter(p => projectMatchesClientTypes(p, filters.clientTypes || []));
+      setProjects(filtered);
+      setTotal(filtered.length);
 
       // Extract unique categories and sources
       const cats = [...new Set((data.projects || []).map((p) => p.category))];
@@ -2972,11 +2882,11 @@ export default function SiteScanApp() {
     ? {
         total_projects: total,
         total_pipeline_value: projects.reduce((s, p) => s + (p.value || 0), 0),
-        avg_match_score:
-          projects.length > 0
-            ? Math.round((projects.reduce((s, p) => s + p.match_score, 0) / projects.length) * 10) / 10
-            : 0,
-        high_match_count: projects.filter((p) => p.match_score >= 80).length,
+        new_this_week: projects.filter((p) => {
+          const d = new Date(p.posted_date);
+          return !isNaN(d) && (Date.now() - d) < 7 * 24 * 60 * 60 * 1000;
+        }).length,
+        bids_open: projects.filter((p) => ["Open", "Accepting Bids"].includes(p.status)).length,
         last_scan_at: stats?.last_scan_at,
       }
     : stats;
@@ -3045,7 +2955,7 @@ export default function SiteScanApp() {
               { id: "contractors",  label: "Contractors",                icon: "🤝" },
               { id: "company",      label: "Profile",                    icon: "🏢" },
               { id: "history",      label: "History",                    icon: "📊" },
-              { id: "profile",      label: "Match Profile",              icon: "⚙" },
+              { id: "profile",      label: "Settings",                   icon: "⚙" },
             ].map((t) => (
               <button
                 key={t.id}
@@ -3109,7 +3019,6 @@ export default function SiteScanApp() {
         {tab === "history" && <HistoryTab history={history} onRefresh={loadHistory} />}
         {tab === "profile" && (
           <ProfileTab
-            onCriteriaChange={handleCriteriaChange}
             lastScanAt={stats?.last_scan_at}
             onScan={handleScanComplete}
           />
