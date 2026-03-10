@@ -573,6 +573,12 @@ const ALL_SOURCES = [
   { id: "charlotte-cip", label: "CLT CIP" },
   { id: "charlotte-ncdot", label: "CLT NCDOT" },
 ];
+const CLIENT_TYPES = [
+  { id: "developer",  label: "Developer",   desc: "Private developers pulling permits" },
+  { id: "government", label: "Government",  desc: "Public agencies, municipalities, SCDOT" },
+  { id: "higher-ed",  label: "Higher Ed",   desc: "Universities, hospitals, health systems" },
+  { id: "broker",     label: "Broker",      desc: "Commercial brokers with TI or build-to-suit" },
+];
 
 function ProfileTab({ onCriteriaChange, lastScanAt, onScan }) {
   const [profile, setProfile] = useState(null);
@@ -580,6 +586,7 @@ function ProfileTab({ onCriteriaChange, lastScanAt, onScan }) {
   const [categories, setCategories] = useState([]);
   const [statuses, setStatuses] = useState([]);
   const [sources, setSources] = useState([]);
+  const [clientTypes, setClientTypes] = useState([]);
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
   const [scanning, setScanning] = useState(false);
@@ -595,6 +602,7 @@ function ProfileTab({ onCriteriaChange, lastScanAt, onScan }) {
       setCategories(data.criteria_categories || []);
       setStatuses(data.criteria_statuses || []);
       setSources(data.criteria_sources || []);
+      setClientTypes(data.criteria_client_types || []);
     });
   }, []);
 
@@ -610,6 +618,7 @@ function ProfileTab({ onCriteriaChange, lastScanAt, onScan }) {
         criteria_categories: categories,
         criteria_statuses: statuses,
         criteria_sources: sources,
+        criteria_client_types: clientTypes,
       }),
     });
     setSaving(false);
@@ -660,12 +669,24 @@ function ProfileTab({ onCriteriaChange, lastScanAt, onScan }) {
 
   return (
     <div style={{ maxWidth: 620 }}>
-      <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 8 }}>Match Criteria</h2>
+      <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 8 }}>Match Profile</h2>
       <p style={{ color: C.textSub, fontSize: 13, lineHeight: 1.6, marginBottom: 32 }}>
         Projects meeting <strong style={{ color: C.text }}>all</strong> your criteria score 100%.
         Projects meeting some criteria are scored proportionally.
         Projects meeting none score 0%.
       </p>
+
+      {/* Client Types */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={styles.criteriaLabel}>Client Type</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {CLIENT_TYPES.map(({ id, label }) => (
+            <button key={id} onClick={() => toggle(clientTypes, setClientTypes, id)} style={chipStyle(clientTypes.includes(id), C.orange)}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Min Value */}
       <div style={{ marginBottom: 28 }}>
@@ -3024,7 +3045,7 @@ export default function SiteScanApp() {
               { id: "contractors",  label: "Contractors",                icon: "🤝" },
               { id: "company",      label: "Profile",                    icon: "🏢" },
               { id: "history",      label: "History",                    icon: "📊" },
-              { id: "profile",      label: "Match Filter",               icon: "⚙" },
+              { id: "profile",      label: "Match Profile",              icon: "⚙" },
             ].map((t) => (
               <button
                 key={t.id}
