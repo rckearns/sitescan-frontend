@@ -377,9 +377,10 @@ function StatusPill({ status }) {
 // ─── PROJECT CARD ─────────────────────────────────────────────────────────────
 // One card per project (address group). Shows the most informative permit.
 
-function ProjectCard({ group, onSave, savedIds, animDelay }) {
+function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss }) {
   const { lat, lng, projects } = group;
   const [expanded, setExpanded] = useState(false);
+  const [hovered, setHovered] = useState(false);
 
   const primary = getPrimaryPermit(projects);
   const displayTitle = getDisplayTitle(primary);
@@ -408,8 +409,26 @@ function ProjectCard({ group, onSave, savedIds, animDelay }) {
     <div style={{ marginBottom: 6, animation: `fadeIn 0.3s ease ${animDelay}s both` }}>
       <div
         onClick={() => setExpanded(!expanded)}
-        style={{ ...styles.projectRow, borderLeft: `3px solid ${C.border}` }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{ ...styles.projectRow, borderLeft: `3px solid ${C.border}`, position: "relative" }}
       >
+        {hovered && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onDismiss(primary.id); }}
+            title="Hide this project"
+            style={{
+              position: "absolute", top: 8, right: 8, background: "none",
+              border: "none", color: "#444", fontSize: 16, cursor: "pointer",
+              lineHeight: 1, padding: "2px 5px", borderRadius: 4,
+              transition: "color 0.1s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "#ef4444"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "#444"; }}
+          >
+            ✕
+          </button>
+        )}
         <div style={styles.projectHeader}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={styles.projectTitle}>
@@ -2912,6 +2931,7 @@ export default function SiteScanApp() {
   });
   const [categories, setCategories] = useState([]);
   const [sources, setSources] = useState([]);
+  const [dismissedIds, setDismissedIds] = useState(new Set());
   const debounceRef = useRef(null);
 
   const loadProjects = useCallback(async () => {
@@ -3162,6 +3182,17 @@ export default function SiteScanApp() {
                 }
                 {filters.search && ` matching "${filters.search}"`}
               </span>
+              {dismissedIds.size > 0 && (
+                <span style={{ color: "#555", fontSize: 13, marginLeft: 12 }}>
+                  · {dismissedIds.size} hidden{" "}
+                  <button
+                    onClick={() => setDismissedIds(new Set())}
+                    style={{ background: "none", border: "none", color: C.blue, cursor: "pointer", fontSize: 13, padding: 0, fontFamily: "inherit" }}
+                  >
+                    Clear
+                  </button>
+                </span>
+              )}
             </div>
             {loading ? (
               <div style={{ textAlign: "center", padding: 60, color: "#555" }}>
@@ -3175,13 +3206,14 @@ export default function SiteScanApp() {
               </div>
             ) : (
               <div>
-                {groupByAddress(projects.filter((p) => !isSubpermit(p))).map((group, i) => (
+                {groupByAddress(projects.filter((p) => !isSubpermit(p) && !dismissedIds.has(p.id))).map((group, i) => (
                   <ProjectCard
                     key={group.address ?? `noaddr-${i}`}
                     group={group}
                     onSave={saveProject}
                     savedIds={savedIds}
                     animDelay={Math.min(i, 25) * 0.03}
+                    onDismiss={(id) => setDismissedIds(s => new Set([...s, id]))}
                   />
                 ))}
               </div>
