@@ -604,17 +604,11 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
               {maxValue ? (
                 <div style={{ color: C.orange, fontWeight: 700, fontSize: 14, fontFamily: "'JetBrains Mono', monospace", whiteSpace: "nowrap" }}>
                   {fmt$(maxValue)}
-                  {group.phaseCount > 1 && (
-                    <span style={{ fontSize: 11, fontWeight: 400, color: C.textMuted, marginLeft: 4 }}>×{group.phaseCount}</span>
-                  )}
                 </div>
               ) : estValue ? (
                 <div style={{ color: C.textMuted, fontWeight: 400, fontSize: 13, fontFamily: "'JetBrains Mono', monospace", whiteSpace: "nowrap" }}
                   title="Estimated from similar projects">
                   {fmtEst(estValue)}
-                  {group.phaseCount > 1 && (
-                    <span style={{ fontSize: 11, color: C.textMuted, marginLeft: 4 }}>×{group.phaseCount}</span>
-                  )}
                 </div>
               ) : (
                 <div style={{ color: C.textMuted, fontWeight: 400, fontSize: 14, fontFamily: "'JetBrains Mono', monospace" }}>—</div>
@@ -3389,7 +3383,7 @@ export default function SiteScanApp() {
               </div>
             ) : (
               <div>
-                {groupByTitle(groupByAddress(projects.filter((p) => !isSubpermit(p) && !dismissedIds.has(p.id)))).map((group, i) => (
+                {groupByAddress(projects.filter((p) => !isSubpermit(p) && !dismissedIds.has(p.id))).map((group, i) => (
                   <ProjectCard
                     key={group.address ?? `noaddr-${i}`}
                     group={group}
