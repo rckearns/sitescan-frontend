@@ -140,13 +140,32 @@ function getDisplayTitle(project) {
   return title;
 }
 
+// Procurement boilerplate openers that add no useful info for a GC
+const _BID_BOILERPLATE = /^(this is (a |an )?(combined synopsis|sources sought|pre-?solicitation|request for (proposal|quote|information)|rfp|rfq|rfi|notice of intent|amendment)|the (government|department|agency|city|county|state) is (requesting|seeking|issuing|soliciting)|synopsis\/solicitation|pre-solicitation notice|combined synopsis\/solicitation|notice type:|set-aside:|naics code:|product service code:|response date:|solicitation number:)/i;
+
 function getDescText(project) {
   if (!project.description) return null;
-  let text = project.description;
+
   if (project.source_id === "charleston-permits") {
-    text = project.description.split(" | ")[0].trim();
+    const text = project.description.split(" | ")[0].trim();
+    return text && text.length > 4 ? text : null;
   }
-  return text && text.length > 4 ? text : null;
+
+  // For bid sources: skip boilerplate opener sentences, show first meaningful content
+  const BID_SOURCES = new Set(["sam-gov", "scbo", "charleston-city-bids", "charlotte-cip", "charlotte-ncdot"]);
+  if (BID_SOURCES.has(project.source_id)) {
+    // Split on sentence boundaries and skip boilerplate openers
+    const sentences = project.description.split(/(?<=[.!?])\s+/);
+    const meaningful = sentences.find(s => s.length > 20 && !_BID_BOILERPLATE.test(s.trim()));
+    if (meaningful) {
+      // Return first ~300 chars of useful content
+      return meaningful.length > 300 ? meaningful.slice(0, 297) + "…" : meaningful;
+    }
+    // Fall back to first 300 chars if no clean sentence found
+    return project.description.slice(0, 300) + (project.description.length > 300 ? "…" : "");
+  }
+
+  return project.description.length > 4 ? project.description : null;
 }
 
 // Category priority for picking the most informative permit from a group
