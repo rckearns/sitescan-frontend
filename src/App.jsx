@@ -724,6 +724,24 @@ const TRADE_CATEGORIES = new Set([
   "fire-sprinkler", "electrical", "plumbing", "mechanical", "painting", "roofing",
 ]);
 
+// Civil/infrastructure project titles to exclude from the default GC feed.
+const CIVIL_INFRA_RE = /\b(culvert|resurfacing|road\s+(resurface|widening|repair|improvement)|highway\s+construction|roundabout|bridge\s+(repair|replacement|construction|project)|pavement\s+(marking|replacement)|traffic\s+signal|water\s+main|sewer\s+main|utility\s+(relocation|undergrounding))\b/i;
+
+// Lowcountry region filtering
+const LOWCOUNTRY_RE = /\b(charleston|mt\.?\s*pleasant|mount\s+pleasant|goose\s+creek|summerville|hanahan|isle\s+of\s+palms|sullivan'?s\s+island|james\s+island|johns\s+island|daniel\s+island|folly\s+beach|ladson|moncks\s+corner|berkeley\s+county|dorchester\s+county|north\s+charleston|seabrook|kiawah)\b/i;
+const LOWCOUNTRY_PERMIT_SOURCES = new Set([
+  "charleston-permits", "north-charleston-permits", "mt-pleasant-permits", "charleston-city-bids",
+]);
+const CHARLOTTE_SOURCES = new Set([
+  "charlotte-permits", "charlotte-land-dev", "charlotte-cip", "charlotte-ncdot",
+]);
+function projectInLowcountry(project) {
+  if (LOWCOUNTRY_PERMIT_SOURCES.has(project.source_id)) return true;
+  if (CHARLOTTE_SOURCES.has(project.source_id)) return false;
+  const text = `${project.title || ""} ${project.description || ""}`;
+  return LOWCOUNTRY_RE.test(text);
+}
+
 function ProfileTab({ lastScanAt, onScan }) {
   const [defaults, setDefaults] = useState({ clientTypes: [], minValue: 0, categories: [], statuses: [] });
   const [saving, setSaving] = useState(false);
@@ -1159,7 +1177,7 @@ function FilterBar({ filters, setFilters }) {
 
   return (
     <div style={{ ...styles.filterBar, flexWrap: "wrap", gap: 6 }}>
-      {/* Client type */}
+      {/* Client type + region */}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: "1 1 100%", alignItems: "center" }}>
         <span style={rowLabel}>Client</span>
         {CLIENT_TYPES.map(({ id, label }) => (
@@ -1167,6 +1185,11 @@ function FilterBar({ filters, setFilters }) {
             {label}
           </button>
         ))}
+        <span style={{ color: C.textMuted, alignSelf: "center", margin: "0 2px" }}>·</span>
+        <button onClick={() => setFilters(f => ({ ...f, lowcountry: !f.lowcountry }))}
+          style={chip(!!filters.lowcountry, C.sky)}>
+          Lowcountry
+        </button>
       </div>
       {/* Min value + More filters toggle on same row */}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: "1 1 100%", alignItems: "center" }}>
@@ -1221,7 +1244,7 @@ function FilterBar({ filters, setFilters }) {
       />
       <select
         style={styles.select}
-        value={filters.sortBy || "posted_date"}
+        value={filters.sortBy || "value"}
         onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
       >
         <option value="value">Sort: Value</option>
@@ -3020,7 +3043,7 @@ export default function SiteScanApp() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
-    search: "", category: "", source: "", clientTypes: [], minValue: 0, categories: [], statuses: [], sortBy: "posted_date", sortDir: "desc",
+    search: "", category: "", source: "", clientTypes: [], minValue: 100000, categories: [], statuses: [], sortBy: "value", sortDir: "desc", lowcountry: false,
   });
   const [categories, setCategories] = useState([]);
   const [sources, setSources] = useState([]);
@@ -3047,10 +3070,12 @@ export default function SiteScanApp() {
         if ((filters.minValue || 0) > 0 && (!p.value || p.value < filters.minValue)) return false;
         if ((filters.categories || []).length) {
           if (!filters.categories.includes(p.category)) return false;
-        } else if (TRADE_CATEGORIES.has(p.category)) {
-          return false;
+        } else {
+          if (TRADE_CATEGORIES.has(p.category)) return false;
+          if (CIVIL_INFRA_RE.test(p.title || "")) return false;
         }
         if ((filters.statuses || []).length && !filters.statuses.includes(p.status)) return false;
+        if (filters.lowcountry && !projectInLowcountry(p)) return false;
         return true;
       });
       setProjects(filtered);
