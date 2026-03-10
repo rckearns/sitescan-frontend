@@ -495,7 +495,9 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
                 <span style={{ marginLeft: 12, color: C.textMuted }}>👷 {primary.contractor}</span>
               )}
               {primary.agency && (
-                <span style={{ marginLeft: locationTag ? 12 : 0 }}>🏢 {primary.agency}</span>
+                <span style={{ marginLeft: locationTag ? 12 : 0, color: C.textSub }}>
+                  🏢 {primary.agency.split("|")[0]}
+                </span>
               )}
               <span style={{ marginLeft: 8 }}>
                 <span style={{
