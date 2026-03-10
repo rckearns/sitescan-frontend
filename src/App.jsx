@@ -419,7 +419,7 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss }) {
         onClick={() => setExpanded(!expanded)}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        style={{ ...styles.projectRow, borderLeft: `3px solid ${sourceColors[primary.source_id] || C.border}`, position: "relative" }}
+        style={{ ...styles.projectRow, borderLeft: `3px solid ${maxValue ? (sourceColors[primary.source_id] || C.border) : C.border}`, position: "relative", opacity: maxValue ? 1 : 0.65 }}
       >
         {hovered && (
           <button
@@ -494,7 +494,11 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss }) {
               </span>
             )}
             <div style={{ width: 80, textAlign: "right" }}>
-              <div style={{ color: C.orange, fontWeight: 700, fontSize: 14, fontFamily: "'JetBrains Mono', monospace" }}>
+              <div style={{
+                color: maxValue ? C.orange : C.textMuted,
+                fontWeight: maxValue ? 700 : 400,
+                fontSize: 14, fontFamily: "'JetBrains Mono', monospace",
+              }}>
                 {fmt$(maxValue)}
               </div>
             </div>
