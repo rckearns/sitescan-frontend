@@ -138,6 +138,9 @@ function getDisplayTitle(project) {
   let title = project.title;
   if (permitSources.has(project.source_id)) {
     title = title.split(" — ")[0].trim();
+    // Strip TRC/zoning boilerplate appended to the real project description
+    title = title.replace(/[.*]?\s*(ZONING CONDITIONS|TRC CONDITIONS|TRC CONDITION)[^]*/i, "").trim();
+    title = title.replace(/\.\s*TRC[^]*$/i, "").trim();
   }
 
   // Fall back to category+workclass only if the description is truly generic
@@ -647,7 +650,7 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
 
 // ─── STATS BAR ──────────────────────────────────────────────────────────────
 
-function StatsBar({ stats }) {
+function StatsBar({ stats, onBidsOpen }) {
   if (!stats) return null;
   return (
     <div className="stats-grid">
@@ -663,7 +666,11 @@ function StatsBar({ stats }) {
         <div style={{ ...styles.statNumber, color: C.sky }}>{stats.new_this_week}</div>
         <div style={styles.statLabel}>New This Week</div>
       </div>
-      <div style={{ ...styles.statBox, borderLeft: `3px solid #22c55e` }}>
+      <div
+        onClick={onBidsOpen}
+        style={{ ...styles.statBox, borderLeft: `3px solid #22c55e`, cursor: onBidsOpen ? "pointer" : "default" }}
+        title={onBidsOpen ? "Show open bids" : undefined}
+      >
         <div style={{ ...styles.statNumber, color: "#22c55e" }}>{stats.bids_open}</div>
         <div style={styles.statLabel}>Bids Open</div>
       </div>
@@ -704,18 +711,20 @@ const ALL_SOURCES = [
   { id: "charlotte-ncdot", label: "CLT NCDOT" },
 ];
 const CLIENT_TYPES = [
-  { id: "developer",  label: "Developer" },
-  { id: "government", label: "Government" },
-  { id: "higher-ed",  label: "Higher Ed" },
-  { id: "broker",     label: "Broker" },
+  { id: "developer",    label: "Developer" },
+  { id: "government",   label: "Government" },
+  { id: "higher-ed",    label: "Higher Ed" },
+  { id: "broker",       label: "Broker" },
+  { id: "multi-family", label: "Multi Family" },
 ];
 const CLIENT_TYPE_SOURCES = {
   developer:  new Set(["charleston-permits","north-charleston-permits","mt-pleasant-permits","charlotte-permits","charlotte-land-dev"]),
   government: new Set(["sam-gov","scbo","charleston-city-bids","charlotte-cip","charlotte-ncdot"]),
 };
 const CLIENT_TYPE_CATEGORIES = {
-  "higher-ed": new Set(["institutional","healthcare","education"]),
-  broker:      new Set(["commercial","office","retail","renovation"]),
+  "higher-ed":    new Set(["institutional","healthcare","education"]),
+  broker:         new Set(["commercial","office","retail","renovation"]),
+  "multi-family": new Set(["multi-family","mixed-use"]),
 };
 function projectMatchesClientTypes(project, clientTypes) {
   if (!clientTypes.length) return true;
@@ -732,7 +741,7 @@ const TRADE_CATEGORIES = new Set([
 ]);
 
 // Civil/infrastructure and sub-permit titles to exclude from the default GC feed.
-const CIVIL_INFRA_RE = /\b(culvert|resurfacing|road\s+(resurface|widening|repair|improvement)|highway\s+construction|roundabout|bridge\s+(repair|replacement|construction|project)|pavement\s+(marking|replacement)|traffic\s+signal|water\s+main|sewer\s+main|utility\s+(relocation|undergrounding))\b|^(phasing\s+permit|phased\s+permit|parking\s+garage\s+for\s|roof\s+permit\s+for\s)/i;
+const CIVIL_INFRA_RE = /\b(culvert|resurfacing|road\s+(resurface|widening|repair|improvement)|highway\s+construction|roundabout|bridge\s+(repair|replacement|construction|project)|pavement\s+(marking|replacement)|traffic\s+signal|water\s+main|sewer\s+main|utility\s+(relocation|undergrounding))\b|^(phasing\s+permit|phased\s+permit|phasing\s+floor\s+\d+|level\s+\d+[-–\s]|parking\s+garage\s+for\s|roof\s+permit\s+for\s|overall\s+master\s+permit|an?\s+internal\s+parking\s+garage|hotel\s+rooms\s+level\s+\d+|pool\s+area\s+and\s)/i;
 
 // Lowcountry region filtering
 const LOWCOUNTRY_RE = /\b(charleston|mt\.?\s*pleasant|mount\s+pleasant|goose\s+creek|summerville|hanahan|isle\s+of\s+palms|sullivan'?s\s+island|james\s+island|johns\s+island|daniel\s+island|folly\s+beach|ladson|moncks\s+corner|berkeley\s+county|dorchester\s+county|north\s+charleston|seabrook|kiawah)\b/i;
@@ -3305,7 +3314,7 @@ export default function SiteScanApp() {
       <main className="app-main">
         {tab === "scanner" && (
           <>
-            <StatsBar stats={liveStats} />
+            <StatsBar stats={liveStats} onBidsOpen={() => setFilters(f => ({ ...f, clientTypes: ["government"] }))} />
             <FilterBar
               filters={filters}
               setFilters={setFilters}
