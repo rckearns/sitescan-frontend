@@ -30,6 +30,19 @@ const fmt$ = (v) => {
   return `$${v.toLocaleString()}`;
 };
 
+// Returns { label, color } for how old a posted_date is, or null if unknown
+function postedAge(dateStr) {
+  if (!dateStr) return null;
+  const days = Math.floor((Date.now() - new Date(dateStr)) / (1000 * 60 * 60 * 24));
+  if (isNaN(days) || days < 0) return null;
+  if (days === 0) return { label: "Today",          color: "#22c55e" };
+  if (days === 1) return { label: "Yesterday",       color: "#22c55e" };
+  if (days <= 7)  return { label: `${days}d ago`,    color: "#22c55e" };
+  if (days <= 30) return { label: `${Math.ceil(days/7)}w ago`,  color: C.textSub };
+  if (days <= 90) return { label: `${Math.ceil(days/30)}mo ago`, color: C.textMuted };
+  return           { label: `${Math.ceil(days/30)}mo ago`,       color: "#3d4f5e" }; // very old, dim
+}
+
 const fmtEst = (v) => {
   if (!v) return null;
   if (v >= 1e6) return `~$${(v / 1e6).toFixed(1)}M`;
@@ -528,6 +541,11 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
                   {sourceLabels[primary.source_id] || primary.source_id}
                 </span>
               </span>
+              {(() => { const age = postedAge(primary.posted_date); return age ? (
+                <span style={{ marginLeft: 8, fontSize: 11, color: age.color, whiteSpace: "nowrap" }}>
+                  {age.label}
+                </span>
+              ) : null; })()}
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
