@@ -30,6 +30,29 @@ const fmt$ = (v) => {
   return `$${v.toLocaleString()}`;
 };
 
+const fmtEst = (v) => {
+  if (!v) return null;
+  if (v >= 1e6) return `~$${(v / 1e6).toFixed(1)}M`;
+  if (v >= 1e3) return `~$${(v / 1e3).toFixed(0)}K`;
+  return `~$${v.toLocaleString()}`;
+};
+
+function buildValueMedians(projects) {
+  const buckets = {};
+  for (const p of projects) {
+    if (!p.value || p.value <= 0) continue;
+    const key = `${p.category || "unknown"}__${p.work_class || "unknown"}`;
+    if (!buckets[key]) buckets[key] = [];
+    buckets[key].push(p.value);
+  }
+  const medians = {};
+  for (const [key, vals] of Object.entries(buckets)) {
+    const sorted = [...vals].sort((a, b) => a - b);
+    medians[key] = sorted[Math.floor(sorted.length / 2)];
+  }
+  return medians;
+}
+
 const fmtDate = (d) => {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -385,7 +408,7 @@ function StatusPill({ status }) {
 // ─── PROJECT CARD ─────────────────────────────────────────────────────────────
 // One card per project (address group). Shows the most informative permit.
 
-function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss }) {
+function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedians = {} }) {
   const { lat, lng, projects } = group;
   const [expanded, setExpanded] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -395,6 +418,9 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss }) {
   const workClass = getWorkClass(primary);
   const hood = getNeighborhood(lat, lng);
   const maxValue = Math.max(...projects.map((p) => p.value || 0)) || null;
+  const estValue = !maxValue
+    ? valueMedians[`${primary.category || "unknown"}__${primary.work_class || "unknown"}`] || null
+    : null;
   const isSaved = savedIds.has(primary.id);
   const descText = getDescText(primary);
 
@@ -419,7 +445,7 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss }) {
         onClick={() => setExpanded(!expanded)}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        style={{ ...styles.projectRow, borderLeft: `3px solid ${maxValue ? (sourceColors[primary.source_id] || C.border) : C.border}`, position: "relative", opacity: maxValue ? 1 : 0.65 }}
+        style={{ ...styles.projectRow, borderLeft: `3px solid ${(maxValue || estValue) ? (sourceColors[primary.source_id] || C.border) : C.border}`, position: "relative", opacity: (maxValue || estValue) ? 1 : 0.65 }}
       >
         {hovered && (
           <button
@@ -494,13 +520,18 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss }) {
               </span>
             )}
             <div style={{ width: 80, textAlign: "right" }}>
-              <div style={{
-                color: maxValue ? C.orange : C.textMuted,
-                fontWeight: maxValue ? 700 : 400,
-                fontSize: 14, fontFamily: "'JetBrains Mono', monospace",
-              }}>
-                {fmt$(maxValue)}
-              </div>
+              {maxValue ? (
+                <div style={{ color: C.orange, fontWeight: 700, fontSize: 14, fontFamily: "'JetBrains Mono', monospace" }}>
+                  {fmt$(maxValue)}
+                </div>
+              ) : estValue ? (
+                <div style={{ color: C.textMuted, fontWeight: 400, fontSize: 13, fontFamily: "'JetBrains Mono', monospace" }}
+                  title="Estimated from similar projects">
+                  {fmtEst(estValue)}
+                </div>
+              ) : (
+                <div style={{ color: C.textMuted, fontWeight: 400, fontSize: 14, fontFamily: "'JetBrains Mono', monospace" }}>—</div>
+              )}
             </div>
             <div style={{ width: 110, display: "flex", justifyContent: "flex-end" }}>
               <StatusPill status={primary.status} />
@@ -2949,6 +2980,7 @@ export default function SiteScanApp() {
   const [categories, setCategories] = useState([]);
   const [sources, setSources] = useState([]);
   const [dismissedIds, setDismissedIds] = useState(new Set());
+  const [valueMedians, setValueMedians] = useState({});
   const debounceRef = useRef(null);
 
   const loadProjects = useCallback(async () => {
@@ -2975,6 +3007,7 @@ export default function SiteScanApp() {
       setProjects(filtered);
       setTotal(filtered.length);
       setTotalUnfiltered(allProjects.length);
+      setValueMedians(buildValueMedians(allProjects));
 
       // Extract unique categories and sources
       const cats = [...new Set((data.projects || []).map((p) => p.category))];
@@ -3231,6 +3264,7 @@ export default function SiteScanApp() {
                     savedIds={savedIds}
                     animDelay={Math.min(i, 25) * 0.03}
                     onDismiss={(id) => setDismissedIds(s => new Set([...s, id]))}
+                    valueMedians={valueMedians}
                   />
                 ))}
               </div>
