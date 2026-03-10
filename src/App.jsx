@@ -718,6 +718,12 @@ function projectMatchesClientTypes(project, clientTypes) {
   );
 }
 
+// Trade-only permit categories — subcontractor pulls, not GC-level projects.
+// Excluded from the default feed; shown only when explicitly filtered for.
+const TRADE_CATEGORIES = new Set([
+  "fire-sprinkler", "electrical", "plumbing", "mechanical", "painting", "roofing",
+]);
+
 function ProfileTab({ lastScanAt, onScan }) {
   const [defaults, setDefaults] = useState({ clientTypes: [], minValue: 0, categories: [], statuses: [] });
   const [saving, setSaving] = useState(false);
@@ -3039,7 +3045,11 @@ export default function SiteScanApp() {
       const filtered = allProjects.filter(p => {
         if (!projectMatchesClientTypes(p, filters.clientTypes || [])) return false;
         if ((filters.minValue || 0) > 0 && (!p.value || p.value < filters.minValue)) return false;
-        if ((filters.categories || []).length && !filters.categories.includes(p.category)) return false;
+        if ((filters.categories || []).length) {
+          if (!filters.categories.includes(p.category)) return false;
+        } else if (TRADE_CATEGORIES.has(p.category)) {
+          return false;
+        }
         if ((filters.statuses || []).length && !filters.statuses.includes(p.status)) return false;
         return true;
       });
