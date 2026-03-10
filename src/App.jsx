@@ -144,9 +144,13 @@ function getDisplayTitle(project) {
     title = title.replace(/^BAR\s+APP\s+REQUESTED\s*[–-]+\s*/i, "").trim();
     title = title.replace(/^\(still\s+need\s+to\s+create[^)]*\)\s*/i, "").trim();
     title = title.replace(/^BUILDING\s+\d+\s+/i, "").trim();
-    // Strip TRC/zoning boilerplate appended to the real project description
-    title = title.replace(/[.*]?\s*(ZONING CONDITIONS|TRC CONDITIONS|TRC CONDITION)[^]*/i, "").trim();
+    title = title.replace(/^MASTER:\s*/i, "").trim();
+    // Strip TRC/zoning/conditions boilerplate appended to the real project description
+    title = title.replace(/[.*]?\s*(ZONING CONDITIONS|TRC CONDITIONS|TRC CONDITION|CONDITIONS)[^]*/i, "").trim();
     title = title.replace(/\.\s*TRC[^]*$/i, "").trim();
+    // Strip administrative suffixes
+    title = title.replace(/\s*[\.\s]*Fire\s+District\s*[-–]\s*ALT\w+/i, "").trim();
+    title = title.replace(/\s*\(Replaced\s+CA\w+\)/i, "").trim();
   }
 
   // Fall back to category+workclass only if the description is truly generic
@@ -747,7 +751,7 @@ const TRADE_CATEGORIES = new Set([
 ]);
 
 // Civil/infrastructure and sub-permit titles to exclude from the default GC feed.
-const CIVIL_INFRA_RE = /\b(culvert|resurfacing|road\s+(resurface|widening|repair|improvement)|highway\s+construction|roundabout|bridge\s+(repair|replacement|construction|project)|pavement\s+(marking|replacement)|traffic\s+signal|water\s+main|sewer\s+main|utility\s+(relocation|undergrounding))\b|^(phasing\s+permit|phased\s+permit|phasing\s+floor\s+\d+|level\s+\d+[-–\s]|parking\s+garage\s+for\s|roof\s+permit\s+for\s|overall\s+master\s+permit|master\s+permit\s+for\s|retail\s+floor\s+[\d.]+|leasing\s+office$|an?\s+internal\s+parking\s+garage|hotel\s+rooms\s+level\s+\d+|pool\s+area\s+and\s|test\s+permit)/i;
+const CIVIL_INFRA_RE = /\b(culvert|resurfacing|road\s+(resurface|widening|repair|improvement)|highway\s+construction|roundabout|bridge\s+(repair|replacement|construction|project)|pavement\s+(marking|replacement)|traffic\s+signal|water\s+main|sewer\s+main|utility\s+(relocation|undergrounding))\b|^(phasing\s+permit|phased\s+permit|phasing\s+floor\s+\d+|level\s+\d+[-–\s]|parking\s+garage\s+for\s|roof\s+permit\s+for\s|overall\s+master\s+permit|master\s+permit\s+for\s|retail\s+floor\s+[\d.]+|leasing\s+office\b|an?\s+internal\s+parking\s+garage|hotel\s+rooms\s+level\s+\d+|pool\s+area\s+and\s|test\s+permit|this\s+permit\s+to\s+serve\s+for|mockup\s+panel\s+for|site\s+i?o?mprovements?\s*[-–])/i;
 
 // Lowcountry region filtering
 const LOWCOUNTRY_RE = /\b(charleston|mt\.?\s*pleasant|mount\s+pleasant|goose\s+creek|summerville|hanahan|isle\s+of\s+palms|sullivan'?s\s+island|james\s+island|johns\s+island|daniel\s+island|folly\s+beach|ladson|moncks\s+corner|berkeley\s+county|dorchester\s+county|north\s+charleston|seabrook|kiawah)\b/i;
