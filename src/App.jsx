@@ -200,6 +200,19 @@ const sourceLabels = {
   "charlotte-ncdot": "CLT NCDOT",
 };
 
+const sourceColors = {
+  "charleston-permits":        C.orange,
+  "north-charleston-permits":  C.orange,
+  "mt-pleasant-permits":       C.orange,
+  "charlotte-permits":         C.orange,
+  "charlotte-land-dev":        C.orange,
+  "sam-gov":                   C.blue,
+  "scbo":                      C.blue,
+  "charleston-city-bids":      C.blue,
+  "charlotte-cip":             C.sky,
+  "charlotte-ncdot":           C.sky,
+};
+
 const statusColors = {
   Open: C.orange,
   Active: C.orange,
@@ -385,7 +398,7 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss }) {
         onClick={() => setExpanded(!expanded)}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        style={{ ...styles.projectRow, borderLeft: `3px solid ${C.border}`, position: "relative" }}
+        style={{ ...styles.projectRow, borderLeft: `3px solid ${sourceColors[primary.source_id] || C.border}`, position: "relative" }}
       >
         {hovered && (
           <button
@@ -438,7 +451,12 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss }) {
                 <span style={{ marginLeft: locationTag ? 12 : 0 }}>🏢 {primary.agency}</span>
               )}
               <span style={{ marginLeft: 8 }}>
-                <span style={{ fontSize: 9, padding: "1px 6px", background: "#ffffff08", borderRadius: 3, color: "#888" }}>
+                <span style={{
+                  fontSize: 10, padding: "1px 7px", borderRadius: 3,
+                  background: `${sourceColors[primary.source_id] || "#ffffff"}0f`,
+                  color: sourceColors[primary.source_id] || "#666",
+                  fontWeight: 600, letterSpacing: "0.02em",
+                }}>
                   {sourceLabels[primary.source_id] || primary.source_id}
                 </span>
               </span>
