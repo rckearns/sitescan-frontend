@@ -3192,17 +3192,15 @@ export default function SiteScanApp() {
 
   const savedIds = new Set(saved.map((s) => s.project_id));
 
-  // Compute live stats from the currently-loaded (filtered) projects so the
-  // stats bar always reflects whatever search / match-filter criteria are active.
+  // Compute live stats: project count and pipeline value from the filtered local
+  // list (reflects active filters); new_this_week and bids_open from the API
+  // stats (covers the full DB, not just the 1000-item page loaded in the list).
   const liveStats = total > 0
     ? {
         total_projects: total,
         total_pipeline_value: projects.reduce((s, p) => s + (p.value || 0), 0),
-        new_this_week: projects.filter((p) => {
-          const d = new Date(p.posted_date);
-          return !isNaN(d) && (Date.now() - d) < 7 * 24 * 60 * 60 * 1000;
-        }).length,
-        bids_open: projects.filter((p) => ["Open", "Accepting Bids"].includes(p.status)).length,
+        new_this_week: stats?.new_this_week ?? 0,
+        bids_open: stats?.bids_open ?? 0,
         last_scan_at: stats?.last_scan_at,
       }
     : stats;
