@@ -234,6 +234,28 @@ function groupByAddress(projects) {
   return order;
 }
 
+// Group address-groups that share the same normalized title + source into one
+// card, so multi-building phased permits don't flood the feed.
+function groupByTitle(addressGroups) {
+  const order = [];
+  const map = new Map();
+  for (const grp of addressGroups) {
+    const primary = getPrimaryPermit(grp.projects);
+    const title = (getDisplayTitle(primary) || primary.title || "").toLowerCase().trim().replace(/\s+/g, " ");
+    const key = `${primary.source_id}||${title}`;
+    if (map.has(key)) {
+      const existing = map.get(key);
+      existing.projects = [...existing.projects, ...grp.projects];
+      existing.phaseCount += 1;
+    } else {
+      const sg = { ...grp, phaseCount: 1 };
+      map.set(key, sg);
+      order.push(sg);
+    }
+  }
+  return order;
+}
+
 // ─── PARCEL OPPORTUNITY HELPERS ───────────────────────────────────────────────
 
 // Score 0–100: how underimproved is this parcel relative to its land value?
@@ -578,15 +600,21 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
                 ⏱ {deadlineTag.label}
               </span>
             )}
-            <div style={{ width: 80, textAlign: "right" }}>
+            <div style={{ textAlign: "right" }}>
               {maxValue ? (
-                <div style={{ color: C.orange, fontWeight: 700, fontSize: 14, fontFamily: "'JetBrains Mono', monospace" }}>
+                <div style={{ color: C.orange, fontWeight: 700, fontSize: 14, fontFamily: "'JetBrains Mono', monospace", whiteSpace: "nowrap" }}>
                   {fmt$(maxValue)}
+                  {group.phaseCount > 1 && (
+                    <span style={{ fontSize: 11, fontWeight: 400, color: C.textMuted, marginLeft: 4 }}>×{group.phaseCount}</span>
+                  )}
                 </div>
               ) : estValue ? (
-                <div style={{ color: C.textMuted, fontWeight: 400, fontSize: 13, fontFamily: "'JetBrains Mono', monospace" }}
+                <div style={{ color: C.textMuted, fontWeight: 400, fontSize: 13, fontFamily: "'JetBrains Mono', monospace", whiteSpace: "nowrap" }}
                   title="Estimated from similar projects">
                   {fmtEst(estValue)}
+                  {group.phaseCount > 1 && (
+                    <span style={{ fontSize: 11, color: C.textMuted, marginLeft: 4 }}>×{group.phaseCount}</span>
+                  )}
                 </div>
               ) : (
                 <div style={{ color: C.textMuted, fontWeight: 400, fontSize: 14, fontFamily: "'JetBrains Mono', monospace" }}>—</div>
@@ -3361,7 +3389,7 @@ export default function SiteScanApp() {
               </div>
             ) : (
               <div>
-                {groupByAddress(projects.filter((p) => !isSubpermit(p) && !dismissedIds.has(p.id))).map((group, i) => (
+                {groupByTitle(groupByAddress(projects.filter((p) => !isSubpermit(p) && !dismissedIds.has(p.id)))).map((group, i) => (
                   <ProjectCard
                     key={group.address ?? `noaddr-${i}`}
                     group={group}
