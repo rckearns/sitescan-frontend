@@ -2883,6 +2883,7 @@ export default function SiteScanApp() {
   const [showMap, setShowMap] = useState(false);
   const [projects, setProjects] = useState([]);
   const [total, setTotal] = useState(0);
+  const [totalUnfiltered, setTotalUnfiltered] = useState(0);
   const [stats, setStats] = useState(null);
   const [saved, setSaved] = useState([]);
   const [history, setHistory] = useState([]);
@@ -2917,6 +2918,7 @@ export default function SiteScanApp() {
       });
       setProjects(filtered);
       setTotal(filtered.length);
+      setTotalUnfiltered(allProjects.length);
 
       // Extract unique categories and sources
       const cats = [...new Set((data.projects || []).map((p) => p.category))];
@@ -3135,7 +3137,10 @@ export default function SiteScanApp() {
             />
             <div style={styles.resultHeader}>
               <span style={{ color: "#888", fontSize: 13 }}>
-                {total} project{total !== 1 ? "s" : ""} found
+                {totalUnfiltered > 0 && total < totalUnfiltered
+                  ? <><span style={{ color: C.text, fontWeight: 600 }}>{total}</span> of {totalUnfiltered} projects</>
+                  : <>{total} project{total !== 1 ? "s" : ""}</>
+                }
                 {filters.search && ` matching "${filters.search}"`}
               </span>
             </div>
