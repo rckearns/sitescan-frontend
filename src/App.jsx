@@ -724,8 +724,8 @@ const TRADE_CATEGORIES = new Set([
   "fire-sprinkler", "electrical", "plumbing", "mechanical", "painting", "roofing",
 ]);
 
-// Civil/infrastructure project titles to exclude from the default GC feed.
-const CIVIL_INFRA_RE = /\b(culvert|resurfacing|road\s+(resurface|widening|repair|improvement)|highway\s+construction|roundabout|bridge\s+(repair|replacement|construction|project)|pavement\s+(marking|replacement)|traffic\s+signal|water\s+main|sewer\s+main|utility\s+(relocation|undergrounding))\b/i;
+// Civil/infrastructure and sub-permit titles to exclude from the default GC feed.
+const CIVIL_INFRA_RE = /\b(culvert|resurfacing|road\s+(resurface|widening|repair|improvement)|highway\s+construction|roundabout|bridge\s+(repair|replacement|construction|project)|pavement\s+(marking|replacement)|traffic\s+signal|water\s+main|sewer\s+main|utility\s+(relocation|undergrounding))\b|^(phasing\s+permit|phased\s+permit|parking\s+garage\s+for\s|roof\s+permit\s+for\s)/i;
 
 // Lowcountry region filtering
 const LOWCOUNTRY_RE = /\b(charleston|mt\.?\s*pleasant|mount\s+pleasant|goose\s+creek|summerville|hanahan|isle\s+of\s+palms|sullivan'?s\s+island|james\s+island|johns\s+island|daniel\s+island|folly\s+beach|ladson|moncks\s+corner|berkeley\s+county|dorchester\s+county|north\s+charleston|seabrook|kiawah)\b/i;
