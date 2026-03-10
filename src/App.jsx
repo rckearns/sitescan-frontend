@@ -592,11 +592,38 @@ function projectMatchesClientTypes(project, clientTypes) {
 }
 
 function ProfileTab({ lastScanAt, onScan }) {
+  const [defaultClientTypes, setDefaultClientTypes] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [savedMsg, setSavedMsg] = useState("");
   const [scanning, setScanning] = useState(false);
   const [scanMsg, setScanMsg] = useState("");
   const [connTesting, setConnTesting] = useState(false);
   const [connResult, setConnResult] = useState(null);
   const [dbResult, setDbResult] = useState(null);
+
+  useEffect(() => {
+    api("/auth/me").then((data) => setDefaultClientTypes(data.criteria_client_types || []));
+  }, []);
+
+  const toggleDefault = (id) =>
+    setDefaultClientTypes((ct) => ct.includes(id) ? ct.filter(x => x !== id) : [...ct, id]);
+
+  const saveDefaults = async () => {
+    setSaving(true);
+    await api("/auth/me", { method: "PATCH", body: JSON.stringify({ criteria_client_types: defaultClientTypes }) });
+    setSaving(false);
+    setSavedMsg("✓ Saved — applied on next login");
+    setTimeout(() => setSavedMsg(""), 4000);
+  };
+
+  const ctChip = (active) => ({
+    padding: "8px 16px", borderRadius: 8,
+    border: `1px solid ${active ? C.orange : C.border}`,
+    background: active ? `${C.orange}20` : "transparent",
+    color: active ? C.orange : C.textSub,
+    fontSize: 13, fontWeight: 600, cursor: "pointer",
+    fontFamily: "'DM Sans', sans-serif", transition: "all 0.15s",
+  });
 
   const doScan = async () => {
     setScanning(true);
@@ -627,7 +654,28 @@ function ProfileTab({ lastScanAt, onScan }) {
 
   return (
     <div style={{ maxWidth: 620 }}>
-      <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 32 }}>Settings</h2>
+      <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 8 }}>Settings</h2>
+
+      {/* Default client type filters */}
+      <div style={{ marginBottom: 36 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 6 }}>Default Client Filter</h3>
+        <p style={{ color: C.textSub, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
+          These are applied automatically when you log in. You can always change them in the filter bar.
+        </p>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+          {CLIENT_TYPES.map(({ id, label }) => (
+            <button key={id} onClick={() => toggleDefault(id)} style={ctChip(defaultClientTypes.includes(id))}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <button onClick={saveDefaults} disabled={saving} style={styles.authBtn}>
+          {saving ? "Saving..." : "Save Defaults"}
+        </button>
+        {savedMsg && <span style={{ color: C.orange, fontSize: 13, marginLeft: 16 }}>{savedMsg}</span>}
+      </div>
+
+      <div style={{ borderTop: `1px solid ${C.border}`, margin: "0 0 32px" }} />
 
       {/* Manual scan */}
       <h3 style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>Data Refresh</h3>
@@ -2843,6 +2891,11 @@ export default function SiteScanApp() {
     loadStats();
     loadSaved();
     loadHistory();
+    // Pre-populate filters from saved profile preferences
+    api("/auth/me").then((data) => {
+      const saved = data.criteria_client_types;
+      if (saved?.length) setFilters((f) => ({ ...f, clientTypes: saved }));
+    }).catch(() => {});
   }, [authed]);
 
   // Poll history every 30s — if the most recent entry has no finished_at, a scan
