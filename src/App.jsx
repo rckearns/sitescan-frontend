@@ -3067,7 +3067,7 @@ export default function SiteScanApp() {
       const allProjects = data.projects || [];
       const filtered = allProjects.filter(p => {
         if (!projectMatchesClientTypes(p, filters.clientTypes || [])) return false;
-        if ((filters.minValue || 0) > 0 && (!p.value || p.value < filters.minValue)) return false;
+        if ((filters.minValue || 0) > 0 && p.value && p.value < filters.minValue) return false;
         if ((filters.categories || []).length) {
           if (!filters.categories.includes(p.category)) return false;
         } else {
