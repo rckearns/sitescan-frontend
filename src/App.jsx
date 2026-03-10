@@ -523,9 +523,16 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
               {locationTag && (
                 <span style={{ marginLeft: 10, color: C.textSub }}>{locationTag}</span>
               )}
-              {primary.contractor && (
-                <span style={{ marginLeft: 12, color: C.textMuted }}>👷 {primary.contractor}</span>
-              )}
+              {primary.contractor && (() => {
+                const names = primary.contractor.split("|").map(s => s.trim()).filter(Boolean);
+                const shown = names.slice(0, 2);
+                const extra = names.length - shown.length;
+                return (
+                  <span style={{ marginLeft: 12, color: C.textMuted }}>
+                    👷 {shown.join(", ")}{extra > 0 ? ` +${extra} more` : ""}
+                  </span>
+                );
+              })()}
               {primary.agency && (
                 <span style={{ marginLeft: locationTag ? 12 : 0, color: C.textSub }}>
                   🏢 {primary.agency.split("|")[0]}
@@ -721,7 +728,7 @@ function projectMatchesClientTypes(project, clientTypes) {
 // Trade-only permit categories — subcontractor pulls, not GC-level projects.
 // Excluded from the default feed; shown only when explicitly filtered for.
 const TRADE_CATEGORIES = new Set([
-  "fire-sprinkler", "electrical", "plumbing", "mechanical", "painting", "roofing",
+  "fire-sprinkler", "electrical", "plumbing", "mechanical", "painting", "roofing", "structural",
 ]);
 
 // Civil/infrastructure and sub-permit titles to exclude from the default GC feed.
