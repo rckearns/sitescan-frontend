@@ -323,32 +323,6 @@ function AuthScreen({ onAuth }) {
   );
 }
 
-// ─── MATCH BADGE ────────────────────────────────────────────────────────────
-
-function MatchBadge({ score }) {
-  const c = matchColor(score);
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: `${c}18`,
-        color: c,
-        border: `1px solid ${c}40`,
-        borderRadius: 20,
-        padding: "3px 10px",
-        fontSize: 12,
-        fontWeight: 700,
-        fontFamily: "'JetBrains Mono', monospace",
-        minWidth: 44,
-      }}
-    >
-      {score}%
-    </span>
-  );
-}
-
 // ─── STATUS PILL ────────────────────────────────────────────────────────────
 
 function StatusPill({ status }) {
