@@ -542,19 +542,21 @@ function StatsBar({ stats }) {
 // ─── PROFILE TAB ────────────────────────────────────────────────────────────
 
 const ALL_CATEGORIES = [
+  { id: "healthcare", label: "Healthcare" },
+  { id: "education", label: "Education" },
+  { id: "government", label: "Government" },
+  { id: "institutional", label: "Institutional" },
+  { id: "office", label: "Office" },
+  { id: "retail", label: "Retail" },
+  { id: "restaurant", label: "Restaurant" },
   { id: "hotel", label: "Hotel" },
   { id: "multi-family", label: "Multi-Family" },
   { id: "mixed-use", label: "Mixed Use" },
-  { id: "office", label: "Office" },
-  { id: "restaurant", label: "Restaurant" },
-  { id: "retail", label: "Retail" },
   { id: "industrial", label: "Industrial" },
-  { id: "institutional", label: "Institutional" },
-  { id: "government", label: "Government" },
+  { id: "renovation", label: "Renovation" },
   { id: "historic-restoration", label: "Historic Restoration" },
-  { id: "masonry", label: "Masonry" },
-  { id: "structural", label: "Structural" },
   { id: "commercial", label: "Commercial" },
+  { id: "other", label: "Other" },
 ];
 const ALL_STATUSES = ["Open", "Active", "Accepting Bids", "Issued", "In Review", "Finaled"];
 const ALL_SOURCES = [
@@ -580,8 +582,8 @@ const CLIENT_TYPE_SOURCES = {
   government: new Set(["sam-gov","scbo","charleston-city-bids","charlotte-cip","charlotte-ncdot"]),
 };
 const CLIENT_TYPE_CATEGORIES = {
-  "higher-ed": new Set(["institutional"]),
-  broker:      new Set(["commercial","office","retail"]),
+  "higher-ed": new Set(["institutional","healthcare","education"]),
+  broker:      new Set(["commercial","office","retail","renovation"]),
 };
 function projectMatchesClientTypes(project, clientTypes) {
   if (!clientTypes.length) return true;
