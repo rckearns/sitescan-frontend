@@ -592,7 +592,7 @@ function projectMatchesClientTypes(project, clientTypes) {
 }
 
 function ProfileTab({ lastScanAt, onScan }) {
-  const [defaultClientTypes, setDefaultClientTypes] = useState([]);
+  const [defaults, setDefaults] = useState({ clientTypes: [], minValue: 0, categories: [], statuses: [] });
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
   const [scanning, setScanning] = useState(false);
@@ -602,28 +602,43 @@ function ProfileTab({ lastScanAt, onScan }) {
   const [dbResult, setDbResult] = useState(null);
 
   useEffect(() => {
-    api("/auth/me").then((data) => setDefaultClientTypes(data.criteria_client_types || []));
+    api("/auth/me").then((data) => setDefaults({
+      clientTypes: data.criteria_client_types || [],
+      minValue: data.criteria_min_value || 0,
+      categories: data.criteria_categories || [],
+      statuses: data.criteria_statuses || [],
+    }));
   }, []);
 
-  const toggleDefault = (id) =>
-    setDefaultClientTypes((ct) => ct.includes(id) ? ct.filter(x => x !== id) : [...ct, id]);
+  const toggle = (key, id) =>
+    setDefaults((d) => {
+      const arr = d[key] || [];
+      return { ...d, [key]: arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id] };
+    });
 
   const saveDefaults = async () => {
     setSaving(true);
-    await api("/auth/me", { method: "PATCH", body: JSON.stringify({ criteria_client_types: defaultClientTypes }) });
+    await api("/auth/me", { method: "PATCH", body: JSON.stringify({
+      criteria_client_types: defaults.clientTypes,
+      criteria_min_value: defaults.minValue || null,
+      criteria_categories: defaults.categories,
+      criteria_statuses: defaults.statuses,
+    }) });
     setSaving(false);
-    setSavedMsg("✓ Saved — applied on next login");
+    setSavedMsg("✓ Saved as defaults");
     setTimeout(() => setSavedMsg(""), 4000);
   };
 
-  const ctChip = (active) => ({
-    padding: "8px 16px", borderRadius: 8,
-    border: `1px solid ${active ? C.orange : C.border}`,
-    background: active ? `${C.orange}20` : "transparent",
-    color: active ? C.orange : C.textSub,
-    fontSize: 13, fontWeight: 600, cursor: "pointer",
+  const chip = (active, color) => ({
+    padding: "7px 14px", borderRadius: 8,
+    border: `1px solid ${active ? color : C.border}`,
+    background: active ? `${color}20` : "transparent",
+    color: active ? color : C.textSub,
+    fontSize: 12, fontWeight: 600, cursor: "pointer",
     fontFamily: "'DM Sans', sans-serif", transition: "all 0.15s",
   });
+  const sectionLabel = { fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase",
+    letterSpacing: "0.08em", marginBottom: 10, display: "block" };
 
   const doScan = async () => {
     setScanning(true);
@@ -656,19 +671,49 @@ function ProfileTab({ lastScanAt, onScan }) {
     <div style={{ maxWidth: 620 }}>
       <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 8 }}>Settings</h2>
 
-      {/* Default client type filters */}
+      {/* Default filters */}
       <div style={{ marginBottom: 36 }}>
-        <h3 style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 6 }}>Default Client Filter</h3>
-        <p style={{ color: C.textSub, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
-          These are applied automatically when you log in. You can always change them in the filter bar.
+        <h3 style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 6 }}>Default Filters</h3>
+        <p style={{ color: C.textSub, fontSize: 13, marginBottom: 20, lineHeight: 1.6 }}>
+          Applied automatically when you log in. Override any time in the filter bar.
         </p>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+
+        <span style={sectionLabel}>Client Type</span>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
           {CLIENT_TYPES.map(({ id, label }) => (
-            <button key={id} onClick={() => toggleDefault(id)} style={ctChip(defaultClientTypes.includes(id))}>
+            <button key={id} onClick={() => toggle("clientTypes", id)} style={chip(defaults.clientTypes.includes(id), C.orange)}>
               {label}
             </button>
           ))}
         </div>
+
+        <span style={sectionLabel}>Minimum Value</span>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+          {[0, 100000, 500000, 1000000, 5000000].map((v) => (
+            <button key={v} onClick={() => setDefaults(d => ({ ...d, minValue: v }))} style={chip(defaults.minValue === v, C.sky)}>
+              {v === 0 ? "Any" : v >= 1000000 ? `$${v / 1000000}M+` : `$${v / 1000}K+`}
+            </button>
+          ))}
+        </div>
+
+        <span style={sectionLabel}>Project Type</span>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+          {ALL_CATEGORIES.map(({ id, label }) => (
+            <button key={id} onClick={() => toggle("categories", id)} style={chip(defaults.categories.includes(id), C.blue)}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <span style={sectionLabel}>Status</span>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+          {ALL_STATUSES.map((s) => (
+            <button key={s} onClick={() => toggle("statuses", s)} style={chip(defaults.statuses.includes(s), C.sky)}>
+              {s}
+            </button>
+          ))}
+        </div>
+
         <button onClick={saveDefaults} disabled={saving} style={styles.authBtn}>
           {saving ? "Saving..." : "Save Defaults"}
         </button>
@@ -952,48 +997,69 @@ function ScanButton({ onScan }) {
 function FilterBar({ filters, setFilters }) {
   const toggleDir = () =>
     setFilters((f) => ({ ...f, sortDir: f.sortDir === "desc" ? "asc" : "desc" }));
-  const toggleClientType = (id) =>
+  const toggle = (key, id) =>
     setFilters((f) => {
-      const ct = f.clientTypes || [];
-      return { ...f, clientTypes: ct.includes(id) ? ct.filter(x => x !== id) : [...ct, id] };
+      const arr = f[key] || [];
+      return { ...f, [key]: arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id] };
     });
 
   const btnBase = {
-    padding: "9px 11px",
-    background: C.surface,
-    border: `1px solid ${C.border}`,
-    borderRadius: 8,
-    color: C.textSub,
-    fontSize: 16,
-    cursor: "pointer",
-    fontFamily: "'DM Sans', sans-serif",
-    minWidth: 38,
-    textAlign: "center",
+    padding: "9px 11px", background: C.surface, border: `1px solid ${C.border}`,
+    borderRadius: 8, color: C.textSub, fontSize: 16, cursor: "pointer",
+    fontFamily: "'DM Sans', sans-serif", minWidth: 38, textAlign: "center",
     transition: "border-color 0.15s, color 0.15s",
   };
-
-  const ctChip = (active) => ({
-    padding: "7px 14px",
-    borderRadius: 8,
-    border: `1px solid ${active ? C.orange : C.border}`,
-    background: active ? `${C.orange}20` : "transparent",
-    color: active ? C.orange : C.textSub,
-    fontSize: 12,
-    fontWeight: 600,
-    cursor: "pointer",
-    fontFamily: "'DM Sans', sans-serif",
-    transition: "all 0.15s",
+  const chip = (active, color) => ({
+    padding: "6px 13px", borderRadius: 8,
+    border: `1px solid ${active ? color : C.border}`,
+    background: active ? `${color}20` : "transparent",
+    color: active ? color : C.textSub,
+    fontSize: 12, fontWeight: 600, cursor: "pointer",
+    fontFamily: "'DM Sans', sans-serif", transition: "all 0.15s",
   });
+  const rowLabel = { fontSize: 10, fontWeight: 700, color: C.textMuted, textTransform: "uppercase",
+    letterSpacing: "0.08em", marginRight: 8, alignSelf: "center", whiteSpace: "nowrap" };
 
   return (
-    <div style={{ ...styles.filterBar, flexWrap: "wrap", gap: 8 }}>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", flex: "1 1 100%" }}>
+    <div style={{ ...styles.filterBar, flexWrap: "wrap", gap: 6 }}>
+      {/* Client type */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: "1 1 100%", alignItems: "center" }}>
+        <span style={rowLabel}>Client</span>
         {CLIENT_TYPES.map(({ id, label }) => (
-          <button key={id} onClick={() => toggleClientType(id)} style={ctChip((filters.clientTypes || []).includes(id))}>
+          <button key={id} onClick={() => toggle("clientTypes", id)} style={chip((filters.clientTypes || []).includes(id), C.orange)}>
             {label}
           </button>
         ))}
       </div>
+      {/* Min value */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: "1 1 100%", alignItems: "center" }}>
+        <span style={rowLabel}>Min Value</span>
+        {[0, 100000, 500000, 1000000, 5000000].map((v) => (
+          <button key={v} onClick={() => setFilters(f => ({ ...f, minValue: v }))}
+            style={chip((filters.minValue || 0) === v, C.sky)}>
+            {v === 0 ? "Any" : v >= 1000000 ? `$${v / 1000000}M+` : `$${v / 1000}K+`}
+          </button>
+        ))}
+      </div>
+      {/* Project type */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: "1 1 100%", alignItems: "center" }}>
+        <span style={rowLabel}>Type</span>
+        {ALL_CATEGORIES.map(({ id, label }) => (
+          <button key={id} onClick={() => toggle("categories", id)} style={chip((filters.categories || []).includes(id), C.blue)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {/* Status */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: "1 1 100%", alignItems: "center" }}>
+        <span style={rowLabel}>Status</span>
+        {ALL_STATUSES.map((s) => (
+          <button key={s} onClick={() => toggle("statuses", s)} style={chip((filters.statuses || []).includes(s), C.sky)}>
+            {s}
+          </button>
+        ))}
+      </div>
+      {/* Search + sort */}
       <input
         style={{ ...styles.searchInput, flex: "1 1 200px" }}
         placeholder="Search projects..."
@@ -1010,7 +1076,7 @@ function FilterBar({ filters, setFilters }) {
       </select>
       <button
         onClick={toggleDir}
-        title={filters.sortDir === "desc" ? "High → Low (click to flip)" : "Low → High (click to flip)"}
+        title={filters.sortDir === "desc" ? "High → Low" : "Low → High"}
         style={btnBase}
         onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.borderHi; e.currentTarget.style.color = C.text; }}
         onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textSub; }}
@@ -2801,7 +2867,7 @@ export default function SiteScanApp() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
-    search: "", category: "", source: "", clientTypes: [], sortBy: "posted_date", sortDir: "desc",
+    search: "", category: "", source: "", clientTypes: [], minValue: 0, categories: [], statuses: [], sortBy: "posted_date", sortDir: "desc",
   });
   const [categories, setCategories] = useState([]);
   const [sources, setSources] = useState([]);
@@ -2821,7 +2887,13 @@ export default function SiteScanApp() {
 
       const data = await api(`/projects?${params}`);
       const allProjects = data.projects || [];
-      const filtered = allProjects.filter(p => projectMatchesClientTypes(p, filters.clientTypes || []));
+      const filtered = allProjects.filter(p => {
+        if (!projectMatchesClientTypes(p, filters.clientTypes || [])) return false;
+        if ((filters.minValue || 0) > 0 && (!p.value || p.value < filters.minValue)) return false;
+        if ((filters.categories || []).length && !filters.categories.includes(p.category)) return false;
+        if ((filters.statuses || []).length && !filters.statuses.includes(p.status)) return false;
+        return true;
+      });
       setProjects(filtered);
       setTotal(filtered.length);
 
@@ -2893,8 +2965,13 @@ export default function SiteScanApp() {
     loadHistory();
     // Pre-populate filters from saved profile preferences
     api("/auth/me").then((data) => {
-      const saved = data.criteria_client_types;
-      if (saved?.length) setFilters((f) => ({ ...f, clientTypes: saved }));
+      setFilters((f) => ({
+        ...f,
+        clientTypes: data.criteria_client_types?.length ? data.criteria_client_types : f.clientTypes,
+        minValue: data.criteria_min_value || f.minValue,
+        categories: data.criteria_categories?.length ? data.criteria_categories : f.categories,
+        statuses: data.criteria_statuses?.length ? data.criteria_statuses : f.statuses,
+      }));
     }).catch(() => {});
   }, [authed]);
 
