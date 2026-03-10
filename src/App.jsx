@@ -146,7 +146,7 @@ function getDisplayTitle(project) {
     title = title.replace(/^BUILDING\s+\d+\s+/i, "").trim();
     title = title.replace(/^MASTER:\s*/i, "").trim();
     // Strip TRC/zoning/conditions boilerplate appended to the real project description
-    title = title.replace(/[.*]?\s*(ZONING CONDITIONS|TRC CONDITIONS|TRC CONDITION|CONDITIONS)[^]*/i, "").trim();
+    title = title.replace(/[.*]?\s*(ZONING CONDITIONS|TRC CONDITIONS|TRC CONDITION|CONDITIONS:)[^]*/i, "").trim();
     title = title.replace(/\.\s*TRC[^]*$/i, "").trim();
     // Strip administrative suffixes
     title = title.replace(/\s*[\.\s]*Fire\s+District\s*[-–]\s*ALT\w+/i, "").trim();
