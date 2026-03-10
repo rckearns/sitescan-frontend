@@ -697,7 +697,7 @@ const ALL_CATEGORIES = [
   { id: "commercial", label: "Commercial" },
   { id: "other", label: "Other" },
 ];
-const ALL_STATUSES = ["Open", "Active", "Accepting Bids", "Issued", "In Review", "Finaled"];
+const ALL_STATUSES = ["Applied", "Open", "Active", "Accepting Bids", "Issued", "In Review", "Finaled"];
 const ALL_SOURCES = [
   { id: "sam-gov", label: "SAM.gov" },
   { id: "charleston-permits", label: "CHS Permits" },
@@ -1247,9 +1247,9 @@ function FilterBar({ filters, setFilters }) {
             ))}
           </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: "1 1 100%", alignItems: "center" }}>
-            <span style={rowLabel}>Status</span>
+            <span style={rowLabel}>Hide Status</span>
             {ALL_STATUSES.map((s) => (
-              <button key={s} onClick={() => toggle("statuses", s)} style={chip((filters.statuses || []).includes(s), C.sky)}>
+              <button key={s} onClick={() => toggle("statuses", s)} style={chip((filters.statuses || []).includes(s), "#e44")}>
                 {s}
               </button>
             ))}
@@ -3095,7 +3095,7 @@ export default function SiteScanApp() {
           if (TRADE_CATEGORIES.has(p.category)) return false;
           if (CIVIL_INFRA_RE.test(p.title || "")) return false;
         }
-        if ((filters.statuses || []).length && !filters.statuses.includes(p.status)) return false;
+        if ((filters.statuses || []).length && filters.statuses.includes(p.status)) return false;
         if (filters.lowcountry && !projectInLowcountry(p)) return false;
         if (PERMIT_SOURCES.has(p.source_id) && p.posted_date &&
             (Date.now() - new Date(p.posted_date)) > THREE_YEARS_MS) return false;
