@@ -394,6 +394,16 @@ function ProjectCard({ group, onSave, savedIds, animDelay }) {
     ? hood
     : primary.location || hood;
 
+  // Deadline urgency
+  const deadlineTag = (() => {
+    if (!primary.deadline) return null;
+    const days = Math.ceil((new Date(primary.deadline) - Date.now()) / (1000 * 60 * 60 * 24));
+    if (days < 0) return null; // already passed
+    if (days <= 7)  return { label: days === 0 ? "Due today" : `Due in ${days}d`, color: "#ef4444" };
+    if (days <= 30) return { label: `Due in ${days}d`, color: "#f59e0b" };
+    return null; // far out, not urgent enough to surface
+  })();
+
   return (
     <div style={{ marginBottom: 6, animation: `fadeIn 0.3s ease ${animDelay}s both` }}>
       <div
@@ -442,6 +452,15 @@ function ProjectCard({ group, onSave, savedIds, animDelay }) {
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+            {deadlineTag && (
+              <span style={{
+                fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4,
+                background: `${deadlineTag.color}20`, color: deadlineTag.color,
+                border: `1px solid ${deadlineTag.color}40`, whiteSpace: "nowrap",
+              }}>
+                ⏱ {deadlineTag.label}
+              </span>
+            )}
             <div style={{ width: 80, textAlign: "right" }}>
               <div style={{ color: C.orange, fontWeight: 700, fontSize: 14, fontFamily: "'JetBrains Mono', monospace" }}>
                 {fmt$(maxValue)}
