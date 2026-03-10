@@ -997,6 +997,8 @@ function ScanButton({ onScan }) {
 // ─── FILTER BAR ─────────────────────────────────────────────────────────────
 
 function FilterBar({ filters, setFilters }) {
+  const [showMore, setShowMore] = useState(false);
+
   const toggleDir = () =>
     setFilters((f) => ({ ...f, sortDir: f.sortDir === "desc" ? "asc" : "desc" }));
   const toggle = (key, id) =>
@@ -1022,6 +1024,8 @@ function FilterBar({ filters, setFilters }) {
   const rowLabel = { fontSize: 10, fontWeight: 700, color: C.textMuted, textTransform: "uppercase",
     letterSpacing: "0.08em", marginRight: 8, alignSelf: "center", whiteSpace: "nowrap" };
 
+  const moreCount = (filters.categories || []).length + (filters.statuses || []).length;
+
   return (
     <div style={{ ...styles.filterBar, flexWrap: "wrap", gap: 6 }}>
       {/* Client type */}
@@ -1033,7 +1037,7 @@ function FilterBar({ filters, setFilters }) {
           </button>
         ))}
       </div>
-      {/* Min value */}
+      {/* Min value + More filters toggle on same row */}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: "1 1 100%", alignItems: "center" }}>
         <span style={rowLabel}>Min Value</span>
         {[0, 100000, 500000, 1000000, 5000000].map((v) => (
@@ -1042,25 +1046,41 @@ function FilterBar({ filters, setFilters }) {
             {v === 0 ? "Any" : v >= 1000000 ? `$${v / 1000000}M+` : `$${v / 1000}K+`}
           </button>
         ))}
+        <button
+          onClick={() => setShowMore(v => !v)}
+          style={{
+            marginLeft: "auto", padding: "6px 13px", borderRadius: 8, cursor: "pointer",
+            border: `1px solid ${showMore || moreCount > 0 ? C.blue : C.border}`,
+            background: showMore ? `${C.blue}20` : "transparent",
+            color: showMore || moreCount > 0 ? C.blue : C.textSub,
+            fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans', sans-serif",
+            transition: "all 0.15s", whiteSpace: "nowrap",
+          }}
+        >
+          {showMore ? "▲ Less" : "▼ More"}{moreCount > 0 ? ` (${moreCount})` : ""}
+        </button>
       </div>
-      {/* Project type */}
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: "1 1 100%", alignItems: "center" }}>
-        <span style={rowLabel}>Type</span>
-        {ALL_CATEGORIES.map(({ id, label }) => (
-          <button key={id} onClick={() => toggle("categories", id)} style={chip((filters.categories || []).includes(id), C.blue)}>
-            {label}
-          </button>
-        ))}
-      </div>
-      {/* Status */}
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: "1 1 100%", alignItems: "center" }}>
-        <span style={rowLabel}>Status</span>
-        {ALL_STATUSES.map((s) => (
-          <button key={s} onClick={() => toggle("statuses", s)} style={chip((filters.statuses || []).includes(s), C.sky)}>
-            {s}
-          </button>
-        ))}
-      </div>
+      {/* Project type + Status — collapsed by default */}
+      {showMore && (
+        <>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: "1 1 100%", alignItems: "center" }}>
+            <span style={rowLabel}>Type</span>
+            {ALL_CATEGORIES.map(({ id, label }) => (
+              <button key={id} onClick={() => toggle("categories", id)} style={chip((filters.categories || []).includes(id), C.blue)}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: "1 1 100%", alignItems: "center" }}>
+            <span style={rowLabel}>Status</span>
+            {ALL_STATUSES.map((s) => (
+              <button key={s} onClick={() => toggle("statuses", s)} style={chip((filters.statuses || []).includes(s), C.sky)}>
+                {s}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
       {/* Search + sort */}
       <input
         style={{ ...styles.searchInput, flex: "1 1 200px" }}
@@ -1114,7 +1134,6 @@ function SavedTab({ saved, onUnsave }) {
               </div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <MatchBadge score={s.project.match_score} />
               <div style={{ color: C.orange, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>
                 {fmt$(s.project.value)}
               </div>
