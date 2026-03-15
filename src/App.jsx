@@ -2933,41 +2933,29 @@ function ParcelLayer({ show, onStatus }) {
         const score = parcelOppScore(p);
         const addr = [p.HOUSE, p.STREET].filter(Boolean).join(" ") || "No address";
         const oppLabel = score >= 80 ? "🔥 High" : score >= 55 ? "📈 Medium" : "✓ Low";
-        const tmsEsc = (p.TMS || "").replace(/'/g, "\\'");
         layer.bindPopup(`
           <div style="font-family:'DM Sans',sans-serif;min-width:230px;font-size:13px">
             <div style="font-weight:700;margin-bottom:3px;color:#111;font-size:14px">${addr}</div>
-            <div style="color:#777;font-size:11px;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em">${p.GENUSE || "Unknown use"}</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;margin-bottom:12px">
-              <div>
-                <div style="color:#999;font-size:10px;text-transform:uppercase;letter-spacing:.05em">Land Value</div>
-                <strong>$${Number(p.LAND_APPR||0).toLocaleString()}</strong>
-              </div>
-              <div>
-                <div style="color:#999;font-size:10px;text-transform:uppercase;letter-spacing:.05em">Improvements</div>
-                <strong>$${Number(p.IMP_APPR||0).toLocaleString()}</strong>
-              </div>
-              <div>
-                <div style="color:#999;font-size:10px;text-transform:uppercase;letter-spacing:.05em">Total Appraisal</div>
-                <strong>$${Number(p.APPRVAL||0).toLocaleString()}</strong>
-              </div>
-              <div>
-                <div style="color:#999;font-size:10px;text-transform:uppercase;letter-spacing:.05em">Year Built</div>
-                <strong>${p.YRBUILT || "—"}</strong>
-              </div>
+            <div style="color:#777;font-size:11px;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">${p.GENUSE || "Unknown use"}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;margin-bottom:8px">
+              <div><div style="color:#999;font-size:10px;text-transform:uppercase">Land Value</div><strong>$${Number(p.LAND_APPR||0).toLocaleString()}</strong></div>
+              <div><div style="color:#999;font-size:10px;text-transform:uppercase">Improvements</div><strong>$${Number(p.IMP_APPR||0).toLocaleString()}</strong></div>
+              <div><div style="color:#999;font-size:10px;text-transform:uppercase">Total Appraisal</div><strong>$${Number(p.APPRVAL||0).toLocaleString()}</strong></div>
+              <div><div style="color:#999;font-size:10px;text-transform:uppercase">Year Built</div><strong>${p.YRBUILT || "—"}</strong></div>
             </div>
-            <div style="background:${parcelColor(score)}20;border:1px solid ${parcelColor(score)}50;border-radius:6px;padding:7px 12px;text-align:center;font-weight:700;color:${parcelColor(score)};font-size:13px;margin-bottom:10px">
+            <div style="background:${parcelColor(score)}20;border:1px solid ${parcelColor(score)}50;border-radius:6px;padding:6px 10px;text-align:center;font-weight:700;color:${parcelColor(score)};font-size:12px;margin-bottom:6px">
               ${oppLabel} Opportunity · ${score}%
             </div>
-            <div style="color:#aaa;font-size:10px;margin-bottom:2px">Owner: ${p.OWNER || "—"}</div>
-            <div style="color:#aaa;font-size:10px;margin-bottom:10px">TMS: ${p.TMS || "—"}</div>
-            ${p.TMS ? `<button
-              onclick="window.__sitescanAnalyze('${tmsEsc}')"
-              style="width:100%;padding:8px;background:#f0a030;border:none;border-radius:6px;color:#fff;font-weight:700;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif">
-              🔍 Generate AI Analysis
-            </button>` : ""}
+            <div style="color:#aaa;font-size:10px">Owner: ${p.OWNER || "—"} &nbsp;·&nbsp; TMS: ${p.TMS || "—"}</div>
+            <div style="margin-top:8px;font-size:11px;color:#888;font-style:italic">Click parcel to generate AI analysis</div>
           </div>
         `);
+        // Clicking the parcel polygon fires the AI analysis directly
+        if (p.TMS) {
+          layer.on("click", () => {
+            if (window.__sitescanAnalyze) window.__sitescanAnalyze(p.TMS);
+          });
+        }
       }}
     />
   );
