@@ -2851,6 +2851,7 @@ function ParcelLayer({ show, onStatus }) {
       east:  String(b.getEast()),
       north: String(b.getNorth()),
       limit: "800",
+      genuse: "commercial",
     });
 
     const token = localStorage.getItem("sitescan_token");
