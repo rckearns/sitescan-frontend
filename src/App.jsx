@@ -2927,9 +2927,13 @@ function ParcelLayer({ show, onStatus }) {
       onEachFeature={(feat, layer) => {
         if (!isCommercialParcel(feat.properties)) return;
         const p = feat.properties;
+        // Store parcel props for the analysis handler
+        window.__sitescanParcels = window.__sitescanParcels || {};
+        if (p.TMS) window.__sitescanParcels[p.TMS] = p;
         const score = parcelOppScore(p);
         const addr = [p.HOUSE, p.STREET].filter(Boolean).join(" ") || "No address";
         const oppLabel = score >= 80 ? "🔥 High" : score >= 55 ? "📈 Medium" : "✓ Low";
+        const tmsEsc = (p.TMS || "").replace(/'/g, "\\'");
         layer.bindPopup(`
           <div style="font-family:'DM Sans',sans-serif;min-width:230px;font-size:13px">
             <div style="font-weight:700;margin-bottom:3px;color:#111;font-size:14px">${addr}</div>
@@ -2952,15 +2956,167 @@ function ParcelLayer({ show, onStatus }) {
                 <strong>${p.YRBUILT || "—"}</strong>
               </div>
             </div>
-            <div style="background:${parcelColor(score)}20;border:1px solid ${parcelColor(score)}50;border-radius:6px;padding:7px 12px;text-align:center;font-weight:700;color:${parcelColor(score)};font-size:13px;margin-bottom:8px">
+            <div style="background:${parcelColor(score)}20;border:1px solid ${parcelColor(score)}50;border-radius:6px;padding:7px 12px;text-align:center;font-weight:700;color:${parcelColor(score)};font-size:13px;margin-bottom:10px">
               ${oppLabel} Opportunity · ${score}%
             </div>
-            <div style="color:#aaa;font-size:10px">Owner: ${p.OWNER || "—"}</div>
-            <div style="color:#aaa;font-size:10px">TMS: ${p.TMS || "—"}</div>
+            <div style="color:#aaa;font-size:10px;margin-bottom:2px">Owner: ${p.OWNER || "—"}</div>
+            <div style="color:#aaa;font-size:10px;margin-bottom:10px">TMS: ${p.TMS || "—"}</div>
+            ${p.TMS ? `<button
+              onclick="window.__sitescanAnalyze('${tmsEsc}')"
+              style="width:100%;padding:8px;background:#f0a030;border:none;border-radius:6px;color:#fff;font-weight:700;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif">
+              🔍 Generate AI Analysis
+            </button>` : ""}
           </div>
         `);
       }}
     />
+  );
+}
+
+// ─── ANALYSIS MODAL ─────────────────────────────────────────────────────────
+
+function AnalysisModal({ state, parcel, onClose }) {
+  if (!state) return null;
+  const { loading, error, data } = state;
+  const addr = [parcel?.HOUSE, parcel?.STREET].filter(Boolean).join(" ") || "Commercial Parcel";
+  const tms = parcel?.TMS || "";
+
+  return (
+    <div
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      style={{
+        position: "fixed", inset: 0, zIndex: 9999,
+        background: "rgba(0,0,0,0.75)",
+        display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+      }}
+    >
+      <div style={{
+        background: C.surface, borderRadius: 16, border: `1px solid ${C.border}`,
+        width: "100%", maxWidth: 780, maxHeight: "90vh", overflowY: "auto",
+        padding: 28, position: "relative",
+      }}>
+        {/* Header */}
+        <button
+          onClick={onClose}
+          style={{
+            position: "absolute", top: 16, right: 16,
+            background: "transparent", border: "none", color: C.textSub,
+            fontSize: 20, cursor: "pointer", lineHeight: 1,
+          }}
+        >✕</button>
+
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 11, color: C.textMuted, textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 4 }}>
+            AI Development Analysis
+          </div>
+          <h2 style={{ margin: 0, color: C.text, fontSize: 20, fontWeight: 700 }}>{addr}</h2>
+          {tms && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>TMS: {tms}</div>}
+        </div>
+
+        {loading ? (
+          <div style={{ textAlign: "center", padding: "50px 0", color: C.textSub }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>🔍</div>
+            <div style={{ fontSize: 15, fontWeight: 600 }}>Generating analysis…</div>
+            <div style={{ fontSize: 12, marginTop: 6, color: C.textMuted }}>This may take 10–20 seconds</div>
+          </div>
+        ) : error ? (
+          <div style={{ color: "#ef4444", padding: "20px 0" }}>Error: {error}</div>
+        ) : data ? (
+          <>
+            {/* Summary */}
+            <div style={{
+              background: `${C.blue}15`, border: `1px solid ${C.blue}40`,
+              borderRadius: 10, padding: "14px 18px", marginBottom: 20,
+            }}>
+              <p style={{ margin: 0, color: C.text, fontSize: 14, lineHeight: 1.6 }}>{data.summary}</p>
+              {data.location_context && (
+                <p style={{ margin: "8px 0 0", color: C.textSub, fontSize: 13, lineHeight: 1.5 }}>
+                  📍 {data.location_context}
+                </p>
+              )}
+            </div>
+
+            {/* Scenarios */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.textSub, textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 12 }}>
+                Development Scenarios
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {(data.scenarios || []).map((s, i) => {
+                  const isRec = s.name === data.recommended_scenario;
+                  const pf = s.proforma || {};
+                  return (
+                    <div key={i} style={{
+                      border: `1px solid ${isRec ? C.orange : C.border}`,
+                      borderRadius: 10, padding: "16px 18px",
+                      background: isRec ? `${C.orange}08` : C.surfaceHi,
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                        <span style={{ fontWeight: 700, fontSize: 15, color: C.text }}>{s.name}</span>
+                        {isRec && (
+                          <span style={{
+                            background: C.orange, color: "#fff", fontSize: 10, fontWeight: 700,
+                            borderRadius: 4, padding: "2px 7px", textTransform: "uppercase",
+                          }}>Recommended</span>
+                        )}
+                        <span style={{ fontSize: 11, color: C.textMuted, marginLeft: "auto" }}>{s.use_type}</span>
+                      </div>
+                      <p style={{ margin: "0 0 12px", color: C.textSub, fontSize: 13, lineHeight: 1.55 }}>{s.description}</p>
+                      {/* Proforma grid */}
+                      <div style={{
+                        display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8,
+                        background: C.bg, borderRadius: 8, padding: "10px 12px",
+                      }}>
+                        {[
+                          ["Dev Cost", pf.total_development_cost],
+                          ["Stabilized NOI", pf.stabilized_noi],
+                          ["Projected Value", pf.projected_value],
+                          ["Hard Costs", pf.estimated_hard_cost],
+                          ["Soft Costs", pf.soft_costs],
+                          ["Profit Margin", pf.profit_margin, true],
+                        ].map(([label, val, isStr]) => (
+                          <div key={label}>
+                            <div style={{ fontSize: 10, color: C.textMuted, textTransform: "uppercase", letterSpacing: ".06em" }}>{label}</div>
+                            <div style={{ fontWeight: 700, color: C.text, fontSize: 13, fontFamily: "'Space Mono', monospace" }}>
+                              {isStr ? (val || "—") : fmt$(val)}
+                            </div>
+                          </div>
+                        ))}
+                        {pf.cap_rate && (
+                          <div>
+                            <div style={{ fontSize: 10, color: C.textMuted, textTransform: "uppercase", letterSpacing: ".06em" }}>Cap Rate</div>
+                            <div style={{ fontWeight: 700, color: C.text, fontSize: 13, fontFamily: "'Space Mono', monospace" }}>
+                              {pf.cap_rate}%
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Next Steps */}
+            {(data.next_steps || []).length > 0 && (
+              <div style={{
+                background: C.surfaceHi, border: `1px solid ${C.border}`,
+                borderRadius: 10, padding: "14px 18px",
+              }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: C.textSub, textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 10 }}>
+                  Next Steps
+                </div>
+                <ol style={{ margin: 0, padding: "0 0 0 18px" }}>
+                  {data.next_steps.map((step, i) => (
+                    <li key={i} style={{ color: C.text, fontSize: 13, lineHeight: 1.6, marginBottom: 4 }}>{step}</li>
+                  ))}
+                </ol>
+              </div>
+            )}
+          </>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -2973,6 +3129,29 @@ function MapTab({ mapHeight = "calc(100vh - 230px)" }) {
   const [mapLoading, setMapLoading] = useState(true);
   const [showParcels, setShowParcels] = useState(false);
   const [parcelStatus, setParcelStatus] = useState({ count: 0, loading: false, zoom: 12 });
+  const [analysisState, setAnalysisState] = useState(null);  // { loading, error, data }
+  const [analysisParcel, setAnalysisParcel] = useState(null);
+
+  useEffect(() => {
+    // Global handler called by Leaflet popup button (which can't use React events)
+    window.__sitescanParcels = window.__sitescanParcels || {};
+    window.__sitescanAnalyze = async (tms) => {
+      const parcel = window.__sitescanParcels[tms] || {};
+      setAnalysisParcel(parcel);
+      setAnalysisState({ loading: true, error: null, data: null });
+      try {
+        const result = await api("/analyze/parcel/" + encodeURIComponent(tms), {
+          method: "POST",
+          body: JSON.stringify({ parcel }),
+        });
+        if (result.detail) throw new Error(result.detail);
+        setAnalysisState({ loading: false, error: null, data: result.analysis });
+      } catch (e) {
+        setAnalysisState({ loading: false, error: e.message, data: null });
+      }
+    };
+    return () => { delete window.__sitescanAnalyze; };
+  }, []);
 
   useEffect(() => {
     setMapLoading(true);
@@ -2985,6 +3164,11 @@ function MapTab({ mapHeight = "calc(100vh - 230px)" }) {
 
   return (
     <div>
+      <AnalysisModal
+        state={analysisState}
+        parcel={analysisParcel}
+        onClose={() => setAnalysisState(null)}
+      />
       {/* Toolbar */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
         {/* Left: counts */}
