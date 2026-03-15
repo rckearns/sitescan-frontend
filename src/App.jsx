@@ -2946,16 +2946,10 @@ function ParcelLayer({ show, onStatus }) {
             <div style="background:${parcelColor(score)}20;border:1px solid ${parcelColor(score)}50;border-radius:6px;padding:6px 10px;text-align:center;font-weight:700;color:${parcelColor(score)};font-size:12px;margin-bottom:6px">
               ${oppLabel} Opportunity · ${score}%
             </div>
-            <div style="color:#aaa;font-size:10px">Owner: ${p.OWNER || "—"} &nbsp;·&nbsp; TMS: ${p.TMS || "—"}</div>
-            <div style="margin-top:8px;font-size:11px;color:#888;font-style:italic">Click parcel to generate AI analysis</div>
+            <div style="color:#aaa;font-size:10px;margin-bottom:8px">Owner: ${p.OWNER || "—"} &nbsp;·&nbsp; TMS: ${p.TMS || "—"}</div>
+            ${p.TMS ? `<button onclick="window.__sitescanAnalyze('${(p.TMS||'').replace(/'/g,"\\'")}')" style="width:100%;padding:7px;background:#f0a030;border:none;border-radius:6px;color:#fff;font-weight:700;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif">🔍 Generate AI Analysis</button>` : ""}
           </div>
         `);
-        // Clicking the parcel polygon fires the AI analysis directly
-        if (p.TMS) {
-          layer.on("click", () => {
-            if (window.__sitescanAnalyze) window.__sitescanAnalyze(p.TMS);
-          });
-        }
       }}
     />
   );
