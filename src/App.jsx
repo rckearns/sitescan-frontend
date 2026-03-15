@@ -282,6 +282,49 @@ function parcelColor(score) {
   return "#3a5f85";                   // slate — fully developed (visible on dark map)
 }
 
+const COMMERCIAL_GENUSE_RE = /commercial|office|retail|hotel|restaurant|shopping|warehouse/i;
+function isCommercialParcel(props) {
+  return COMMERCIAL_GENUSE_RE.test(props.GENUSE || "");
+}
+
+function getPolygonCentroid(geometry) {
+  const rings = geometry.type === "Polygon" ? geometry.coordinates :
+    geometry.type === "MultiPolygon" ? geometry.coordinates[0] : [];
+  const coords = (rings[0] || []);
+  if (!coords.length) return [0, 0];
+  const sum = coords.reduce((a, c) => [a[0] + c[0], a[1] + c[1]], [0, 0]);
+  return [sum[0] / coords.length, sum[1] / coords.length];
+}
+
+function parcelToProject(feat) {
+  const p = feat.properties;
+  const [lng, lat] = getPolygonCentroid(feat.geometry);
+  const addr = [p.HOUSE, p.STREET].filter(Boolean).join(" ");
+  const score = parcelOppScore(p);
+  const genuse = (p.GENUSE || "Commercial").replace(/\s+/g, " ").trim();
+  const title = score >= 80 ? `Vacant ${genuse} lot` : `Underimproved ${genuse} parcel`;
+  return {
+    id: `parcel-${p.TMS || p.PARCELID}`,
+    source_id: "parcel-opportunity",
+    external_id: p.TMS,
+    title,
+    description: title,
+    address: addr,
+    latitude: lat,
+    longitude: lng,
+    value: p.LAND_APPR || p.APPRVAL || null,
+    category: "commercial",
+    status: "Opportunities",
+    posted_date: null,
+    is_active: true,
+    work_class: null,
+    contractor: p.OWNER || "",
+    permit_number: p.TMS || "",
+    source_url: "",
+    agency: "",
+  };
+}
+
 const catIcons = {
   "historic-restoration": "🏛️",
   masonry: "🧱",
@@ -309,6 +352,7 @@ const sourceLabels = {
   "charlotte-land-dev": "CLT Land Dev",
   "charlotte-cip": "CLT CIP",
   "charlotte-ncdot": "CLT NCDOT",
+  "parcel-opportunity": "Opportunity",
 };
 
 const sourceColors = {
@@ -322,6 +366,7 @@ const sourceColors = {
   "charleston-city-bids":      C.blue,
   "charlotte-cip":             C.sky,
   "charlotte-ncdot":           C.sky,
+  "parcel-opportunity":        "#22c55e",
 };
 
 const statusColors = {
@@ -332,6 +377,7 @@ const statusColors = {
   Issued: C.blue,
   Finaled: C.textMuted,
   "In Review": "#c9943a",
+  Opportunities: "#22c55e",
 };
 
 async function api(path, opts = {}) {
@@ -729,7 +775,7 @@ const ALL_CATEGORIES = [
   { id: "commercial", label: "Commercial" },
   { id: "other", label: "Other" },
 ];
-const ALL_STATUSES = ["Applied", "Open", "Active", "Accepting Bids", "Issued", "In Review", "Under Review", "Finaled"];
+const ALL_STATUSES = ["Applied", "Open", "Active", "Accepting Bids", "Issued", "In Review", "Under Review", "Finaled", "Opportunities"];
 const ALL_SOURCES = [
   { id: "sam-gov", label: "SAM.gov" },
   { id: "charleston-permits", label: "CHS Permits" },
@@ -750,7 +796,7 @@ const CLIENT_TYPES = [
   { id: "multi-family", label: "Multi Family" },
 ];
 const CLIENT_TYPE_SOURCES = {
-  developer:  new Set(["charleston-permits","north-charleston-permits","mt-pleasant-permits","charlotte-permits","charlotte-land-dev"]),
+  developer:  new Set(["charleston-permits","north-charleston-permits","mt-pleasant-permits","charlotte-permits","charlotte-land-dev","parcel-opportunity"]),
   government: new Set(["sam-gov","scbo","charleston-city-bids","charlotte-cip","charlotte-ncdot"]),
 };
 const CLIENT_TYPE_CATEGORIES = {
@@ -2866,6 +2912,7 @@ function ParcelLayer({ show, onStatus }) {
       key={fetchKey}
       data={data}
       style={(feat) => {
+        if (!isCommercialParcel(feat.properties)) return { fillOpacity: 0, opacity: 0, weight: 0 };
         const score = parcelOppScore(feat.properties);
         const c = parcelColor(score);
         return {
@@ -2877,6 +2924,7 @@ function ParcelLayer({ show, onStatus }) {
         };
       }}
       onEachFeature={(feat, layer) => {
+        if (!isCommercialParcel(feat.properties)) return;
         const p = feat.properties;
         const score = parcelOppScore(p);
         const addr = [p.HOUSE, p.STREET].filter(Boolean).join(" ") || "No address";
@@ -3089,6 +3137,7 @@ export default function SiteScanApp() {
   const [tab, setTab] = useState("scanner");
   const [showMap, setShowMap] = useState(false);
   const [projects, setProjects] = useState([]);
+  const [parcelOpportunities, setParcelOpportunities] = useState([]);
   const [total, setTotal] = useState(0);
   const [totalUnfiltered, setTotalUnfiltered] = useState(0);
   const [stats, setStats] = useState(null);
@@ -3156,6 +3205,17 @@ export default function SiteScanApp() {
     } catch (err) {}
   };
 
+  const loadParcelOpportunities = async () => {
+    try {
+      // Charleston metro bounding box — fetch commercial parcels only
+      const d = await api("/projects/map/parcels?west=-80.2&south=32.55&east=-79.7&north=33.05&limit=1000&genuse=commercial");
+      const opps = (d.features || [])
+        .filter(f => parcelOppScore(f.properties) >= 55)
+        .map(parcelToProject);
+      setParcelOpportunities(opps);
+    } catch (e) { /* supplementary data — fail silently */ }
+  };
+
   const loadSaved = async () => {
     try {
       const data = await api("/projects/saved/list");
@@ -3204,6 +3264,7 @@ export default function SiteScanApp() {
     loadStats();
     loadSaved();
     loadHistory();
+    loadParcelOpportunities();
     // Pre-populate filters from saved profile preferences
     api("/auth/me").then((data) => {
       setFilters((f) => ({
@@ -3383,7 +3444,16 @@ export default function SiteScanApp() {
               </div>
             ) : (
               <div>
-                {groupByAddress(projects.filter((p) => !isSubpermit(p) && !dismissedIds.has(p.id))).map((group, i) => (
+                {groupByAddress([
+                  ...projects.filter((p) => !isSubpermit(p) && !dismissedIds.has(p.id)),
+                  ...parcelOpportunities.filter(p => {
+                    if (!projectMatchesClientTypes(p, filters.clientTypes || [])) return false;
+                    if ((filters.minValue || 0) > 0 && p.value && p.value < filters.minValue) return false;
+                    if ((filters.statuses || []).length && filters.statuses.includes("Opportunities")) return false;
+                    if (dismissedIds.has(p.id)) return false;
+                    return true;
+                  }),
+                ]).map((group, i) => (
                   <ProjectCard
                     key={group.address ?? `noaddr-${i}`}
                     group={group}
