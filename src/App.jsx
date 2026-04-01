@@ -1604,7 +1604,7 @@ function PermitContractorsSection() {
       {/* Search + sort + min value filter */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 20 }}>
         <input
-          placeholder="Search contractors\u2026"
+          placeholder="Search contractors…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={inputStyle}
@@ -1617,18 +1617,18 @@ function PermitContractorsSection() {
         <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={selectStyle}>
           <option value="total_permit_value">Sort: Total Value</option>
           <option value="permit_count">Sort: Permit Count</option>
-          <option value="name">Sort: Name A\u2013Z</option>
+          <option value="name">Sort: Name A–Z</option>
         </select>
       </div>
 
       {loading && (
-        <div style={{ textAlign: "center", padding: 40, color: C.textMuted }}>Loading\u2026</div>
+        <div style={{ textAlign: "center", padding: 40, color: C.textMuted }}>Loading…</div>
       )}
 
       {!loading && tradeData && tradeGroups.length === 0 && (
         search ? (
           <div style={{ textAlign: "center", padding: 32, color: C.textMuted, fontSize: 13 }}>
-            No contractors matching \u201C{search}\u201D
+            No contractors matching "{search}"
           </div>
         ) : (
           <div style={{ textAlign: "center", padding: 32, color: C.textMuted, border: `1px dashed ${C.border}`, borderRadius: 10, fontSize: 13 }}>
