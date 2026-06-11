@@ -2996,6 +2996,293 @@ function MapTab({ mapHeight = "calc(100vh - 230px)" }) {
   );
 }
 
+// ─── BOARD PIPELINE ─────────────────────────────────────────────────────────
+
+const STAGE_COLORS = {
+  final:        "#f0a030",
+  preliminary:  "#4a9fd4",
+  conceptual:   "#7ec8e3",
+  rezoning:     "#a78bfa",
+  demolition:   "#e05555",
+  concept_plan: "#6b8aaa",
+};
+
+const STAGE_LABELS = {
+  final:        "Final Approval",
+  preliminary:  "Preliminary",
+  conceptual:   "Conceptual",
+  rezoning:     "Rezoning",
+  demolition:   "Demolition",
+  concept_plan: "Concept Plan",
+};
+
+function stageColor(s) { return STAGE_COLORS[s] || "#3d5a7a"; }
+function stageLabel(s) { return STAGE_LABELS[s] || s || "—"; }
+function scoreColor(n) { return n >= 75 ? "#f0a030" : n >= 50 ? "#4a9fd4" : "#3d5a7a"; }
+
+function BoardProjectCard({ project: p, animDelay }) {
+  const [expanded, setExpanded] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const sc = stageColor(p.current_stage);
+
+  return (
+    <div style={{ animation: `fadeIn 0.3s ease ${animDelay}s both` }}>
+      <div
+        style={{
+          background: hovered ? C.surfaceHi : C.surface,
+          border: `1px solid ${hovered ? C.borderHi : C.border}`,
+          borderLeft: `3px solid ${sc}`,
+          borderRadius: 10, padding: "12px 16px", cursor: "pointer",
+          transition: "all 0.15s",
+        }}
+        onClick={() => setExpanded((v) => !v)}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>
+                {p.address || p.project_key}
+              </span>
+              {p.current_stage && (
+                <span style={{
+                  fontSize: 10, fontWeight: 700, color: sc,
+                  background: `${sc}22`, borderRadius: 4, padding: "2px 7px",
+                  textTransform: "uppercase", letterSpacing: "0.06em",
+                }}>
+                  {stageLabel(p.current_stage)}
+                </span>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 5, flexWrap: "wrap", alignItems: "center" }}>
+              {p.neighborhood && (
+                <span style={{ fontSize: 11, color: C.textSub }}>{p.neighborhood}</span>
+              )}
+              {p.applicant && (
+                <span style={{ fontSize: 11, color: C.textMuted }}>· {p.applicant}</span>
+              )}
+              {p.case_number && (
+                <span style={{ fontSize: 11, color: C.textMuted, fontFamily: "'Space Mono', monospace" }}>
+                  {p.case_number}
+                </span>
+              )}
+            </div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
+            <span style={{
+              fontSize: 13, fontWeight: 800, color: scoreColor(p.max_score),
+              background: `${scoreColor(p.max_score)}18`, borderRadius: 6,
+              padding: "3px 9px", fontFamily: "'Space Mono', monospace",
+            }}>
+              {p.max_score}
+            </span>
+            <span style={{ fontSize: 9, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em" }}>score</span>
+          </div>
+        </div>
+
+        {expanded && (
+          <div style={{
+            marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.border}`,
+            display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 24px",
+          }}>
+            {[
+              ["Owner",            p.owner],
+              ["TMS",              p.tms],
+              ["Council District", p.council_district != null ? `District ${p.council_district}` : null],
+              ["Acreage",          p.acreage != null ? `${p.acreage} ac` : null],
+              ["First Seen",       p.first_seen_at ? new Date(p.first_seen_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : null],
+              ["Last Seen",        p.last_seen_at  ? new Date(p.last_seen_at).toLocaleDateString("en-US",  { month: "short", day: "numeric", year: "numeric" }) : null],
+            ].filter(([, v]) => v != null).map(([label, val]) => (
+              <div key={label}>
+                <div style={{ fontSize: 10, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600 }}>{label}</div>
+                <div style={{ fontSize: 13, color: C.textSub, marginTop: 2 }}>{val}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BoardPipelineTab({ projects, events, loading, onRefresh }) {
+  const [stageFilter, setStageFilter] = useState("");
+  const [minScore, setMinScore] = useState(0);
+  const [search, setSearch]     = useState("");
+
+  const chip = (active, color) => ({
+    padding: "5px 12px", borderRadius: 8,
+    border: `1px solid ${active ? color : C.border}`,
+    background: active ? `${color}22` : "transparent",
+    color: active ? color : C.textSub,
+    fontSize: 12, fontWeight: 600, cursor: "pointer",
+    fontFamily: "'DM Sans', sans-serif", transition: "all 0.15s",
+  });
+
+  const filtered = projects.filter((p) => {
+    if (stageFilter && p.current_stage !== stageFilter) return false;
+    if (minScore > 0 && p.max_score < minScore) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return (
+        (p.address || "").toLowerCase().includes(q) ||
+        (p.neighborhood || "").toLowerCase().includes(q) ||
+        (p.applicant || "").toLowerCase().includes(q) ||
+        (p.case_number || "").toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
+
+  const stages = [...new Set(projects.map((p) => p.current_stage).filter(Boolean))];
+  const recentChanges = events.filter((e) => e.event_type === "stage_change");
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <div>
+          <span style={{ color: C.text, fontWeight: 700, fontSize: 16 }}>🏛️ Board Pipeline</span>
+          <span style={{ color: C.textMuted, fontSize: 12, marginLeft: 10 }}>
+            Charleston planning &amp; design board agendas · 6–24 months ahead of permits
+          </span>
+        </div>
+        <button
+          onClick={onRefresh}
+          style={{
+            background: "none", border: `1px solid ${C.border}`, borderRadius: 6,
+            color: C.textSub, fontSize: 12, padding: "5px 12px", cursor: "pointer",
+            fontFamily: "'DM Sans', sans-serif", transition: "all 0.15s",
+          }}
+        >
+          ↻ Refresh
+        </button>
+      </div>
+
+      {/* Recent stage-change events */}
+      {recentChanges.length > 0 && (
+        <div style={{ marginBottom: 22 }}>
+          <div style={{ fontSize: 10, color: C.textMuted, textTransform: "uppercase",
+            letterSpacing: "0.08em", fontWeight: 600, marginBottom: 10 }}>
+            Recent Stage Changes
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {recentChanges.slice(0, 6).map((e, i) => {
+              const sc = stageColor(e.to_stage);
+              return (
+                <div key={e.id} style={{
+                  background: C.surface, border: `1px solid ${C.border}`,
+                  borderLeft: `3px solid ${sc}`, borderRadius: 8, padding: "9px 14px",
+                  display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+                  animation: `fadeIn 0.3s ease ${i * 0.04}s both`,
+                }}>
+                  <span style={{ fontSize: 11, color: C.textMuted, whiteSpace: "nowrap" }}>
+                    {e.from_stage ? <>{stageLabel(e.from_stage)} <span style={{ color: C.textMuted }}>→</span> </> : ""}
+                    <span style={{ color: sc, fontWeight: 700 }}>{stageLabel(e.to_stage)}</span>
+                  </span>
+                  <span style={{ flex: 1, fontSize: 13, color: C.text, minWidth: 120 }}>
+                    {e.project_address || "—"}
+                  </span>
+                  {e.project_neighborhood && (
+                    <span style={{ fontSize: 11, color: C.textSub }}>{e.project_neighborhood}</span>
+                  )}
+                  {e.project_applicant && (
+                    <span style={{ fontSize: 11, color: C.textMuted, maxWidth: 200,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {e.project_applicant}
+                    </span>
+                  )}
+                  {e.score != null && (
+                    <span style={{
+                      fontSize: 11, fontWeight: 700, color: scoreColor(e.score),
+                      background: `${scoreColor(e.score)}18`, borderRadius: 4, padding: "2px 7px",
+                      fontFamily: "'Space Mono', monospace",
+                    }}>
+                      {e.score}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Filter bar */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search address, neighborhood, applicant…"
+          style={{
+            flex: "1 1 220px", minWidth: 180, maxWidth: 340,
+            background: C.surface, border: `1px solid ${C.border}`,
+            borderRadius: 8, color: C.text, fontSize: 12, padding: "7px 11px",
+            fontFamily: "'DM Sans', sans-serif", outline: "none",
+          }}
+        />
+        <button style={chip(!stageFilter, C.textSub)} onClick={() => setStageFilter("")}>
+          All Stages
+        </button>
+        {stages.map((s) => (
+          <button key={s} style={chip(stageFilter === s, stageColor(s))}
+            onClick={() => setStageFilter(stageFilter === s ? "" : s)}>
+            {stageLabel(s)}
+          </button>
+        ))}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 11, color: C.textMuted }}>Min score</span>
+          <input
+            type="number" min="0" max="100" value={minScore || ""}
+            onChange={(e) => setMinScore(Number(e.target.value) || 0)}
+            placeholder="0"
+            style={{
+              width: 56, background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 6, color: C.text, fontSize: 12, padding: "5px 8px",
+              fontFamily: "'DM Sans', sans-serif", outline: "none",
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Project list */}
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 60, color: "#555" }}>
+          <div style={styles.spinner} />
+          <div style={{ marginTop: 12 }}>Loading board pipeline...</div>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 60, color: "#555" }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>🏛️</div>
+          <div>
+            {projects.length
+              ? "No projects match the current filters."
+              : "No board agenda data yet — first scrape runs daily."}
+          </div>
+        </div>
+      ) : (
+        <div>
+          <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 10 }}>
+            <span style={{ color: C.text, fontWeight: 600 }}>{filtered.length}</span>
+            {" "}project{filtered.length !== 1 ? "s" : ""}
+            {stageFilter ? ` · ${stageLabel(stageFilter)}` : ""}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {filtered.map((p, i) => (
+              <BoardProjectCard
+                key={p.id}
+                project={p}
+                animDelay={Math.min(i, 25) * 0.03}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── MAIN APP ───────────────────────────────────────────────────────────────
 
 export default function SiteScanApp() {
@@ -3017,6 +3304,9 @@ export default function SiteScanApp() {
   const [sources, setSources] = useState([]);
   const [dismissedIds, setDismissedIds] = useState(new Set());
   const [valueMedians, setValueMedians] = useState({});
+  const [boardProjects, setBoardProjects] = useState([]);
+  const [boardEvents, setBoardEvents]   = useState([]);
+  const [boardLoading, setBoardLoading] = useState(false);
   const debounceRef = useRef(null);
 
   const loadProjects = useCallback(async () => {
@@ -3096,6 +3386,21 @@ export default function SiteScanApp() {
     } catch (err) {}
   };
 
+  const loadBoardPipeline = async () => {
+    setBoardLoading(true);
+    try {
+      const [projData, evtData] = await Promise.all([
+        api("/boards/projects?limit=200"),
+        api("/boards/events?limit=30"),
+      ]);
+      setBoardProjects(Array.isArray(projData.projects) ? projData.projects : []);
+      setBoardEvents(Array.isArray(evtData.events) ? evtData.events : []);
+    } catch (err) {
+      console.error("Load board pipeline failed:", err);
+    }
+    setBoardLoading(false);
+  };
+
   const saveProject = async (projectId) => {
     await api("/projects/save", {
       method: "POST",
@@ -3131,6 +3436,7 @@ export default function SiteScanApp() {
     loadSaved();
     loadHistory();
     loadParcelOpportunities();
+    loadBoardPipeline();
     // Pre-populate filters from saved profile preferences
     api("/auth/me").then((data) => {
       setFilters((f) => ({
@@ -3247,6 +3553,7 @@ export default function SiteScanApp() {
             {[
               { id: "scanner",      label: "Scanner",                    icon: "⚡" },
               { id: "map",          label: "Map",                        icon: "🗺️" },
+              { id: "boards",       label: "Board Pipeline",             icon: "🏛️" },
               { id: "saved",        label: `Saved (${saved.length})`,    icon: "★" },
               { id: "contractors",  label: "Contractors",                icon: "🤝" },
               { id: "company",      label: "Profile",                    icon: "🏢" },
@@ -3333,6 +3640,14 @@ export default function SiteScanApp() {
               </div>
             )}
           </>
+        )}
+        {tab === "boards" && (
+          <BoardPipelineTab
+            projects={boardProjects}
+            events={boardEvents}
+            loading={boardLoading}
+            onRefresh={loadBoardPipeline}
+          />
         )}
         {tab === "saved" && <SavedTab saved={saved} onUnsave={unsaveProject} />}
         {tab === "contractors" && <ContractorsTab />}
