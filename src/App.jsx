@@ -25,6 +25,7 @@ const C = {
 
 const fmt$ = (v) => {
   if (!v) return "—";
+  if (v >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
   if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
   if (v >= 1e3) return `$${(v / 1e3).toFixed(0)}K`;
   return `$${v.toLocaleString()}`;
@@ -288,6 +289,7 @@ function isCommercialParcel(props) {
 }
 
 function getPolygonCentroid(geometry) {
+  if (geometry?.type === "Point") return geometry.coordinates;
   const rings = geometry.type === "Polygon" ? geometry.coordinates :
     geometry.type === "MultiPolygon" ? geometry.coordinates[0] : [];
   const coords = (rings[0] || []);
@@ -301,11 +303,11 @@ function parcelToProject(feat) {
   const [lng, lat] = getPolygonCentroid(feat.geometry);
   const addr = [p.HOUSE, p.STREET].filter(Boolean).join(" ");
   const score = parcelOppScore(p);
-  const genuse = (p.GENUSE || "Commercial")
-    .replace(/^\s*\d+\s*-\s*/, "").replace(/\b(vacant|general)\b/gi, " ")
-    .replace(/\s+/g, " ").trim().toLowerCase()
-    .replace(/\b\w/g, (c) => c.toUpperCase()) || "Commercial";
-  const title = score >= 80 ? `Vacant ${genuse} lot` : `Underimproved ${genuse} parcel`;
+  const imp = parseFloat(p.IMP_APPR) || 0;
+  // County class codes: 952 vacant commercial lot, 910 commercial development acreage.
+  const title = p.CLASS_CODE === "910" ? "Commercial development acreage"
+    : p.CLASS_CODE === "952" || imp === 0 ? "Vacant commercial lot"
+    : "Underimproved commercial parcel";
   return {
     id: `parcel-${p.TMS || p.PARCELID}`,
     source_id: "parcel-opportunity",
@@ -317,9 +319,11 @@ function parcelToProject(feat) {
     longitude: lng,
     value: p.LAND_APPR || p.APPRVAL || null,
     category: "commercial",
-    opp_score: score,
+    // Rounding can reach 100% even with a small building on the lot.
+    opp_score: imp > 0 ? Math.min(score, 99) : score,
     land_value: parseFloat(p.LAND_APPR) || null,
-    imp_value: parseFloat(p.IMP_APPR) || 0,
+    imp_value: imp,
+    city: p.CITY || "",
     acres: parseFloat(p.GISACRES) || null,
     parcel_props: p,
     status: "Opportunities",
@@ -3091,6 +3095,16 @@ function countDueWithin(projects, days) {
   return projects.filter((p) => p.deadline && new Date(p.deadline).getTime() <= cutoff).length;
 }
 
+// Area label for a parcel: the county's city, split into neighborhoods only within
+// the City of Charleston (the neighborhood boxes overlap other towns).
+const CHARLESTON_NEIGHBORHOODS = new Set(["Downtown", "West Ashley", "James Island", "Johns Island", "Daniel Island"]);
+function parcelArea(p) {
+  const hood = getNeighborhood(p.latitude, p.longitude);
+  if (!p.city) return hood === "Mt Pleasant" ? "Mount Pleasant" : hood;
+  if (p.city === "Charleston" && CHARLESTON_NEIGHBORHOODS.has(hood)) return hood;
+  return p.city;
+}
+
 // Pull ideal use, project size and profit on cost out of the AI highest-and-best-use analysis.
 // Profit on cost = (projected value - total development cost) / total development cost.
 // Version 2 analyses include land in total_development_cost (and report land_cost);
@@ -3311,24 +3325,30 @@ function ParcelCard({ parcel, analysis, status, onAnalyze, onOpenAnalysis, onDis
   );
 }
 
-// First LANDING_PREVIEW cards with a "Show all" toggle.
+// First LANDING_PREVIEW cards, then more in steps (lists can run to thousands).
+const LANDING_STEP = 25;
 function CardList({ items, renderItem }) {
-  const [showAll, setShowAll] = useState(false);
-  const shown = showAll ? items : items.slice(0, LANDING_PREVIEW);
+  const [count, setCount] = useState(LANDING_PREVIEW);
+  const shown = items.slice(0, count);
+  const btn = {
+    flex: 1, padding: "8px 0", background: "transparent",
+    border: `1px solid ${C.border}`, borderRadius: 8, color: C.textSub,
+    fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+  };
   return (
     <>
       {shown.map((p, i) => renderItem(p, Math.min(i, 12) * 0.03))}
       {items.length > LANDING_PREVIEW && (
-        <button
-          onClick={() => setShowAll((v) => !v)}
-          style={{
-            width: "100%", marginTop: 4, padding: "8px 0", background: "transparent",
-            border: `1px solid ${C.border}`, borderRadius: 8, color: C.textSub,
-            fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
-          }}
-        >
-          {showAll ? "Show fewer" : `Show all ${items.length}`}
-        </button>
+        <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+          {count < items.length && (
+            <button style={btn} onClick={() => setCount((c) => c + LANDING_STEP)}>
+              Show {Math.min(LANDING_STEP, items.length - count)} more · {shown.length} of {items.length}
+            </button>
+          )}
+          {count > LANDING_PREVIEW && (
+            <button style={btn} onClick={() => setCount(LANDING_PREVIEW)}>Show fewer</button>
+          )}
+        </div>
       )}
     </>
   );
@@ -3385,7 +3405,7 @@ function LandingTab({
         return {
           ...p, summary,
           useGroup: groupForUse(summary?.use),
-          hood: getNeighborhood(p.latitude, p.longitude),
+          hood: parcelArea(p),
           perAcre: p.acres && p.land_value ? p.land_value / p.acres : null,
         };
       }),
@@ -3707,8 +3727,12 @@ export default function SiteScanApp() {
 
   const loadParcelOpportunities = async () => {
     try {
-      // Charleston metro bounding box — fetch commercial parcels only
-      const d = await api("/projects/map/parcels?west=-80.2&south=32.55&east=-79.7&north=33.05&limit=1000&genuse=commercial");
+      // Charleston County commercial + vacant-commercial parcels, ranked by the backend.
+      // Falls back to the older city-layer query if the backend hasn't deployed yet.
+      let d = await api("/projects/home/parcels");
+      if (!Array.isArray(d?.features)) {
+        d = await api("/projects/map/parcels?west=-80.2&south=32.55&east=-79.7&north=33.05&limit=1000&genuse=commercial");
+      }
       const opps = (d.features || [])
         .filter(f => parcelOppScore(f.properties) >= 55)
         .map(parcelToProject);
