@@ -4,7 +4,7 @@ import "leaflet/dist/leaflet.css";
 
 const API = (import.meta.env.VITE_API_URL || "https://sitescan-backend-production-423e.up.railway.app") + "/api/v1";
 
-// ─── BRAND COLORS ────────────────────────────────────────────────────────────
+// ‚îÄ‚îÄ‚îÄ BRAND COLORS ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
 const C = {
   bg:        "#080f1a",   // near-black navy
   surface:   "#0c1524",  // card background
@@ -21,10 +21,10 @@ const C = {
   textMuted: "#3d5a7a",  // muted
 };
 
-// ─── HELPERS ────────────────────────────────────────────────────────────────
+// ‚îÄ‚îÄ‚îÄ HELPERS ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
 
 const fmt$ = (v) => {
-  if (!v) return "—";
+  if (!v) return "‚Äî";
   if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
   if (v >= 1e3) return `$${(v / 1e3).toFixed(0)}K`;
   return `$${v.toLocaleString()}`;
@@ -67,7 +67,7 @@ function buildValueMedians(projects) {
 }
 
 const fmtDate = (d) => {
-  if (!d) return "—";
+  if (!d) return "‚Äî";
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 };
 
@@ -104,7 +104,7 @@ function cleanAddress(address) {
 
 // Group a sorted project list by normalised address.
 // Returns an array of { address, displayAddress, lat, lng, projects[] } objects.
-// Single-project "groups" are included — callers decide how to render them.
+// Single-project "groups" are included ‚Äî callers decide how to render them.
 // Charleston permit helpers
 function isSubpermit(project) {
   if (project.source_id !== "charleston-permits") return false;
@@ -129,7 +129,7 @@ const _GENERIC_TITLE = /^(new construction|building permit|commercial|residentia
 function getDisplayTitle(project) {
   if (!project.title) return project.title;
 
-  // For permit sources, strip the " — address" suffix the backend appends
+  // For permit sources, strip the " ‚Äî address" suffix the backend appends
   // (address is already shown in the location tag)
   const permitSources = new Set([
     "charleston-permits","north-charleston-permits","mt-pleasant-permits",
@@ -137,11 +137,11 @@ function getDisplayTitle(project) {
   ]);
   let title = project.title;
   if (permitSources.has(project.source_id)) {
-    title = title.split(" — ")[0].trim();
+    title = title.split(" ‚Äî ")[0].trim();
     // Strip internal permit-office prefixes that precede the real project description
     title = title.replace(/^(WILL\s+REQUIRE\s+GC\s+(INFO(?:RMATION)?)\s+BEFORE\s+ISSUANCE\s*[-=*]+\s*)/i, "").trim();
     title = title.replace(/^NEED\s+(CONTRACTOR\s+)?INFORMATION\s*:\s*/i, "").trim();
-    title = title.replace(/^BAR\s+APP\s+REQUESTED\s*[–-]+\s*/i, "").trim();
+    title = title.replace(/^BAR\s+APP\s+REQUESTED\s*[‚Äì-]+\s*/i, "").trim();
     title = title.replace(/^\(still\s+need\s+to\s+create[^)]*\)\s*/i, "").trim();
     title = title.replace(/^BUILDING\s+\d+\s+/i, "").trim();
     title = title.replace(/^MASTER:\s*/i, "").trim();
@@ -149,7 +149,7 @@ function getDisplayTitle(project) {
     title = title.replace(/[.*]?\s*(ZONING CONDITIONS|TRC CONDITIONS|TRC CONDITION|CONDITIONS:)[^]*/i, "").trim();
     title = title.replace(/\.\s*TRC[^]*$/i, "").trim();
     // Strip administrative suffixes
-    title = title.replace(/\s*[.\s]*Fire\s+District\s*[-–]\s*ALT[\w-]+/i, "").trim();
+    title = title.replace(/\s*[.\s]*Fire\s+District\s*[-‚Äì]\s*ALT[\w-]+/i, "").trim();
     title = title.replace(/\s*\(Replaced\s+CA\w+\)/i, "").trim();
   }
 
@@ -159,7 +159,7 @@ function getDisplayTitle(project) {
     const cat = project.category;
     if (cat && cat !== "residential") {
       const catLabel = cat.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-      return wc ? `${catLabel} — ${wc}` : catLabel;
+      return wc ? `${catLabel} ‚Äî ${wc}` : catLabel;
     }
   }
 
@@ -185,10 +185,10 @@ function getDescText(project) {
     const meaningful = sentences.find(s => s.length > 20 && !_BID_BOILERPLATE.test(s.trim()));
     if (meaningful) {
       // Return first ~300 chars of useful content
-      return meaningful.length > 300 ? meaningful.slice(0, 297) + "…" : meaningful;
+      return meaningful.length > 300 ? meaningful.slice(0, 297) + "‚Ä¶" : meaningful;
     }
     // Fall back to first 300 chars if no clean sentence found
-    return project.description.slice(0, 300) + (project.description.length > 300 ? "…" : "");
+    return project.description.slice(0, 300) + (project.description.length > 300 ? "‚Ä¶" : "");
   }
 
   return project.description.length > 4 ? project.description : null;
@@ -227,7 +227,7 @@ function groupByAddress(projects) {
         order.push(grp);
       }
     } else {
-      // No usable address — treat as its own group with null address
+      // No usable address ‚Äî treat as its own group with null address
       order.push({ address: null, displayAddress: null, lat: p.latitude, lng: p.longitude, projects: [p] });
     }
   }
@@ -256,9 +256,9 @@ function groupByTitle(addressGroups) {
   return order;
 }
 
-// ─── PARCEL OPPORTUNITY HELPERS ───────────────────────────────────────────────
+// ‚îÄ‚îÄ‚îÄ PARCEL OPPORTUNITY HELPERS ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
 
-// Score 0–100: how underimproved is this parcel relative to its land value?
+// Score 0‚Äì100: how underimproved is this parcel relative to its land value?
 // Vacant land = 95 (max opportunity), full build = ~5.
 function parcelOppScore(props) {
   const genuse = (props.GENUSE || "").toLowerCase();
@@ -268,7 +268,7 @@ function parcelOppScore(props) {
   const imp  = parseFloat(props.IMP_APPR)  || 0;
 
   if (land === 0 && imp === 0) return 50;   // unknown
-  if (imp === 0)  return 95;                // vacant land → maximum opportunity
+  if (imp === 0)  return 95;                // vacant land ‚Üí maximum opportunity
   if (land === 0) return 15;               // improvements only, no land value recorded
 
   const impRatio = imp / (land + imp);
@@ -276,10 +276,10 @@ function parcelOppScore(props) {
 }
 
 function parcelColor(score) {
-  if (score >= 80) return "#f0a030";  // orange — vacant/underbuilt
-  if (score >= 55) return "#7ec8e3";  // sky   — mixed
-  if (score >= 30) return "#4a90d9";  // blue  — moderate build
-  return "#3a5f85";                   // slate — fully developed (visible on dark map)
+  if (score >= 80) return "#f0a030";  // orange ‚Äî vacant/underbuilt
+  if (score >= 55) return "#7ec8e3";  // sky   ‚Äî mixed
+  if (score >= 30) return "#4a90d9";  // blue  ‚Äî moderate build
+  return "#3a5f85";                   // slate ‚Äî fully developed (visible on dark map)
 }
 
 const COMMERCIAL_GENUSE_RE = /commercial|office|retail|hotel|restaurant|shopping|warehouse/i;
@@ -314,6 +314,7 @@ function parcelToProject(feat) {
     longitude: lng,
     value: p.LAND_APPR || p.APPRVAL || null,
     category: "commercial",
+    opp_score: score,
     status: "Opportunities",
     posted_date: null,
     is_active: true,
@@ -326,19 +327,19 @@ function parcelToProject(feat) {
 }
 
 const catIcons = {
-  "historic-restoration": "🏛️",
-  masonry: "🧱",
-  structural: "🏗️",
-  government: "⚖️",
-  commercial: "🏢",
-  hotel: "🏨",
-  "multi-family": "🏘️",
-  "mixed-use": "🏙️",
-  office: "🖥️",
-  restaurant: "🍽️",
-  retail: "🛍️",
-  industrial: "🏭",
-  institutional: "🏫",
+  "historic-restoration": "üèõÔ∏è",
+  masonry: "üß±",
+  structural: "üèóÔ∏è",
+  government: "‚öñÔ∏è",
+  commercial: "üè¢",
+  hotel: "üè®",
+  "multi-family": "üèòÔ∏è",
+  "mixed-use": "üèôÔ∏è",
+  office: "üñ•Ô∏è",
+  restaurant: "üçΩÔ∏è",
+  retail: "üõçÔ∏è",
+  industrial: "üè≠",
+  institutional: "üè´",
 };
 
 const sourceLabels = {
@@ -392,7 +393,7 @@ async function api(path, opts = {}) {
   return res.json();
 }
 
-// ─── AUTH SCREEN ────────────────────────────────────────────────────────────
+// ‚îÄ‚îÄ‚îÄ AUTH SCREEN ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
 
 function AuthScreen({ onAuth }) {
   const [mode, setMode] = useState("login");
@@ -421,7 +422,7 @@ function AuthScreen({ onAuth }) {
         setError(data.detail || "Auth failed");
       }
     } catch (err) {
-      setError("Connection failed — is the server running?");
+      setError("Connection failed ‚Äî is the server running?");
     }
     setLoading(false);
   };
@@ -493,7 +494,7 @@ function AuthScreen({ onAuth }) {
   );
 }
 
-// ─── STATUS PILL ────────────────────────────────────────────────────────────
+// ‚îÄ‚îÄ‚îÄ STATUS PILL ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
 
 function StatusPill({ status }) {
   const c = statusColors[status] || "#6b7280";
@@ -516,9 +517,9 @@ function StatusPill({ status }) {
   );
 }
 
-// ─── PROJECT ROW ────────────────────────────────────────────────────────────
+// ‚îÄ‚îÄ‚îÄ PROJECT ROW ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
 
-// ─── PROJECT CARD ─────────────────────────────────────────────────────────────
+// ‚îÄ‚îÄ‚îÄ PROJECT CARD ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
 // One card per project (address group). Shows the most informative permit.
 
 function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedians = {} }) {
@@ -573,13 +574,13 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
             onMouseEnter={(e) => { e.currentTarget.style.color = "#ef4444"; }}
             onMouseLeave={(e) => { e.currentTarget.style.color = "#444"; }}
           >
-            ✕
+            ‚úï
           </button>
         )}
         <div style={styles.projectHeader}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={styles.projectTitle}>
-              <span style={{ marginRight: 8 }}>{catIcons[primary.category] || "📋"}</span>
+              <span style={{ marginRight: 8 }}>{catIcons[primary.category] || "üìã"}</span>
               {displayTitle}
             </div>
             <div style={styles.projectMeta}>
@@ -610,13 +611,13 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
                 const extra = names.length - shown.length;
                 return (
                   <span style={{ marginLeft: 12, color: C.textMuted }}>
-                    👷 {shown.join(", ")}{extra > 0 ? ` +${extra} more` : ""}
+                    üë∑ {shown.join(", ")}{extra > 0 ? ` +${extra} more` : ""}
                   </span>
                 );
               })()}
               {primary.agency && (
                 <span style={{ marginLeft: locationTag ? 12 : 0, color: C.textSub }}>
-                  🏢 {primary.agency.split("|")[0]}
+                  üè¢ {primary.agency.split("|")[0]}
                 </span>
               )}
               <span style={{ marginLeft: 8 }}>
@@ -643,7 +644,7 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
                 background: `${deadlineTag.color}20`, color: deadlineTag.color,
                 border: `1px solid ${deadlineTag.color}40`, whiteSpace: "nowrap",
               }}>
-                ⏱ {deadlineTag.label}
+                ‚è± {deadlineTag.label}
               </span>
             )}
             <div style={{ textAlign: "right" }}>
@@ -657,7 +658,7 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
                   {fmtEst(estValue)}
                 </div>
               ) : (
-                <div style={{ color: C.textMuted, fontWeight: 400, fontSize: 14, fontFamily: "'JetBrains Mono', monospace" }}>—</div>
+                <div style={{ color: C.textMuted, fontWeight: 400, fontSize: 14, fontFamily: "'JetBrains Mono', monospace" }}>‚Äî</div>
               )}
             </div>
             <div style={{ width: 110, display: "flex", justifyContent: "flex-end" }}>
@@ -708,13 +709,13 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
               {primary.source_url && (
                 <a href={primary.source_url} target="_blank" rel="noopener"
                   style={styles.linkBtn} onClick={(e) => e.stopPropagation()}>
-                  View Source →
+                  View Source ‚Üí
                 </a>
               )}
               {!isSaved && (
                 <button style={styles.saveBtn}
                   onClick={(e) => { e.stopPropagation(); onSave(primary.id); }}>
-                  ★ Save
+                  ‚òÖ Save
                 </button>
               )}
             </div>
@@ -726,7 +727,7 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
 }
 
 
-// ─── STATS BAR ──────────────────────────────────────────────────────────────
+// ‚îÄ‚îÄ‚îÄ STATS BAR ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
 
 function StatsBar({ stats, onBidsOpen }) {
   if (!stats) return null;
@@ -756,7 +757,7 @@ function StatsBar({ stats, onBidsOpen }) {
   );
 }
 
-// ─── PROFILE TAB ────────────────────────────────────────────────────────────
+// ‚îÄ‚îÄ‚îÄ PROFILE TAB ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
 
 const ALL_CATEGORIES = [
   { id: "healthcare", label: "Healthcare" },
@@ -812,14 +813,14 @@ function projectMatchesClientTypes(project, clientTypes) {
   );
 }
 
-// Trade-only permit categories — subcontractor pulls, not GC-level projects.
+// Trade-only permit categories ‚Äî subcontractor pulls, not GC-level projects.
 // Excluded from the default feed; shown only when explicitly filtered for.
 const TRADE_CATEGORIES = new Set([
   "fire-sprinkler", "electrical", "plumbing", "mechanical", "painting", "roofing", "structural",
 ]);
 
 // Civil/infrastructure and sub-permit titles to exclude from the default GC feed.
-const CIVIL_INFRA_RE = /\b(culvert|resurfacing|road\s+(resurface|widening|repair|improvement)|highway\s+construction|roundabout|bridge\s+(repair|replacement|construction|project)|pavement\s+(marking|replacement)|traffic\s+signal|water\s+main|sewer\s+main|utility\s+(relocation|undergrounding))\b|^(phasing\s+permit|phased\s+permit|phasing\s+floor\s+\d+|level\s+\d+[-–\s]|parking\s+garage\s+for\s|roof\s+permit\s+for\s|overall\s+master\s+permit|master\s+permit\s+for\s|retail\s+floor\s+[\d.]+|leasing\s+office\b|an?\s+internal\s+parking\s+garage|hotel\s+rooms\s+level\s+\d+|pool\s+area\s+and\s|test\s+permit|this\s+permit\s+to\s+serve\s+for|mockup\s+panel\s+for|site\s+i?o?mprovements?\s*[-–])/i;
+const CIVIL_INFRA_RE = /\b(culvert|resurfacing|road\s+(resurface|widening|repair|improvement)|highway\s+construction|roundabout|bridge\s+(repair|replacement|construction|project)|pavement\s+(marking|replacement)|traffic\s+signal|water\s+main|sewer\s+main|utility\s+(relocation|undergrounding))\b|^(phasing\s+permit|phased\s+permit|phasing\s+floor\s+\d+|level\s+\d+[-‚Äì\s]|parking\s+garage\s+for\s|roof\s+permit\s+for\s|overall\s+master\s+permit|master\s+permit\s+for\s|retail\s+floor\s+[\d.]+|leasing\s+office\b|an?\s+internal\s+parking\s+garage|hotel\s+rooms\s+level\s+\d+|pool\s+area\s+and\s|test\s+permit|this\s+permit\s+to\s+serve\s+for|mockup\s+panel\s+for|site\s+i?o?mprovements?\s*[-‚Äì])/i;
 
 // Lowcountry region filtering
 const LOWCOUNTRY_RE = /\b(charleston|mt\.?\s*pleasant|mount\s+pleasant|goose\s+creek|summerville|hanahan|isle\s+of\s+palms|sullivan'?s\s+island|james\s+island|johns\s+island|daniel\s+island|folly\s+beach|ladson|moncks\s+corner|berkeley\s+county|dorchester\s+county|north\s+charleston|seabrook|kiawah)\b/i;
@@ -875,7 +876,7 @@ function ProfileTab({ lastScanAt, onScan }) {
       criteria_statuses: defaults.statuses,
     }) });
     setSaving(false);
-    setSavedMsg("✓ Saved as defaults");
+    setSavedMsg("‚úì Saved as defaults");
     setTimeout(() => setSavedMsg(""), 4000);
   };
 
@@ -980,7 +981,7 @@ function ProfileTab({ lastScanAt, onScan }) {
       </p>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <button onClick={doScan} disabled={scanning} style={{ ...styles.authBtn, background: C.navy, maxWidth: 180 }}>
-          {scanning ? "Scanning..." : "⚡ Run Scan Now"}
+          {scanning ? "Scanning..." : "‚ö° Run Scan Now"}
         </button>
         <button onClick={doConnTest} disabled={connTesting} style={{ ...styles.authBtn, background: "transparent", border: `1px solid ${C.border}`, color: C.textSub, maxWidth: 180 }}>
           {connTesting ? "Testing..." : "Test Connectivity"}
@@ -997,22 +998,22 @@ function ProfileTab({ lastScanAt, onScan }) {
               {connResult.scbo && (
                 <div style={{ marginBottom: 10 }}>
                   <span style={{ color: connResult.scbo.parsed_project_count > 0 ? "#4c4" : "#e44" }}>
-                    {connResult.scbo.parsed_project_count > 0 ? "✓" : "✗"} SCBO
+                    {connResult.scbo.parsed_project_count > 0 ? "‚úì" : "‚úó"} SCBO
                   </span>
                   {connResult.scbo.error
                     ? <span style={{ color: "#e44" }}> Error: {connResult.scbo.error}</span>
                     : <span>
-                        {" — "}{connResult.scbo.response_bytes?.toLocaleString()} bytes
+                        {" ‚Äî "}{connResult.scbo.response_bytes?.toLocaleString()} bytes
                         {connResult.scbo.raw_marker_count != null && `, ${connResult.scbo.raw_marker_count} raw / ${connResult.scbo.parsed_project_count ?? "?"} parsed`}
                       </span>
                   }
-                  {" "}<span style={{ color: connResult.scbo.via_zenrows ? "#4c4" : "#e44" }}>(via: {connResult.scbo.via_zenrows ? "ZenRows ✓" : "direct — no key!"})</span>
+                  {" "}<span style={{ color: connResult.scbo.via_zenrows ? "#4c4" : "#e44" }}>(via: {connResult.scbo.via_zenrows ? "ZenRows ‚úì" : "direct ‚Äî no key!"})</span>
                 </div>
               )}
               {connResult.arcgis && (
                 <div style={{ marginBottom: 6 }}>
                   <span style={{ color: connResult.arcgis.error || connResult.arcgis.layer20_error ? "#e44" : "#4c4" }}>
-                    {connResult.arcgis.error || connResult.arcgis.layer20_error ? "✗" : "✓"} ArcGIS
+                    {connResult.arcgis.error || connResult.arcgis.layer20_error ? "‚úó" : "‚úì"} ArcGIS
                   </span>
                   {connResult.arcgis.error
                     ? <span style={{ color: "#e44" }}> Error: {connResult.arcgis.error}</span>
@@ -1029,11 +1030,11 @@ function ProfileTab({ lastScanAt, onScan }) {
               {connResult.energov && (
                 <div>
                   <span style={{ color: connResult.energov.contractors?.length > 0 ? "#4c4" : "#e44" }}>
-                    {connResult.energov.contractors?.length > 0 ? "✓" : "✗"} EnerGov
+                    {connResult.energov.contractors?.length > 0 ? "‚úì" : "‚úó"} EnerGov
                   </span>
                   {connResult.energov.error
                     ? <span style={{ color: "#e44" }}> Error: {connResult.energov.error}</span>
-                    : <span> — {connResult.energov.contacts_found} contacts, contractors: [{connResult.energov.contractors?.join(", ") || "none"}]</span>
+                    : <span> ‚Äî {connResult.energov.contacts_found} contacts, contractors: [{connResult.energov.contractors?.join(", ") || "none"}]</span>
                   }
                 </div>
               )}
@@ -1048,7 +1049,7 @@ function ProfileTab({ lastScanAt, onScan }) {
         <div style={{ marginTop: 10, padding: 12, background: C.surface, borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 11, fontFamily: "monospace", maxHeight: 220, overflowY: "auto" }}>
           {dbResult.map((p, i) => (
             <div key={i} style={{ marginBottom: 6, borderBottom: `1px solid ${C.border}`, paddingBottom: 4 }}>
-              <span style={{ color: p.contractor !== "(empty)" ? "#4c4" : "#e44" }}>{p.contractor !== "(empty)" ? "✓" : "✗"}</span>
+              <span style={{ color: p.contractor !== "(empty)" ? "#4c4" : "#e44" }}>{p.contractor !== "(empty)" ? "‚úì" : "‚úó"}</span>
               {" "}<span style={{ color: C.text }}>{p.address}</span>
               {" "}<span style={{ color: C.textMuted }}>contractor: {p.contractor}</span>
               {" "}<span style={{ color: C.textMuted }}>[active:{String(p.is_active)}, cat:{p.category}]</span>
@@ -1061,58 +1062,58 @@ function ProfileTab({ lastScanAt, onScan }) {
   );
 }
 
-// ─── CITY SELECTOR ──────────────────────────────────────────────────────────
+// ‚îÄ‚îÄ‚îÄ CITY SELECTOR ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
 
 const CITIES = [
   // Southeast
-  { id: "charleston-sc",  label: "Charleston, SC",   icon: "🌊", active: true },
-  { id: "columbia-sc",    label: "Columbia, SC",     icon: "🏛️" },
-  { id: "greenville-sc",  label: "Greenville, SC",   icon: "🌿" },
-  { id: "charlotte-nc",   label: "Charlotte, NC",    icon: "🏙️", active: true },
-  { id: "raleigh-nc",     label: "Raleigh, NC",      icon: "🔬" },
-  { id: "atlanta-ga",     label: "Atlanta, GA",      icon: "🍑" },
-  { id: "savannah-ga",    label: "Savannah, GA",     icon: "🌳" },
-  { id: "jacksonville-fl",label: "Jacksonville, FL", icon: "🌞" },
-  { id: "orlando-fl",     label: "Orlando, FL",      icon: "🎡" },
-  { id: "tampa-fl",       label: "Tampa, FL",        icon: "⚡" },
-  { id: "miami-fl",       label: "Miami, FL",        icon: "🌴" },
-  { id: "nashville-tn",   label: "Nashville, TN",    icon: "🎸" },
-  { id: "memphis-tn",     label: "Memphis, TN",      icon: "🎵" },
-  { id: "birmingham-al",  label: "Birmingham, AL",   icon: "🔩" },
-  { id: "new-orleans-la", label: "New Orleans, LA",  icon: "🎷" },
+  { id: "charleston-sc",  label: "Charleston, SC",   icon: "üåä", active: true },
+  { id: "columbia-sc",    label: "Columbia, SC",     icon: "üèõÔ∏è" },
+  { id: "greenville-sc",  label: "Greenville, SC",   icon: "üåø" },
+  { id: "charlotte-nc",   label: "Charlotte, NC",    icon: "üèôÔ∏è", active: true },
+  { id: "raleigh-nc",     label: "Raleigh, NC",      icon: "üî¨" },
+  { id: "atlanta-ga",     label: "Atlanta, GA",      icon: "üçë" },
+  { id: "savannah-ga",    label: "Savannah, GA",     icon: "üå≥" },
+  { id: "jacksonville-fl",label: "Jacksonville, FL", icon: "üåû" },
+  { id: "orlando-fl",     label: "Orlando, FL",      icon: "üé°" },
+  { id: "tampa-fl",       label: "Tampa, FL",        icon: "‚ö°" },
+  { id: "miami-fl",       label: "Miami, FL",        icon: "üå¥" },
+  { id: "nashville-tn",   label: "Nashville, TN",    icon: "üé∏" },
+  { id: "memphis-tn",     label: "Memphis, TN",      icon: "üéµ" },
+  { id: "birmingham-al",  label: "Birmingham, AL",   icon: "üî©" },
+  { id: "new-orleans-la", label: "New Orleans, LA",  icon: "üé∑" },
   // Northeast
-  { id: "new-york-ny",    label: "New York, NY",     icon: "🗽" },
-  { id: "boston-ma",      label: "Boston, MA",       icon: "🦞" },
-  { id: "philadelphia-pa",label: "Philadelphia, PA", icon: "🔔" },
-  { id: "washington-dc",  label: "Washington, DC",   icon: "🏛️" },
-  { id: "baltimore-md",   label: "Baltimore, MD",    icon: "🦀" },
+  { id: "new-york-ny",    label: "New York, NY",     icon: "üóΩ" },
+  { id: "boston-ma",      label: "Boston, MA",       icon: "ü¶û" },
+  { id: "philadelphia-pa",label: "Philadelphia, PA", icon: "üîî" },
+  { id: "washington-dc",  label: "Washington, DC",   icon: "üèõÔ∏è" },
+  { id: "baltimore-md",   label: "Baltimore, MD",    icon: "ü¶Ä" },
   // Midwest
-  { id: "chicago-il",     label: "Chicago, IL",      icon: "🌬️" },
-  { id: "detroit-mi",     label: "Detroit, MI",      icon: "🚗" },
-  { id: "columbus-oh",    label: "Columbus, OH",     icon: "🌰" },
-  { id: "indianapolis-in",label: "Indianapolis, IN", icon: "🏎️" },
-  { id: "minneapolis-mn", label: "Minneapolis, MN",  icon: "❄️" },
-  { id: "kansas-city-mo", label: "Kansas City, MO",  icon: "🥩" },
-  { id: "st-louis-mo",    label: "St. Louis, MO",    icon: "⚾" },
+  { id: "chicago-il",     label: "Chicago, IL",      icon: "üå¨Ô∏è" },
+  { id: "detroit-mi",     label: "Detroit, MI",      icon: "üöó" },
+  { id: "columbus-oh",    label: "Columbus, OH",     icon: "üå∞" },
+  { id: "indianapolis-in",label: "Indianapolis, IN", icon: "üèéÔ∏è" },
+  { id: "minneapolis-mn", label: "Minneapolis, MN",  icon: "‚ùÑÔ∏è" },
+  { id: "kansas-city-mo", label: "Kansas City, MO",  icon: "ü•©" },
+  { id: "st-louis-mo",    label: "St. Louis, MO",    icon: "‚öæ" },
   // South / Southwest
-  { id: "dallas-tx",      label: "Dallas, TX",       icon: "🤠" },
-  { id: "houston-tx",     label: "Houston, TX",      icon: "⭐" },
-  { id: "san-antonio-tx", label: "San Antonio, TX",  icon: "🌵" },
-  { id: "austin-tx",      label: "Austin, TX",       icon: "🎶" },
-  { id: "oklahoma-city-ok",label:"Oklahoma City, OK",icon: "🌪️" },
-  { id: "phoenix-az",     label: "Phoenix, AZ",      icon: "☀️" },
-  { id: "tucson-az",      label: "Tucson, AZ",       icon: "🌵" },
-  { id: "las-vegas-nv",   label: "Las Vegas, NV",    icon: "🎰" },
-  { id: "albuquerque-nm", label: "Albuquerque, NM",  icon: "🎈" },
+  { id: "dallas-tx",      label: "Dallas, TX",       icon: "ü§†" },
+  { id: "houston-tx",     label: "Houston, TX",      icon: "‚≠ê" },
+  { id: "san-antonio-tx", label: "San Antonio, TX",  icon: "üåµ" },
+  { id: "austin-tx",      label: "Austin, TX",       icon: "üé∂" },
+  { id: "oklahoma-city-ok",label:"Oklahoma City, OK",icon: "üå™Ô∏è" },
+  { id: "phoenix-az",     label: "Phoenix, AZ",      icon: "‚òÄÔ∏è" },
+  { id: "tucson-az",      label: "Tucson, AZ",       icon: "üåµ" },
+  { id: "las-vegas-nv",   label: "Las Vegas, NV",    icon: "üé∞" },
+  { id: "albuquerque-nm", label: "Albuquerque, NM",  icon: "üéà" },
   // West
-  { id: "los-angeles-ca", label: "Los Angeles, CA",  icon: "🎬" },
-  { id: "san-diego-ca",   label: "San Diego, CA",    icon: "🌮" },
-  { id: "san-francisco-ca",label:"San Francisco, CA",icon: "🌉" },
-  { id: "sacramento-ca",  label: "Sacramento, CA",   icon: "🌾" },
-  { id: "portland-or",    label: "Portland, OR",     icon: "🌲" },
-  { id: "seattle-wa",     label: "Seattle, WA",      icon: "☕" },
-  { id: "denver-co",      label: "Denver, CO",       icon: "⛰️" },
-  { id: "salt-lake-city-ut",label:"Salt Lake City, UT",icon:"⛷️" },
+  { id: "los-angeles-ca", label: "Los Angeles, CA",  icon: "üé¨" },
+  { id: "san-diego-ca",   label: "San Diego, CA",    icon: "üåÆ" },
+  { id: "san-francisco-ca",label:"San Francisco, CA",icon: "üåâ" },
+  { id: "sacramento-ca",  label: "Sacramento, CA",   icon: "üåæ" },
+  { id: "portland-or",    label: "Portland, OR",     icon: "üå≤" },
+  { id: "seattle-wa",     label: "Seattle, WA",      icon: "‚òï" },
+  { id: "denver-co",      label: "Denver, CO",       icon: "‚õ∞Ô∏è" },
+  { id: "salt-lake-city-ut",label:"Salt Lake City, UT",icon:"‚õ∑Ô∏è" },
 ];
 
 function CitySelector() {
@@ -1146,9 +1147,9 @@ function CitySelector() {
           whiteSpace: "nowrap",
         }}
       >
-        <span style={{ fontSize: 13 }}>🌊</span>
+        <span style={{ fontSize: 13 }}>üåä</span>
         Charleston, SC
-        <span style={{ color: C.textMuted, fontSize: 9, marginLeft: 2 }}>▾</span>
+        <span style={{ color: C.textMuted, fontSize: 9, marginLeft: 2 }}>‚ñæ</span>
       </button>
 
       {open && (
@@ -1206,7 +1207,7 @@ function CitySelector() {
   );
 }
 
-// ─── SCAN BUTTON ────────────────────────────────────────────────────────────
+// ‚îÄ‚îÄ‚îÄ SCAN BUTTON ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
 
 function ScanButton({ onScan }) {
   const [scanning, setScanning] = useState(false);
@@ -1234,7 +1235,7 @@ function ScanButton({ onScan }) {
             <span style={styles.spinner} /> Scanning...
           </span>
         ) : (
-          "⚡ Run Scan"
+          "‚ö° Run Scan"
         )}
       </button>
       {result && <span style={{ color: C.orange, fontSize: 12 }}>{result}</span>}
@@ -1242,7 +1243,7 @@ function ScanButton({ onScan }) {
   );
 }
 
-// ─── FILTER BAR ─────────────────────────────────────────────────────────────
+// ‚îÄ‚îÄ‚îÄ FILTER BAR ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
 
 function FilterBar({ filters, setFilters }) {
   const [showMore, setShowMore] = useState(false);
@@ -1284,7 +1285,7 @@ function FilterBar({ filters, setFilters }) {
             {label}
           </button>
         ))}
-        <span style={{ color: C.textMuted, alignSelf: "center", margin: "0 2px" }}>·</span>
+        <span style={{ color: C.textMuted, alignSelf: "center", margin: "0 2px" }}>¬∑</span>
         <button onClick={() => setFilters(f => ({ ...f, lowcountry: !f.lowcountry }))}
           style={chip(!!filters.lowcountry, C.sky)}>
           Lowcountry
@@ -1310,10 +1311,10 @@ function FilterBar({ filters, setFilters }) {
             transition: "all 0.15s", whiteSpace: "nowrap",
           }}
         >
-          {showMore ? "▲ Less" : "▼ More"}{moreCount > 0 ? ` (${moreCount})` : ""}
+          {showMore ? "‚ñ≤ Less" : "‚ñº More"}{moreCount > 0 ? ` (${moreCount})` : ""}
         </button>
       </div>
-      {/* Project type + Status — collapsed by default */}
+      {/* Project type + Status ‚Äî collapsed by default */}
       {showMore && (
         <>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: "1 1 100%", alignItems: "center" }}>
@@ -1351,25 +1352,25 @@ function FilterBar({ filters, setFilters }) {
       </select>
       <button
         onClick={toggleDir}
-        title={filters.sortDir === "desc" ? "High → Low" : "Low → High"}
+        title={filters.sortDir === "desc" ? "High ‚Üí Low" : "Low ‚Üí High"}
         style={btnBase}
         onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.borderHi; e.currentTarget.style.color = C.text; }}
         onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textSub; }}
       >
-        {filters.sortDir === "desc" ? "↓" : "↑"}
+        {filters.sortDir === "desc" ? "‚Üì" : "‚Üë"}
       </button>
     </div>
   );
 }
 
-// ─── SAVED PROJECTS TAB ─────────────────────────────────────────────────────
+// ‚îÄ‚îÄ‚îÄ SAVED PROJECTS TAB ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
 
 function SavedTab({ saved, onUnsave }) {
   if (!saved.length) {
     return (
       <div style={{ textAlign: "center", padding: 60, color: "#555" }}>
-        <div style={{ fontSize: 40, marginBottom: 12 }}>★</div>
-        <div>No saved projects yet. Click "★ Save" on any project to track it.</div>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>‚òÖ</div>
+        <div>No saved projects yet. Click "‚òÖ Save" on any project to track it.</div>
       </div>
     );
   }
@@ -1380,10 +1381,10 @@ function SavedTab({ saved, onUnsave }) {
           <div style={styles.projectHeader}>
             <div style={{ flex: 1 }}>
               <div style={styles.projectTitle}>
-                {catIcons[s.project.category] || "📋"} {s.project.title}
+                {catIcons[s.project.category] || "üìã"} {s.project.title}
               </div>
               <div style={styles.projectMeta}>
-                📍 {s.project.location} · Saved {fmtDate(s.saved_at)}
+                üìç {s.project.location} ¬∑ Saved {fmtDate(s.saved_at)}
               </div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -1404,7 +1405,7 @@ function SavedTab({ saved, onUnsave }) {
   );
 }
 
-// ─── PERMIT CONTRACTOR DATA ──────────────────────────────────────────────────
+// ‚îÄ‚îÄ‚îÄ PERMIT CONTRACTOR DATA ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
 
 // Trade display sequence (maps backend trade IDs to construction order)
 const TRADE_SEQUENCE = [
@@ -1604,7 +1605,7 @@ function PermitContractorsSection() {
       {/* Search + sort + min value filter */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 20 }}>
         <input
-          placeholder="Search contractors…"
+          placeholder="Search contractors‚Ä¶"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={inputStyle}
@@ -1617,12 +1618,12 @@ function PermitContractorsSection() {
         <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={selectStyle}>
           <option value="total_permit_value">Sort: Total Value</option>
           <option value="permit_count">Sort: Permit Count</option>
-          <option value="name">Sort: Name A–Z</option>
+          <option value="name">Sort: Name A‚ÄìZ</option>
         </select>
       </div>
 
       {loading && (
-        <div style={{ textAlign: "center", padding: 40, color: C.textMuted }}>Loading…</div>
+        <div style={{ textAlign: "center", padding: 40, color: C.textMuted }}>Loading‚Ä¶</div>
       )}
 
       {!loading && tradeData && tradeGroups.length === 0 && (
@@ -1701,7 +1702,7 @@ function PermitContractorsSection() {
 }
 
 
-// ─── CONTRACTORS TAB ────────────────────────────────────────────────────────
+// ‚îÄ‚îÄ‚îÄ CONTRACTORS TAB ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
 
 const BLANK_FORM = { name: "", specialty: "", phone: "", email: "", website: "", notes: "" };
 
@@ -1725,15 +1726,15 @@ function ContractorCard({ c, onEdit, onDelete }) {
           </div>
         )}
         <div style={{ fontSize: 12, color: C.textSub, display: "flex", flexWrap: "wrap", gap: "4px 16px" }}>
-          {c.phone && <span>📞 {c.phone}</span>}
-          {c.email && <span>✉ {c.email}</span>}
+          {c.phone && <span>üìû {c.phone}</span>}
+          {c.email && <span>‚úâ {c.email}</span>}
           {c.website && (
             <a href={c.website.startsWith("http") ? c.website : `https://${c.website}`}
               target="_blank" rel="noopener"
               style={{ color: C.sky, textDecoration: "none" }}
               onClick={(e) => e.stopPropagation()}
             >
-              🌐 {c.website.replace(/^https?:\/\//, "")}
+              üåê {c.website.replace(/^https?:\/\//, "")}
             </a>
           )}
         </div>
@@ -1755,7 +1756,7 @@ function ContractorCard({ c, onEdit, onDelete }) {
           border: `1px solid #dc262640`, borderRadius: 6,
           color: "#f87171", fontSize: 11, cursor: "pointer",
           fontFamily: "'DM Sans', sans-serif",
-        }}>✕</button>
+        }}>‚úï</button>
       </div>
     </div>
   );
@@ -1811,7 +1812,7 @@ function ContractorForm({ initial, type, onSave, onCancel }) {
             fontFamily: "'DM Sans', sans-serif", opacity: form.name.trim() ? 1 : 0.5,
           }}
         >
-          {saving ? "Saving…" : initial ? "Save Changes" : "Add"}
+          {saving ? "Saving‚Ä¶" : initial ? "Save Changes" : "Add"}
         </button>
         <button onClick={onCancel} style={{
           padding: "8px 14px", background: "transparent",
@@ -1944,14 +1945,14 @@ function ContractorsTab() {
   };
 
   if (loading) {
-    return <div style={{ textAlign: "center", padding: 60, color: C.textMuted }}>Loading…</div>;
+    return <div style={{ textAlign: "center", padding: 60, color: C.textMuted }}>Loading‚Ä¶</div>;
   }
 
   return <PermitContractorsSection />;
 }
 
 
-// ─── COMPANY PROFILE TAB ─────────────────────────────────────────────────────
+// ‚îÄ‚îÄ‚îÄ COMPANY PROFILE TAB ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
 
 function OrgInfoForm({ org, onSaved }) {
   const [form, setForm] = useState({
@@ -1987,7 +1988,7 @@ function OrgInfoForm({ org, onSaved }) {
     const payload = { ...form, license_classifications: form.license_classifications.split(",").map((s) => s.trim()).filter(Boolean) };
     await api("/profile/org", { method: "PUT", body: JSON.stringify(payload) });
     setSaving(false);
-    setMsg("✓ Saved");
+    setMsg("‚úì Saved");
     setTimeout(() => setMsg(""), 3000);
     onSaved();
   };
@@ -2048,7 +2049,7 @@ function OrgInfoForm({ org, onSaved }) {
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 4 }}>
         <button onClick={save} disabled={saving} style={{ padding: "10px 24px", background: C.orange, color: "#000", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
-          {saving ? "Saving…" : "Save"}
+          {saving ? "Saving‚Ä¶" : "Save"}
         </button>
         {msg && <span style={{ color: C.sky, fontSize: 14 }}>{msg}</span>}
       </div>
@@ -2085,8 +2086,8 @@ function PrincipalsSection({ org, onChanged }) {
             <div style={{ fontSize: 12, color: C.textSub }}>{p.title}</div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => setForm({ ...p })} style={{ background: "none", border: "none", color: C.textSub, cursor: "pointer", fontSize: 16 }}>✏️</button>
-            <button onClick={() => del(p.id)} style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: 16 }}>🗑️</button>
+            <button onClick={() => setForm({ ...p })} style={{ background: "none", border: "none", color: C.textSub, cursor: "pointer", fontSize: 16 }}>‚úèÔ∏è</button>
+            <button onClick={() => del(p.id)} style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: 16 }}>üóëÔ∏è</button>
           </div>
         </div>
       ))}
@@ -2098,7 +2099,7 @@ function PrincipalsSection({ org, onChanged }) {
           </div>
           <div style={{ marginBottom: 12 }}><label style={lbl}>Other Businesses</label><textarea style={{ ...inp, resize: "vertical", minHeight: 60 }} value={form.other_businesses} onChange={set("other_businesses")} /></div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={save} disabled={saving} style={btn(true)}>{saving ? "Saving…" : form.id ? "Update" : "Add"}</button>
+            <button onClick={save} disabled={saving} style={btn(true)}>{saving ? "Saving‚Ä¶" : form.id ? "Update" : "Add"}</button>
             <button onClick={() => setForm(null)} style={btn(false)}>Cancel</button>
           </div>
         </div>
@@ -2139,11 +2140,11 @@ function ProjectRefsSection({ org, onChanged }) {
           <div key={r.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: C.bg, borderRadius: 8, marginBottom: 8 }}>
             <div>
               <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>{r.project_name || "(no name)"}</div>
-              <div style={{ fontSize: 12, color: C.textSub }}>{r.owner_name}{r.contract_value ? ` · $${Number(r.contract_value).toLocaleString()}` : ""}{r.completion_date ? ` · ${r.completion_date}` : ""}</div>
+              <div style={{ fontSize: 12, color: C.textSub }}>{r.owner_name}{r.contract_value ? ` ¬∑ $${Number(r.contract_value).toLocaleString()}` : ""}{r.completion_date ? ` ¬∑ ${r.completion_date}` : ""}</div>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => setForm({ ...r, contract_value: r.contract_value || "" })} style={{ background: "none", border: "none", color: C.textSub, cursor: "pointer", fontSize: 16 }}>✏️</button>
-              <button onClick={() => del(r.id)} style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: 16 }}>🗑️</button>
+              <button onClick={() => setForm({ ...r, contract_value: r.contract_value || "" })} style={{ background: "none", border: "none", color: C.textSub, cursor: "pointer", fontSize: 16 }}>‚úèÔ∏è</button>
+              <button onClick={() => del(r.id)} style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: 16 }}>üóëÔ∏è</button>
             </div>
           </div>
         ))}
@@ -2171,7 +2172,7 @@ function ProjectRefsSection({ org, onChanged }) {
           <div style={{ marginBottom: 12 }}><label style={lbl}>Scope of Work</label><textarea style={{ ...inp, resize: "vertical", minHeight: 60 }} value={form.scope_of_work} onChange={set("scope_of_work")} /></div>
           <div style={{ marginBottom: 12 }}><label style={lbl}>Description</label><textarea style={{ ...inp, resize: "vertical", minHeight: 60 }} value={form.description} onChange={set("description")} /></div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={save} disabled={saving} style={btn(true)}>{saving ? "Saving…" : form.id ? "Update" : "Add"}</button>
+            <button onClick={save} disabled={saving} style={btn(true)}>{saving ? "Saving‚Ä¶" : form.id ? "Update" : "Add"}</button>
             <button onClick={() => setForm(null)} style={btn(false)}>Cancel</button>
           </div>
         </div>
@@ -2213,8 +2214,8 @@ function PersonnelSection({ org, onChanged }) {
                 {p.resume_summary && <div style={{ fontSize: 12, color: C.textSub, marginTop: 4, maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.resume_summary}</div>}
               </div>
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => setEditing({ ...p })} style={{ background: "none", border: "none", color: C.textSub, cursor: "pointer", fontSize: 16 }}>✏️</button>
-                <button onClick={() => del(p.id)} style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: 16 }}>🗑️</button>
+                <button onClick={() => setEditing({ ...p })} style={{ background: "none", border: "none", color: C.textSub, cursor: "pointer", fontSize: 16 }}>‚úèÔ∏è</button>
+                <button onClick={() => del(p.id)} style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: 16 }}>üóëÔ∏è</button>
               </div>
             </div>
           </div>
@@ -2236,7 +2237,7 @@ function PersonnelSection({ org, onChanged }) {
           <div style={{ marginBottom: 12 }}><label style={lbl}>Name</label><input style={inp} value={editing.name} onChange={set("name")} /></div>
           <div style={{ marginBottom: 12 }}><label style={lbl}>Resume Summary</label><textarea style={{ ...inp, resize: "vertical", minHeight: 80 }} value={editing.resume_summary} onChange={set("resume_summary")} /></div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={save} disabled={saving} style={btn(true)}>{saving ? "Saving…" : editing.id ? "Update" : "Add"}</button>
+            <button onClick={save} disabled={saving} style={btn(true)}>{saving ? "Saving‚Ä¶" : editing.id ? "Update" : "Add"}</button>
             <button onClick={() => setEditing(null)} style={btn(false)}>Cancel</button>
           </div>
         </div>
@@ -2293,7 +2294,7 @@ function SOQSection({ org }) {
           <input type="checkbox" checked={selected.includes(r.id)} onChange={() => onToggle(r.id)} style={{ accentColor: C.orange }} disabled={!selected.includes(r.id) && selected.length >= max} />
           <div>
             <div style={{ fontSize: 14, color: C.text, fontWeight: 600 }}>{r.project_name || "(no name)"}</div>
-            <div style={{ fontSize: 12, color: C.textSub }}>{r.owner_name}{r.contract_value ? ` · $${Number(r.contract_value).toLocaleString()}` : ""}</div>
+            <div style={{ fontSize: 12, color: C.textSub }}>{r.owner_name}{r.contract_value ? ` ¬∑ $${Number(r.contract_value).toLocaleString()}` : ""}</div>
           </div>
         </label>
       ))}
@@ -2308,14 +2309,14 @@ function SOQSection({ org }) {
         </div>
       )}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
-        <div><label style={lbl}>Project Manager</label><select style={sel} value={pmId} onChange={(e) => setPmId(e.target.value)}><option value="">— Select PM —</option>{pms.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
-        <div><label style={lbl}>Superintendent</label><select style={sel} value={superId} onChange={(e) => setSuperId(e.target.value)}><option value="">— Select Superintendent —</option>{supers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+        <div><label style={lbl}>Project Manager</label><select style={sel} value={pmId} onChange={(e) => setPmId(e.target.value)}><option value="">‚Äî Select PM ‚Äî</option>{pms.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+        <div><label style={lbl}>Superintendent</label><select style={sel} value={superId} onChange={(e) => setSuperId(e.target.value)}><option value="">‚Äî Select Superintendent ‚Äî</option>{supers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
       </div>
       <CheckList items={genProjects}   selected={genIds}   onToggle={(id) => toggleCheck(genIds,   setGenIds,   id, 3)} max={3} label="General Projects" />
       <CheckList items={stateProjects} selected={stateIds} onToggle={(id) => toggleCheck(stateIds, setStateIds, id, 3)} max={3} label="State Agency Projects" />
       {err && <div style={{ color: "#e05050", fontSize: 13, marginBottom: 12 }}>{err}</div>}
       <button onClick={generate} disabled={generating} style={{ padding: "11px 28px", background: C.orange, color: "#000", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
-        {generating ? "Generating…" : "⬇ Download SOQ .docx"}
+        {generating ? "Generating‚Ä¶" : "‚¨á Download SOQ .docx"}
       </button>
     </div>
   );
@@ -2326,7 +2327,7 @@ function ProfileSection({ id, openSection, onToggle, title, icon, children }) {
     <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 16, overflow: "hidden" }}>
       <div style={{ padding: "14px 18px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: openSection === id ? `1px solid ${C.border}` : "none" }} onClick={() => onToggle(id)}>
         <span style={{ fontWeight: 700, fontSize: 15, color: C.text }}>{icon} {title}</span>
-        <span style={{ color: C.textMuted, fontSize: 12 }}>{openSection === id ? "▲" : "▼"}</span>
+        <span style={{ color: C.textMuted, fontSize: 12 }}>{openSection === id ? "‚ñ≤" : "‚ñº"}</span>
       </div>
       <div style={{ padding: 18, display: openSection === id ? "block" : "none" }}>{children}</div>
     </div>
@@ -2386,11 +2387,11 @@ function BidAssistSection() {
   return (
     <div>
       <div style={{ fontSize: 13, color: C.textSub, marginBottom: 12 }}>
-        Paste an RFQ or upload a PDF — Claude will write a tailored bid narrative using your company profile.
+        Paste an RFQ or upload a PDF ‚Äî Claude will write a tailored bid narrative using your company profile.
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
         <button onClick={() => fileRef.current?.click()} disabled={parsing} style={ghostBtn({ opacity: parsing ? 0.7 : 1 })}>
-          {parsing ? "Parsing PDFs…" : "📎 Upload PDF(s)"}
+          {parsing ? "Parsing PDFs‚Ä¶" : "üìé Upload PDF(s)"}
         </button>
         <input ref={fileRef} type="file" accept=".pdf" multiple style={{ display: "none" }}
           onChange={(e) => { if (e.target.files?.length) uploadPdf(e.target.files); e.target.value = ""; }} />
@@ -2398,7 +2399,7 @@ function BidAssistSection() {
       </div>
       <textarea
         style={{ ...ta, minHeight: 160 }}
-        placeholder="Paste RFQ text, project scope, or solicitation description here…"
+        placeholder="Paste RFQ text, project scope, or solicitation description here‚Ä¶"
         value={rfqText}
         onChange={(e) => setRfqText(e.target.value)}
       />
@@ -2408,14 +2409,14 @@ function BidAssistSection() {
         disabled={loading || parsing}
         style={{ marginTop: 12, padding: "11px 28px", background: C.orange, color: "#000", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", opacity: (loading || parsing) ? 0.7 : 1 }}
       >
-        {loading ? "Generating…" : "✨ Generate Narrative"}
+        {loading ? "Generating‚Ä¶" : "‚ú® Generate Narrative"}
       </button>
       {narrative && (
         <div style={{ marginTop: 20 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Generated Narrative</span>
             <button onClick={copy} style={{ padding: "5px 14px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: 6, color: copied ? "#4caf50" : C.textSub, fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
-              {copied ? "✓ Copied" : "Copy"}
+              {copied ? "‚úì Copied" : "Copy"}
             </button>
           </div>
           <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "16px 18px", fontSize: 14, color: C.text, lineHeight: 1.75, whiteSpace: "pre-wrap" }}>
@@ -2439,25 +2440,25 @@ function CompanyTab() {
 
   useEffect(() => { loadOrg(); }, []);
 
-  if (loading) return <div style={{ textAlign: "center", padding: 60, color: C.textMuted }}>Loading…</div>;
+  if (loading) return <div style={{ textAlign: "center", padding: 60, color: C.textMuted }}>Loading‚Ä¶</div>;
   if (!org || org.detail) return <div style={{ textAlign: "center", padding: 60, color: C.textMuted }}>Could not load company profile. Please refresh.</div>;
 
   const toggle = (id) => setOpenSection((s) => s === id ? null : id);
 
   return (
     <div style={{ maxWidth: 860, margin: "0 auto", padding: "24px 16px" }}>
-      <ProfileSection id="info"       openSection={openSection} onToggle={toggle} title="Company Info"        icon="🏢"><OrgInfoForm       org={org} onSaved={loadOrg}   /></ProfileSection>
-      <ProfileSection id="principals" openSection={openSection} onToggle={toggle} title="Principals"          icon="👤"><PrincipalsSection org={org} onChanged={loadOrg} /></ProfileSection>
-      <ProfileSection id="projects"   openSection={openSection} onToggle={toggle} title="Project References"  icon="📋"><ProjectRefsSection org={org} onChanged={loadOrg} /></ProfileSection>
-      <ProfileSection id="personnel"  openSection={openSection} onToggle={toggle} title="Key Personnel"       icon="🧑‍💼"><PersonnelSection  org={org} onChanged={loadOrg} /></ProfileSection>
-      <ProfileSection id="soq"        openSection={openSection} onToggle={toggle} title="Generate SOQ"        icon="📄"><SOQSection         org={org} /></ProfileSection>
-      <ProfileSection id="bid-assist" openSection={openSection} onToggle={toggle} title="Bid Assist"          icon="✨"><BidAssistSection /></ProfileSection>
+      <ProfileSection id="info"       openSection={openSection} onToggle={toggle} title="Company Info"        icon="üè¢"><OrgInfoForm       org={org} onSaved={loadOrg}   /></ProfileSection>
+      <ProfileSection id="principals" openSection={openSection} onToggle={toggle} title="Principals"          icon="üë§"><PrincipalsSection org={org} onChanged={loadOrg} /></ProfileSection>
+      <ProfileSection id="projects"   openSection={openSection} onToggle={toggle} title="Project References"  icon="üìã"><ProjectRefsSection org={org} onChanged={loadOrg} /></ProfileSection>
+      <ProfileSection id="personnel"  openSection={openSection} onToggle={toggle} title="Key Personnel"       icon="üßë‚Äçüíº"><PersonnelSection  org={org} onChanged={loadOrg} /></ProfileSection>
+      <ProfileSection id="soq"        openSection={openSection} onToggle={toggle} title="Generate SOQ"        icon="üìÑ"><SOQSection         org={org} /></ProfileSection>
+      <ProfileSection id="bid-assist" openSection={openSection} onToggle={toggle} title="Bid Assist"          icon="‚ú®"><BidAssistSection /></ProfileSection>
     </div>
   );
 }
 
 
-// ─── SCAN HISTORY TAB ───────────────────────────────────────────────────────
+// ‚îÄ‚îÄ‚îÄ SCAN HISTORY TAB ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
 
 function HistoryTab({ history, onRefresh }) {
   const hasRunning = history.some((h) => !h.finished_at || h.status === "running");
@@ -2480,7 +2481,7 @@ function HistoryTab({ history, onRefresh }) {
     <div style={{ overflow: "auto" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         {hasRunning && (
-          <span style={{ fontSize: 12, color: "#eab308" }}>⟳ Scan in progress…</span>
+          <span style={{ fontSize: 12, color: "#eab308" }}>‚ü≥ Scan in progress‚Ä¶</span>
         )}
         <button
           onClick={onRefresh}
@@ -2512,7 +2513,7 @@ function HistoryTab({ history, onRefresh }) {
               <td style={styles.td}>
                 {h.finished_at
                   ? `${((new Date(h.finished_at) - new Date(h.started_at)) / 1000).toFixed(1)}s`
-                  : "running…"}
+                  : "running‚Ä¶"}
               </td>
             </tr>
           ))}
@@ -2522,7 +2523,7 @@ function HistoryTab({ history, onRefresh }) {
   );
 }
 
-// ─── PARCEL LAYER ─────────────────────────────────────────────────────────────
+// ‚îÄ‚îÄ‚îÄ PARCEL LAYER ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
 
 function ParcelLayer({ show, onStatus }) {
   const map = useMap();
@@ -2567,7 +2568,7 @@ function ParcelLayer({ show, onStatus }) {
       .then((d) => {
         if (!ctrl.signal.aborted) {
           if (!d.features) {
-            console.error("[Parcels] Unexpected response — no features array:", d);
+            console.error("[Parcels] Unexpected response ‚Äî no features array:", d);
             onStatus?.({ zoom, count: 0, loading: false, error: "Bad response from parcels API" });
             return;
           }
@@ -2631,7 +2632,7 @@ function ParcelLayer({ show, onStatus }) {
         if (p.TMS) window.__sitescanParcels[p.TMS] = p;
         const score = parcelOppScore(p);
         const addr = [p.HOUSE, p.STREET].filter(Boolean).join(" ") || "No address";
-        const oppLabel = score >= 80 ? "🔥 High" : score >= 55 ? "📈 Medium" : "✓ Low";
+        const oppLabel = score >= 80 ? "üî• High" : score >= 55 ? "üìà Medium" : "‚úì Low";
         layer.bindPopup(`
           <div style="font-family:'DM Sans',sans-serif;min-width:230px;font-size:13px">
             <div style="font-weight:700;margin-bottom:3px;color:#111;font-size:14px">${addr}</div>
@@ -2640,13 +2641,13 @@ function ParcelLayer({ show, onStatus }) {
               <div><div style="color:#999;font-size:10px;text-transform:uppercase">Land Value</div><strong>$${Number(p.LAND_APPR||0).toLocaleString()}</strong></div>
               <div><div style="color:#999;font-size:10px;text-transform:uppercase">Improvements</div><strong>$${Number(p.IMP_APPR||0).toLocaleString()}</strong></div>
               <div><div style="color:#999;font-size:10px;text-transform:uppercase">Total Appraisal</div><strong>$${Number(p.APPRVAL||0).toLocaleString()}</strong></div>
-              <div><div style="color:#999;font-size:10px;text-transform:uppercase">Year Built</div><strong>${p.YRBUILT || "—"}</strong></div>
+              <div><div style="color:#999;font-size:10px;text-transform:uppercase">Year Built</div><strong>${p.YRBUILT || "‚Äî"}</strong></div>
             </div>
             <div style="background:${parcelColor(score)}20;border:1px solid ${parcelColor(score)}50;border-radius:6px;padding:6px 10px;text-align:center;font-weight:700;color:${parcelColor(score)};font-size:12px;margin-bottom:6px">
-              ${oppLabel} Opportunity · ${score}%
+              ${oppLabel} Opportunity ¬∑ ${score}%
             </div>
-            <div style="color:#aaa;font-size:10px;margin-bottom:8px">Owner: ${p.OWNER || "—"} &nbsp;·&nbsp; TMS: ${p.TMS || "—"}</div>
-            ${p.TMS ? `<button onclick="window.__sitescanAnalyze('${(p.TMS||'').replace(/'/g,"\\'")}')" style="width:100%;padding:7px;background:#f0a030;border:none;border-radius:6px;color:#fff;font-weight:700;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif">🔍 Generate AI Analysis</button>` : ""}
+            <div style="color:#aaa;font-size:10px;margin-bottom:8px">Owner: ${p.OWNER || "‚Äî"} &nbsp;¬∑&nbsp; TMS: ${p.TMS || "‚Äî"}</div>
+            ${p.TMS ? `<button onclick="window.__sitescanAnalyze('${(p.TMS||'').replace(/'/g,"\\'")}')" style="width:100%;padding:7px;background:#f0a030;border:none;border-radius:6px;color:#fff;font-weight:700;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif">üîç Generate AI Analysis</button>` : ""}
           </div>
         `);
       }}
@@ -2654,7 +2655,7 @@ function ParcelLayer({ show, onStatus }) {
   );
 }
 
-// ─── ANALYSIS MODAL ─────────────────────────────────────────────────────────
+// ‚îÄ‚îÄ‚îÄ ANALYSIS MODAL ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
 
 function AnalysisModal({ state, parcel, onClose }) {
   if (!state) return null;
@@ -2684,7 +2685,7 @@ function AnalysisModal({ state, parcel, onClose }) {
             background: "transparent", border: "none", color: C.textSub,
             fontSize: 20, cursor: "pointer", lineHeight: 1,
           }}
-        >✕</button>
+        >‚úï</button>
 
         <div style={{ marginBottom: 20 }}>
           <div style={{ fontSize: 11, color: C.textMuted, textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 4 }}>
@@ -2696,9 +2697,9 @@ function AnalysisModal({ state, parcel, onClose }) {
 
         {loading ? (
           <div style={{ textAlign: "center", padding: "50px 0", color: C.textSub }}>
-            <div style={{ fontSize: 36, marginBottom: 12 }}>🔍</div>
-            <div style={{ fontSize: 15, fontWeight: 600 }}>Generating analysis…</div>
-            <div style={{ fontSize: 12, marginTop: 6, color: C.textMuted }}>This may take 10–20 seconds</div>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>üîç</div>
+            <div style={{ fontSize: 15, fontWeight: 600 }}>Generating analysis‚Ä¶</div>
+            <div style={{ fontSize: 12, marginTop: 6, color: C.textMuted }}>This may take 10‚Äì20 seconds</div>
           </div>
         ) : error ? (
           <div style={{ color: "#ef4444", padding: "20px 0" }}>Error: {error}</div>
@@ -2712,7 +2713,7 @@ function AnalysisModal({ state, parcel, onClose }) {
               <p style={{ margin: 0, color: C.text, fontSize: 14, lineHeight: 1.6 }}>{data.summary}</p>
               {data.location_context && (
                 <p style={{ margin: "8px 0 0", color: C.textSub, fontSize: 13, lineHeight: 1.5 }}>
-                  📍 {data.location_context}
+                  üìç {data.location_context}
                 </p>
               )}
             </div>
@@ -2759,7 +2760,7 @@ function AnalysisModal({ state, parcel, onClose }) {
                           <div key={label}>
                             <div style={{ fontSize: 10, color: C.textMuted, textTransform: "uppercase", letterSpacing: ".06em" }}>{label}</div>
                             <div style={{ fontWeight: 700, color: C.text, fontSize: 13, fontFamily: "'Space Mono', monospace" }}>
-                              {isStr ? (val || "—") : fmt$(val)}
+                              {isStr ? (val || "‚Äî") : fmt$(val)}
                             </div>
                           </div>
                         ))}
@@ -2801,7 +2802,7 @@ function AnalysisModal({ state, parcel, onClose }) {
   );
 }
 
-// ─── MAP TAB ────────────────────────────────────────────────────────────────
+// ‚îÄ‚îÄ‚îÄ MAP TAB ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
 
 const CHARLESTON_CENTER = [32.7765, -79.9311];
 
@@ -2856,18 +2857,18 @@ function MapTab({ mapHeight = "calc(100vh - 230px)" }) {
         <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 13, color: C.textSub }}>
           <span>
             {mapLoading
-              ? <span style={{ color: C.textMuted }}>Loading…</span>
+              ? <span style={{ color: C.textMuted }}>Loading‚Ä¶</span>
               : <><strong style={{ color: C.text }}>{points.length}</strong> projects</>
             }
           </span>
           {showParcels && (
             <span style={{ fontSize: 12, color: C.textSub }}>
               {parcelStatus.loading
-                ? "⌛ Loading parcels…"
+                ? "‚åõ Loading parcels‚Ä¶"
                 : parcelStatus.error
-                  ? <span style={{ color: "#ef4444" }}>⚠ Parcel error: {parcelStatus.error}</span>
+                  ? <span style={{ color: "#ef4444" }}>‚ö† Parcel error: {parcelStatus.error}</span>
                   : parcelStatus.zoom < 12
-                    ? <span style={{ color: C.textMuted }}>🔍 Zoom in for parcels</span>
+                    ? <span style={{ color: C.textMuted }}>üîç Zoom in for parcels</span>
                     : <><strong style={{ color: C.text }}>{parcelStatus.count}</strong> parcels in view</>
               }
             </span>
@@ -2889,7 +2890,7 @@ function MapTab({ mapHeight = "calc(100vh - 230px)" }) {
               transition: "all 0.15s",
             }}
           >
-            🏘️ Parcels {showParcels ? "on" : "off"}
+            üèòÔ∏è Parcels {showParcels ? "on" : "off"}
           </button>
 
           {showParcels ? (
@@ -2954,10 +2955,10 @@ function MapTab({ mapHeight = "calc(100vh - 230px)" }) {
               <Popup>
                 <div style={{ minWidth: 210, fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}>
                   <div style={{ fontWeight: 700, marginBottom: 4, lineHeight: 1.3, color: "#111" }}>
-                    {catIcons[p.category] || "📋"} {p.title}
+                    {catIcons[p.category] || "üìã"} {p.title}
                   </div>
                   <div style={{ fontSize: 11, color: "#777", marginBottom: 10 }}>
-                    📍 {p.location}
+                    üìç {p.location}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
                     <span style={{
@@ -2983,7 +2984,7 @@ function MapTab({ mapHeight = "calc(100vh - 230px)" }) {
                       rel="noopener noreferrer"
                       style={{ fontSize: 11, color: "#4a9fd4", textDecoration: "none", fontWeight: 600 }}
                     >
-                      View Source →
+                      View Source ‚Üí
                     </a>
                   )}
                 </div>
@@ -2996,7 +2997,7 @@ function MapTab({ mapHeight = "calc(100vh - 230px)" }) {
   );
 }
 
-// ─── BOARD PIPELINE ─────────────────────────────────────────────────────────
+// ‚îÄ‚îÄ‚îÄ BOARD PIPELINE ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
 
 const STAGE_COLORS = {
   final:        "#f0a030",
@@ -3017,7 +3018,7 @@ const STAGE_LABELS = {
 };
 
 function stageColor(s) { return STAGE_COLORS[s] || "#3d5a7a"; }
-function stageLabel(s) { return STAGE_LABELS[s] || s || "—"; }
+function stageLabel(s) { return STAGE_LABELS[s] || s || "‚Äî"; }
 function scoreColor(n) { return n >= 75 ? "#f0a030" : n >= 50 ? "#4a9fd4" : "#3d5a7a"; }
 
 function BoardProjectCard({ project: p, animDelay }) {
@@ -3060,7 +3061,7 @@ function BoardProjectCard({ project: p, animDelay }) {
                 <span style={{ fontSize: 11, color: C.textSub }}>{p.neighborhood}</span>
               )}
               {p.applicant && (
-                <span style={{ fontSize: 11, color: C.textMuted }}>· {p.applicant}</span>
+                <span style={{ fontSize: 11, color: C.textMuted }}>¬∑ {p.applicant}</span>
               )}
               {p.case_number && (
                 <span style={{ fontSize: 11, color: C.textMuted, fontFamily: "'Space Mono', monospace" }}>
@@ -3143,9 +3144,9 @@ function BoardPipelineTab({ projects, events, loading, onRefresh }) {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <div>
-          <span style={{ color: C.text, fontWeight: 700, fontSize: 16 }}>🏛️ Board Pipeline</span>
+          <span style={{ color: C.text, fontWeight: 700, fontSize: 16 }}>üèõÔ∏è Board Pipeline</span>
           <span style={{ color: C.textMuted, fontSize: 12, marginLeft: 10 }}>
-            Charleston planning &amp; design board agendas · 6–24 months ahead of permits
+            Charleston planning &amp; design board agendas ¬∑ 6‚Äì24 months ahead of permits
           </span>
         </div>
         <button
@@ -3156,7 +3157,7 @@ function BoardPipelineTab({ projects, events, loading, onRefresh }) {
             fontFamily: "'DM Sans', sans-serif", transition: "all 0.15s",
           }}
         >
-          ↻ Refresh
+          ‚Üª Refresh
         </button>
       </div>
 
@@ -3178,11 +3179,11 @@ function BoardPipelineTab({ projects, events, loading, onRefresh }) {
                   animation: `fadeIn 0.3s ease ${i * 0.04}s both`,
                 }}>
                   <span style={{ fontSize: 11, color: C.textMuted, whiteSpace: "nowrap" }}>
-                    {e.from_stage ? <>{stageLabel(e.from_stage)} <span style={{ color: C.textMuted }}>→</span> </> : ""}
+                    {e.from_stage ? <>{stageLabel(e.from_stage)} <span style={{ color: C.textMuted }}>‚Üí</span> </> : ""}
                     <span style={{ color: sc, fontWeight: 700 }}>{stageLabel(e.to_stage)}</span>
                   </span>
                   <span style={{ flex: 1, fontSize: 13, color: C.text, minWidth: 120 }}>
-                    {e.project_address || "—"}
+                    {e.project_address || "‚Äî"}
                   </span>
                   {e.project_neighborhood && (
                     <span style={{ fontSize: 11, color: C.textSub }}>{e.project_neighborhood}</span>
@@ -3214,7 +3215,7 @@ function BoardPipelineTab({ projects, events, loading, onRefresh }) {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search address, neighborhood, applicant…"
+          placeholder="Search address, neighborhood, applicant‚Ä¶"
           style={{
             flex: "1 1 220px", minWidth: 180, maxWidth: 340,
             background: C.surface, border: `1px solid ${C.border}`,
@@ -3254,11 +3255,11 @@ function BoardPipelineTab({ projects, events, loading, onRefresh }) {
         </div>
       ) : filtered.length === 0 ? (
         <div style={{ textAlign: "center", padding: 60, color: "#555" }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>🏛️</div>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>üèõÔ∏è</div>
           <div>
             {projects.length
               ? "No projects match the current filters."
-              : "No board agenda data yet — first scrape runs daily."}
+              : "No board agenda data yet ‚Äî first scrape runs daily."}
           </div>
         </div>
       ) : (
@@ -3266,7 +3267,7 @@ function BoardPipelineTab({ projects, events, loading, onRefresh }) {
           <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 10 }}>
             <span style={{ color: C.text, fontWeight: 600 }}>{filtered.length}</span>
             {" "}project{filtered.length !== 1 ? "s" : ""}
-            {stageFilter ? ` · ${stageLabel(stageFilter)}` : ""}
+            {stageFilter ? ` ¬∑ ${stageLabel(stageFilter)}` : ""}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {filtered.map((p, i) => (
@@ -3283,14 +3284,127 @@ function BoardPipelineTab({ projects, events, loading, onRefresh }) {
   );
 }
 
-// ─── MAIN APP ───────────────────────────────────────────────────────────────
+// ‚îÄ‚îÄ‚îÄ MAIN APP ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+
+// ‚îÄ‚îÄ‚îÄ HOME / LANDING ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+
+const BID_SOURCE_IDS = [...CLIENT_TYPE_SOURCES.government];
+const BID_OPEN_STATUSES = new Set(["Open", "Accepting Bids"]);
+const LANDING_PREVIEW = 12;
+
+// Open solicitations whose deadline hasn't passed (or isn't published), soonest first.
+function selectOpenBids(projects) {
+  const now = Date.now();
+  return projects
+    .filter((p) => BID_SOURCE_IDS.includes(p.source_id) && BID_OPEN_STATUSES.has(p.status))
+    .filter((p) => !p.deadline || new Date(p.deadline).getTime() >= now)
+    .sort((a, b) => {
+      const da = a.deadline ? new Date(a.deadline).getTime() : Infinity;
+      const db = b.deadline ? new Date(b.deadline).getTime() : Infinity;
+      return da - db || (b.value || 0) - (a.value || 0);
+    });
+}
+
+function LandingSection({ title, audience, accent, blurb, items, loading, emptyText, cardProps }) {
+  const [showAll, setShowAll] = useState(false);
+  const shown = showAll ? items : items.slice(0, LANDING_PREVIEW);
+  return (
+    <section style={{ minWidth: 0 }}>
+      <div style={{ borderLeft: `3px solid ${accent}`, paddingLeft: 12, marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ color: C.text, fontWeight: 700, fontSize: 17 }}>{title}</span>
+          <span style={{
+            fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase",
+            color: accent, border: `1px solid ${accent}55`, background: `${accent}18`,
+            borderRadius: 5, padding: "2px 7px", fontFamily: "'Space Mono', monospace",
+          }}>
+            {audience}
+          </span>
+          <span style={{ color: C.textMuted, fontSize: 12, marginLeft: "auto" }}>
+            {loading ? "Loading‚Ä¶" : `${items.length} found`}
+          </span>
+        </div>
+        <div style={{ color: C.textSub, fontSize: 12, marginTop: 4 }}>{blurb}</div>
+      </div>
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 40 }}><div style={styles.spinner} /></div>
+      ) : items.length === 0 ? (
+        <div style={{ color: C.textMuted, fontSize: 13, padding: "24px 0", textAlign: "center" }}>{emptyText}</div>
+      ) : (
+        <>
+          {shown.map((p, i) => (
+            <ProjectCard
+              key={p.id}
+              group={{ address: p.address || null, displayAddress: p.address, lat: p.latitude, lng: p.longitude, projects: [p] }}
+              animDelay={Math.min(i, 12) * 0.03}
+              {...cardProps}
+            />
+          ))}
+          {items.length > LANDING_PREVIEW && (
+            <button
+              onClick={() => setShowAll((v) => !v)}
+              style={{
+                width: "100%", marginTop: 4, padding: "8px 0", background: "transparent",
+                border: `1px solid ${C.border}`, borderRadius: 8, color: C.textSub,
+                fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+              }}
+            >
+              {showAll ? "Show fewer" : `Show all ${items.length}`}
+            </button>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+function LandingTab({ parcels, parcelsLoading, bids, bidsLoading, dismissedIds, cardProps }) {
+  const parcelItems = useMemo(
+    () => parcels
+      .filter((p) => !dismissedIds.has(p.id))
+      .sort((a, b) => (b.opp_score || 0) - (a.opp_score || 0) || (b.value || 0) - (a.value || 0)),
+    [parcels, dismissedIds],
+  );
+  const bidItems = useMemo(
+    () => bids.filter((p) => !dismissedIds.has(p.id)),
+    [bids, dismissedIds],
+  );
+
+  return (
+    <div className="landing-grid">
+      <LandingSection
+        title="Underutilized Parcels"
+        audience="Developer interest"
+        accent="#22c55e"
+        blurb="Commercial parcels where land value outweighs improvements: vacant lots and underbuilt sites, highest opportunity first."
+        items={parcelItems}
+        loading={parcelsLoading}
+        emptyText="No underutilized commercial parcels found."
+        cardProps={cardProps}
+      />
+      <LandingSection
+        title="Out to Bid"
+        audience="GC interest"
+        accent={C.sky}
+        blurb="Active public solicitations accepting bids, soonest deadline first."
+        items={bidItems}
+        loading={bidsLoading}
+        emptyText="No open solicitations right now."
+        cardProps={cardProps}
+      />
+    </div>
+  );
+}
 
 export default function SiteScanApp() {
   const [authed, setAuthed] = useState(!!localStorage.getItem("sitescan_token"));
-  const [tab, setTab] = useState("scanner");
+  const [tab, setTab] = useState("home");
   const [showMap, setShowMap] = useState(false);
   const [projects, setProjects] = useState([]);
   const [parcelOpportunities, setParcelOpportunities] = useState([]);
+  const [parcelsLoading, setParcelsLoading] = useState(true);
+  const [openBids, setOpenBids] = useState([]);
+  const [bidsLoading, setBidsLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [totalUnfiltered, setTotalUnfiltered] = useState(0);
   const [stats, setStats] = useState(null);
@@ -3363,13 +3477,26 @@ export default function SiteScanApp() {
 
   const loadParcelOpportunities = async () => {
     try {
-      // Charleston metro bounding box — fetch commercial parcels only
+      // Charleston metro bounding box ‚Äî fetch commercial parcels only
       const d = await api("/projects/map/parcels?west=-80.2&south=32.55&east=-79.7&north=33.05&limit=1000&genuse=commercial");
       const opps = (d.features || [])
         .filter(f => parcelOppScore(f.properties) >= 55)
         .map(parcelToProject);
       setParcelOpportunities(opps);
-    } catch (e) { /* supplementary data — fail silently */ }
+    } catch (e) { /* supplementary data ‚Äî fail silently */ }
+    setParcelsLoading(false);
+  };
+
+  const loadOpenBids = async () => {
+    setBidsLoading(true);
+    try {
+      const params = new URLSearchParams({ sources: BID_SOURCE_IDS.join(","), sort_by: "posted_date", sort_dir: "desc", limit: "1000" });
+      const data = await api(`/projects?${params}`);
+      setOpenBids(selectOpenBids(data.projects || []));
+    } catch (err) {
+      console.error("Load open bids failed:", err);
+    }
+    setBidsLoading(false);
   };
 
   const loadSaved = async () => {
@@ -3436,6 +3563,7 @@ export default function SiteScanApp() {
     loadSaved();
     loadHistory();
     loadParcelOpportunities();
+    loadOpenBids();
     loadBoardPipeline();
     // Pre-populate filters from saved profile preferences
     api("/auth/me").then((data) => {
@@ -3449,7 +3577,7 @@ export default function SiteScanApp() {
     }).catch(() => {});
   }, [authed]);
 
-  // Poll history every 30s — if the most recent entry has no finished_at, a scan
+  // Poll history every 30s ‚Äî if the most recent entry has no finished_at, a scan
   // is in progress; reload projects/stats too once it completes.
   const prevRunningRef = useRef(false);
   useEffect(() => {
@@ -3460,7 +3588,7 @@ export default function SiteScanApp() {
       setHistory(Array.isArray(data) ? data : []);
       const isRunning = data.some((h) => !h.finished_at || h.status === "running");
       if (prevRunningRef.current && !isRunning) {
-        // Scan just finished — reload projects and stats
+        // Scan just finished ‚Äî reload projects and stats
         loadProjects();
         loadStats();
       }
@@ -3514,13 +3642,15 @@ export default function SiteScanApp() {
         .leaflet-control-attribution a { color: #4a9fd4 !important; }
         .leaflet-control-zoom a { background: #0c1524 !important; color: #e8f0fa !important; border-color: #1a2f50 !important; }
         .leaflet-control-zoom a:hover { background: #101d30 !important; }
-        /* ── Responsive layout ── */
+        /* ‚îÄ‚îÄ Responsive layout ‚îÄ‚îÄ */
         .header-wrap { width: 100%; max-width: 1400px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
         .app-nav { display: flex; gap: 2px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; flex: 1; }
         .app-nav::-webkit-scrollbar { display: none; }
         .app-nav button { white-space: nowrap; flex-shrink: 0; }
         .app-main { max-width: 1400px; margin: 0 auto; padding: 20px 32px; box-sizing: border-box; width: 100%; }
         .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+        .landing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+        @media (max-width: 1099px) { .landing-grid { grid-template-columns: 1fr; } }
         @media (max-width: 899px) {
           .header-wrap { flex-wrap: wrap; align-items: center; }
           .header-logo { order: 1; flex-shrink: 0; }
@@ -3551,14 +3681,15 @@ export default function SiteScanApp() {
           </div>
           <nav className="app-nav">
             {[
-              { id: "scanner",      label: "Scanner",                    icon: "⚡" },
-              { id: "map",          label: "Map",                        icon: "🗺️" },
-              { id: "boards",       label: "Board Pipeline",             icon: "🏛️" },
-              { id: "saved",        label: `Saved (${saved.length})`,    icon: "★" },
-              { id: "contractors",  label: "Contractors",                icon: "🤝" },
-              { id: "company",      label: "Profile",                    icon: "🏢" },
-              { id: "history",      label: "History",                    icon: "📊" },
-              { id: "profile",      label: "Settings",                   icon: "⚙" },
+              { id: "home",         label: "Home",                       icon: "üè†" },
+              { id: "scanner",      label: "Scanner",                    icon: "‚ö°" },
+              { id: "map",          label: "Map",                        icon: "üó∫Ô∏è" },
+              { id: "boards",       label: "Board Pipeline",             icon: "üèõÔ∏è" },
+              { id: "saved",        label: `Saved (${saved.length})`,    icon: "‚òÖ" },
+              { id: "contractors",  label: "Contractors",                icon: "ü§ù" },
+              { id: "company",      label: "Profile",                    icon: "üè¢" },
+              { id: "history",      label: "History",                    icon: "üìä" },
+              { id: "profile",      label: "Settings",                   icon: "‚öô" },
             ].map((t) => (
               <button
                 key={t.id}
@@ -3595,7 +3726,7 @@ export default function SiteScanApp() {
               </span>
               {dismissedIds.size > 0 && (
                 <span style={{ color: "#555", fontSize: 13, marginLeft: 12 }}>
-                  · {dismissedIds.size} hidden{" "}
+                  ¬∑ {dismissedIds.size} hidden{" "}
                   <button
                     onClick={() => setDismissedIds(new Set())}
                     style={{ background: "none", border: "none", color: C.blue, cursor: "pointer", fontSize: 13, padding: 0, fontFamily: "inherit" }}
@@ -3612,7 +3743,7 @@ export default function SiteScanApp() {
               </div>
             ) : projects.length === 0 ? (
               <div style={{ textAlign: "center", padding: 60, color: "#555" }}>
-                <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>üîç</div>
                 <div>No projects found. Try running a scan or adjusting filters.</div>
               </div>
             ) : (
@@ -3640,6 +3771,21 @@ export default function SiteScanApp() {
               </div>
             )}
           </>
+        )}
+        {tab === "home" && (
+          <LandingTab
+            parcels={parcelOpportunities}
+            parcelsLoading={parcelsLoading}
+            bids={openBids}
+            bidsLoading={bidsLoading}
+            dismissedIds={dismissedIds}
+            cardProps={{
+              onSave: saveProject,
+              savedIds,
+              onDismiss: (id) => setDismissedIds((s) => new Set([...s, id])),
+              valueMedians,
+            }}
+          />
         )}
         {tab === "boards" && (
           <BoardPipelineTab
@@ -3678,7 +3824,7 @@ export default function SiteScanApp() {
             flexShrink: 0,
           }}>
             <span style={{ color: C.text, fontWeight: 700, fontSize: 15, fontFamily: "'DM Sans', sans-serif" }}>
-              🗺️ Project Map — Charleston, SC
+              üó∫Ô∏è Project Map ‚Äî Charleston, SC
             </span>
             <button
               onClick={() => setShowMap(false)}
@@ -3688,7 +3834,7 @@ export default function SiteScanApp() {
                 cursor: "pointer", fontSize: 13, fontFamily: "'DM Sans', sans-serif",
               }}
             >
-              ✕ Close
+              ‚úï Close
             </button>
           </div>
           {/* Map content */}
@@ -3701,7 +3847,7 @@ export default function SiteScanApp() {
   );
 }
 
-// ─── STYLES ─────────────────────────────────────────────────────────────────
+// ‚îÄ‚îÄ‚îÄ STYLES ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
 
 const styles = {
   app: {
