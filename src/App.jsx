@@ -301,7 +301,9 @@ function parcelToProject(feat) {
   const [lng, lat] = getPolygonCentroid(feat.geometry);
   const addr = [p.HOUSE, p.STREET].filter(Boolean).join(" ");
   const score = parcelOppScore(p);
-  const genuse = (p.GENUSE || "Commercial").replace(/\s+/g, " ").trim();
+  const genuse = (p.GENUSE || "Commercial")
+    .replace(/\bvacant\b/gi, " ").replace(/\s+/g, " ").trim().toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase()) || "Commercial";
   const title = score >= 80 ? `Vacant ${genuse} lot` : `Underimproved ${genuse} parcel`;
   return {
     id: `parcel-${p.TMS || p.PARCELID}`,
@@ -315,6 +317,8 @@ function parcelToProject(feat) {
     value: p.LAND_APPR || p.APPRVAL || null,
     category: "commercial",
     opp_score: score,
+    land_value: parseFloat(p.LAND_APPR) || null,
+    imp_value: parseFloat(p.IMP_APPR) || 0,
     status: "Opportunities",
     posted_date: null,
     is_active: true,
@@ -537,6 +541,7 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
     : null;
   const isSaved = savedIds.has(primary.id);
   const descText = getDescText(primary);
+  const isParcel = primary.source_id === "parcel-opportunity";
 
   // Location: neighborhood for CHS permits, else agency/location
   const locationTag = primary.source_id === "charleston-permits"
@@ -605,7 +610,10 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
               {locationTag && (
                 <span style={{ marginLeft: 10, color: C.textSub }}>{locationTag}</span>
               )}
-              {primary.contractor && (() => {
+              {primary.contractor && isParcel && (
+                <span style={{ marginLeft: 12, color: C.textMuted }}>Owner: {primary.contractor}</span>
+              )}
+              {primary.contractor && !isParcel && (() => {
                 const names = primary.contractor.split("|").map(s => s.trim()).filter(Boolean);
                 const shown = names.slice(0, 2);
                 const extra = names.length - shown.length;
@@ -662,7 +670,20 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
               )}
             </div>
             <div style={{ width: 110, display: "flex", justifyContent: "flex-end" }}>
-              <StatusPill status={primary.status} />
+              {isParcel ? (
+                <span
+                  title="Share of appraised value that is land rather than buildings"
+                  style={{
+                    fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4, whiteSpace: "nowrap",
+                    color: parcelColor(primary.opp_score), background: `${parcelColor(primary.opp_score)}1f`,
+                    border: `1px solid ${parcelColor(primary.opp_score)}55`,
+                  }}
+                >
+                  {primary.opp_score}% underutilized
+                </span>
+              ) : (
+                <StatusPill status={primary.status} />
+              )}
             </div>
           </div>
         </div>
@@ -675,6 +696,28 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
                 <div style={{ color: "#aaa", fontSize: 13, lineHeight: 1.6 }}>{descText}</div>
               </div>
             )}
+            {isParcel ? (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
+              <div>
+                <div style={styles.detailLabel}>Land value</div>
+                <div style={styles.detailValue}>{fmt$(primary.land_value)}</div>
+              </div>
+              <div>
+                <div style={styles.detailLabel}>Improvements</div>
+                <div style={styles.detailValue}>{primary.imp_value ? fmt$(primary.imp_value) : "None"}</div>
+              </div>
+              <div>
+                <div style={styles.detailLabel}>Parcel (TMS)</div>
+                <div style={styles.detailValue}>{primary.permit_number || "—"}</div>
+              </div>
+              {primary.contractor && (
+                <div>
+                  <div style={styles.detailLabel}>Owner</div>
+                  <div style={styles.detailValue}>{primary.contractor}</div>
+                </div>
+              )}
+            </div>
+            ) : (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
               <div>
                 <div style={styles.detailLabel}>Posted</div>
@@ -705,6 +748,7 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
                 </div>
               )}
             </div>
+            )}
             <div style={{ display: "flex", gap: 8 }}>
               {primary.source_url && (
                 <a href={primary.source_url} target="_blank" rel="noopener"
@@ -712,7 +756,7 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
                   View Source →
                 </a>
               )}
-              {!isSaved && (
+              {!isSaved && !isParcel && (
                 <button style={styles.saveBtn}
                   onClick={(e) => { e.stopPropagation(); onSave(primary.id); }}>
                   ★ Save
@@ -3305,7 +3349,12 @@ function selectOpenBids(projects) {
     });
 }
 
-function LandingSection({ title, audience, accent, blurb, items, loading, emptyText, cardProps }) {
+function countDueWithin(projects, days) {
+  const cutoff = Date.now() + days * 864e5;
+  return projects.filter((p) => p.deadline && new Date(p.deadline).getTime() <= cutoff).length;
+}
+
+function LandingSection({ title, audience, accent, blurb, summary, items, loading, emptyText, cardProps }) {
   const [showAll, setShowAll] = useState(false);
   const shown = showAll ? items : items.slice(0, LANDING_PREVIEW);
   return (
@@ -3321,7 +3370,7 @@ function LandingSection({ title, audience, accent, blurb, items, loading, emptyT
             {audience}
           </span>
           <span style={{ color: C.textMuted, fontSize: 12, marginLeft: "auto" }}>
-            {loading ? "Loading…" : `${items.length} found`}
+            {loading ? "Loading…" : summary}
           </span>
         </div>
         <div style={{ color: C.textSub, fontSize: 12, marginTop: 4 }}>{blurb}</div>
@@ -3369,6 +3418,9 @@ function LandingTab({ parcels, parcelsLoading, bids, bidsLoading, dismissedIds, 
     () => bids.filter((p) => !dismissedIds.has(p.id)),
     [bids, dismissedIds],
   );
+  const landTotal = parcelItems.reduce((sum, p) => sum + (p.land_value || 0), 0);
+  const dueThisWeek = countDueWithin(bidItems, 7);
+  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
   return (
     <div className="landing-grid">
@@ -3377,6 +3429,7 @@ function LandingTab({ parcels, parcelsLoading, bids, bidsLoading, dismissedIds, 
         audience="Developer interest"
         accent="#22c55e"
         blurb="Commercial parcels where land value outweighs improvements: vacant lots and underbuilt sites, highest opportunity first."
+        summary={`${plural(parcelItems.length, "parcel")} · ${fmt$(landTotal)} land value`}
         items={parcelItems}
         loading={parcelsLoading}
         emptyText="No underutilized commercial parcels found."
@@ -3387,6 +3440,7 @@ function LandingTab({ parcels, parcelsLoading, bids, bidsLoading, dismissedIds, 
         audience="GC interest"
         accent={C.sky}
         blurb="Active public solicitations accepting bids, soonest deadline first."
+        summary={`${plural(bidItems.length, "open bid")} · ${dueThisWeek} due this week`}
         items={bidItems}
         loading={bidsLoading}
         emptyText="No open solicitations right now."
