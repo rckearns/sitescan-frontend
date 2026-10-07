@@ -302,7 +302,8 @@ function parcelToProject(feat) {
   const addr = [p.HOUSE, p.STREET].filter(Boolean).join(" ");
   const score = parcelOppScore(p);
   const genuse = (p.GENUSE || "Commercial")
-    .replace(/\bvacant\b/gi, " ").replace(/\s+/g, " ").trim().toLowerCase()
+    .replace(/^\s*\d+\s*-\s*/, "").replace(/\b(vacant|general)\b/gi, " ")
+    .replace(/\s+/g, " ").trim().toLowerCase()
     .replace(/\b\w/g, (c) => c.toUpperCase()) || "Commercial";
   const title = score >= 80 ? `Vacant ${genuse} lot` : `Underimproved ${genuse} parcel`;
   return {
@@ -319,6 +320,8 @@ function parcelToProject(feat) {
     opp_score: score,
     land_value: parseFloat(p.LAND_APPR) || null,
     imp_value: parseFloat(p.IMP_APPR) || 0,
+    acres: parseFloat(p.GISACRES) || null,
+    parcel_props: p,
     status: "Opportunities",
     posted_date: null,
     is_active: true,
@@ -526,7 +529,7 @@ function StatusPill({ status }) {
 // ─── PROJECT CARD ─────────────────────────────────────────────────────────────
 // One card per project (address group). Shows the most informative permit.
 
-function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedians = {} }) {
+function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedians = {}, footer = null }) {
   const { lat, lng, projects } = group;
   const [expanded, setExpanded] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -582,7 +585,7 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
             ✕
           </button>
         )}
-        <div style={styles.projectHeader}>
+        <div className="project-header" style={styles.projectHeader}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={styles.projectTitle}>
               <span style={{ marginRight: 8 }}>{catIcons[primary.category] || "📋"}</span>
@@ -645,7 +648,7 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
               ) : null; })()}
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+          <div className="project-header-side" style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
             {deadlineTag && (
               <span style={{
                 fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4,
@@ -687,6 +690,7 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
             </div>
           </div>
         </div>
+        {footer}
 
         {expanded && (
           <div style={styles.projectExpanded}>
@@ -3041,307 +3045,41 @@ function MapTab({ mapHeight = "calc(100vh - 230px)" }) {
   );
 }
 
-// ─── BOARD PIPELINE ─────────────────────────────────────────────────────────
-
-const STAGE_COLORS = {
-  final:        "#f0a030",
-  preliminary:  "#4a9fd4",
-  conceptual:   "#7ec8e3",
-  rezoning:     "#a78bfa",
-  demolition:   "#e05555",
-  concept_plan: "#6b8aaa",
-};
-
-const STAGE_LABELS = {
-  final:        "Final Approval",
-  preliminary:  "Preliminary",
-  conceptual:   "Conceptual",
-  rezoning:     "Rezoning",
-  demolition:   "Demolition",
-  concept_plan: "Concept Plan",
-};
-
-function stageColor(s) { return STAGE_COLORS[s] || "#3d5a7a"; }
-function stageLabel(s) { return STAGE_LABELS[s] || s || "—"; }
-function scoreColor(n) { return n >= 75 ? "#f0a030" : n >= 50 ? "#4a9fd4" : "#3d5a7a"; }
-
-function BoardProjectCard({ project: p, animDelay }) {
-  const [expanded, setExpanded] = useState(false);
-  const [hovered, setHovered] = useState(false);
-  const sc = stageColor(p.current_stage);
-
-  return (
-    <div style={{ animation: `fadeIn 0.3s ease ${animDelay}s both` }}>
-      <div
-        style={{
-          background: hovered ? C.surfaceHi : C.surface,
-          border: `1px solid ${hovered ? C.borderHi : C.border}`,
-          borderLeft: `3px solid ${sc}`,
-          borderRadius: 10, padding: "12px 16px", cursor: "pointer",
-          transition: "all 0.15s",
-        }}
-        onClick={() => setExpanded((v) => !v)}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-      >
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>
-                {p.address || p.project_key}
-              </span>
-              {p.current_stage && (
-                <span style={{
-                  fontSize: 10, fontWeight: 700, color: sc,
-                  background: `${sc}22`, borderRadius: 4, padding: "2px 7px",
-                  textTransform: "uppercase", letterSpacing: "0.06em",
-                }}>
-                  {stageLabel(p.current_stage)}
-                </span>
-              )}
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 5, flexWrap: "wrap", alignItems: "center" }}>
-              {p.neighborhood && (
-                <span style={{ fontSize: 11, color: C.textSub }}>{p.neighborhood}</span>
-              )}
-              {p.applicant && (
-                <span style={{ fontSize: 11, color: C.textMuted }}>· {p.applicant}</span>
-              )}
-              {p.case_number && (
-                <span style={{ fontSize: 11, color: C.textMuted, fontFamily: "'Space Mono', monospace" }}>
-                  {p.case_number}
-                </span>
-              )}
-            </div>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
-            <span style={{
-              fontSize: 13, fontWeight: 800, color: scoreColor(p.max_score),
-              background: `${scoreColor(p.max_score)}18`, borderRadius: 6,
-              padding: "3px 9px", fontFamily: "'Space Mono', monospace",
-            }}>
-              {p.max_score}
-            </span>
-            <span style={{ fontSize: 9, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em" }}>score</span>
-          </div>
-        </div>
-
-        {expanded && (
-          <div style={{
-            marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.border}`,
-            display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 24px",
-          }}>
-            {[
-              ["Owner",            p.owner],
-              ["TMS",              p.tms],
-              ["Council District", p.council_district != null ? `District ${p.council_district}` : null],
-              ["Acreage",          p.acreage != null ? `${p.acreage} ac` : null],
-              ["First Seen",       p.first_seen_at ? new Date(p.first_seen_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : null],
-              ["Last Seen",        p.last_seen_at  ? new Date(p.last_seen_at).toLocaleDateString("en-US",  { month: "short", day: "numeric", year: "numeric" }) : null],
-            ].filter(([, v]) => v != null).map(([label, val]) => (
-              <div key={label}>
-                <div style={{ fontSize: 10, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600 }}>{label}</div>
-                <div style={{ fontSize: 13, color: C.textSub, marginTop: 2 }}>{val}</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function BoardPipelineTab({ projects, events, loading, onRefresh }) {
-  const [stageFilter, setStageFilter] = useState("");
-  const [minScore, setMinScore] = useState(0);
-  const [search, setSearch]     = useState("");
-
-  const chip = (active, color) => ({
-    padding: "5px 12px", borderRadius: 8,
-    border: `1px solid ${active ? color : C.border}`,
-    background: active ? `${color}22` : "transparent",
-    color: active ? color : C.textSub,
-    fontSize: 12, fontWeight: 600, cursor: "pointer",
-    fontFamily: "'DM Sans', sans-serif", transition: "all 0.15s",
-  });
-
-  const filtered = projects.filter((p) => {
-    if (stageFilter && p.current_stage !== stageFilter) return false;
-    if (minScore > 0 && p.max_score < minScore) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      return (
-        (p.address || "").toLowerCase().includes(q) ||
-        (p.neighborhood || "").toLowerCase().includes(q) ||
-        (p.applicant || "").toLowerCase().includes(q) ||
-        (p.case_number || "").toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
-
-  const stages = [...new Set(projects.map((p) => p.current_stage).filter(Boolean))];
-  const recentChanges = events.filter((e) => e.event_type === "stage_change");
-
-  return (
-    <div>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-        <div>
-          <span style={{ color: C.text, fontWeight: 700, fontSize: 16 }}>🏛️ Board Pipeline</span>
-          <span style={{ color: C.textMuted, fontSize: 12, marginLeft: 10 }}>
-            Charleston planning &amp; design board agendas · 6–24 months ahead of permits
-          </span>
-        </div>
-        <button
-          onClick={onRefresh}
-          style={{
-            background: "none", border: `1px solid ${C.border}`, borderRadius: 6,
-            color: C.textSub, fontSize: 12, padding: "5px 12px", cursor: "pointer",
-            fontFamily: "'DM Sans', sans-serif", transition: "all 0.15s",
-          }}
-        >
-          ↻ Refresh
-        </button>
-      </div>
-
-      {/* Recent stage-change events */}
-      {recentChanges.length > 0 && (
-        <div style={{ marginBottom: 22 }}>
-          <div style={{ fontSize: 10, color: C.textMuted, textTransform: "uppercase",
-            letterSpacing: "0.08em", fontWeight: 600, marginBottom: 10 }}>
-            Recent Stage Changes
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {recentChanges.slice(0, 6).map((e, i) => {
-              const sc = stageColor(e.to_stage);
-              return (
-                <div key={e.id} style={{
-                  background: C.surface, border: `1px solid ${C.border}`,
-                  borderLeft: `3px solid ${sc}`, borderRadius: 8, padding: "9px 14px",
-                  display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
-                  animation: `fadeIn 0.3s ease ${i * 0.04}s both`,
-                }}>
-                  <span style={{ fontSize: 11, color: C.textMuted, whiteSpace: "nowrap" }}>
-                    {e.from_stage ? <>{stageLabel(e.from_stage)} <span style={{ color: C.textMuted }}>→</span> </> : ""}
-                    <span style={{ color: sc, fontWeight: 700 }}>{stageLabel(e.to_stage)}</span>
-                  </span>
-                  <span style={{ flex: 1, fontSize: 13, color: C.text, minWidth: 120 }}>
-                    {e.project_address || "—"}
-                  </span>
-                  {e.project_neighborhood && (
-                    <span style={{ fontSize: 11, color: C.textSub }}>{e.project_neighborhood}</span>
-                  )}
-                  {e.project_applicant && (
-                    <span style={{ fontSize: 11, color: C.textMuted, maxWidth: 200,
-                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {e.project_applicant}
-                    </span>
-                  )}
-                  {e.score != null && (
-                    <span style={{
-                      fontSize: 11, fontWeight: 700, color: scoreColor(e.score),
-                      background: `${scoreColor(e.score)}18`, borderRadius: 4, padding: "2px 7px",
-                      fontFamily: "'Space Mono', monospace",
-                    }}>
-                      {e.score}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Filter bar */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search address, neighborhood, applicant…"
-          style={{
-            flex: "1 1 220px", minWidth: 180, maxWidth: 340,
-            background: C.surface, border: `1px solid ${C.border}`,
-            borderRadius: 8, color: C.text, fontSize: 12, padding: "7px 11px",
-            fontFamily: "'DM Sans', sans-serif", outline: "none",
-          }}
-        />
-        <button style={chip(!stageFilter, C.textSub)} onClick={() => setStageFilter("")}>
-          All Stages
-        </button>
-        {stages.map((s) => (
-          <button key={s} style={chip(stageFilter === s, stageColor(s))}
-            onClick={() => setStageFilter(stageFilter === s ? "" : s)}>
-            {stageLabel(s)}
-          </button>
-        ))}
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 11, color: C.textMuted }}>Min score</span>
-          <input
-            type="number" min="0" max="100" value={minScore || ""}
-            onChange={(e) => setMinScore(Number(e.target.value) || 0)}
-            placeholder="0"
-            style={{
-              width: 56, background: C.surface, border: `1px solid ${C.border}`,
-              borderRadius: 6, color: C.text, fontSize: 12, padding: "5px 8px",
-              fontFamily: "'DM Sans', sans-serif", outline: "none",
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Project list */}
-      {loading ? (
-        <div style={{ textAlign: "center", padding: 60, color: "#555" }}>
-          <div style={styles.spinner} />
-          <div style={{ marginTop: 12 }}>Loading board pipeline...</div>
-        </div>
-      ) : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", padding: 60, color: "#555" }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>🏛️</div>
-          <div>
-            {projects.length
-              ? "No projects match the current filters."
-              : "No board agenda data yet — first scrape runs daily."}
-          </div>
-        </div>
-      ) : (
-        <div>
-          <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 10 }}>
-            <span style={{ color: C.text, fontWeight: 600 }}>{filtered.length}</span>
-            {" "}project{filtered.length !== 1 ? "s" : ""}
-            {stageFilter ? ` · ${stageLabel(stageFilter)}` : ""}
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {filtered.map((p, i) => (
-              <BoardProjectCard
-                key={p.id}
-                project={p}
-                animDelay={Math.min(i, 25) * 0.03}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── MAIN APP ───────────────────────────────────────────────────────────────
-
 // ─── HOME / LANDING ─────────────────────────────────────────────────────────
 
-const BID_SOURCE_IDS = [...CLIENT_TYPE_SOURCES.government];
+const GC_SOURCE_IDS = ["sam-gov", "scbo", "charleston-city-bids"];
 const BID_OPEN_STATUSES = new Set(["Open", "Accepting Bids"]);
 const LANDING_PREVIEW = 12;
+const AUTO_ANALYZE_TOP = 50;
+const HOME_VIEW_KEY = "yabodle_home_view";
 
-// Open solicitations whose deadline hasn't passed (or isn't published), soonest first.
-function selectOpenBids(projects) {
+// Single-trade scopes go to subcontractors, not GCs. Matched against titles only,
+// since GC solicitations often mention trades in their descriptions.
+const TRADE_SCOPE_RE = /\b(re-?roof(ing)?|roof(ing)?\s+(replacement|repair|restoration|coating)|hvac|chillers?|boilers?|plumbing|electrical|lighting|generators?|fire\s+(alarm|sprinkler|suppression)|sprinklers?|elevators?|escalators?|painting|flooring|carpet|paving|asphalt|resurfacing|seal\s?coat(ing)?|striping|landscaping|irrigation|fenc(e|ing)|gutters?|window\s+replacement|glazing|waterproofing|caulking|abatement|asbestos|demolition|janitorial|custodial|pest\s+control|signage|insulation|drywall|tuckpointing|sidewalks?)\b/i;
+
+function isCharlestonMetro(p) {
+  if (p.source_id === "charleston-city-bids") return true;
+  return LOWCOUNTRY_RE.test(`${p.location || ""} ${p.agency || ""} ${p.title || ""} ${p.description || ""}`);
+}
+
+function isGcOpportunity(p) {
+  if (TRADE_CATEGORIES.has(p.category)) return false;
+  if (TRADE_SCOPE_RE.test(p.title || "")) return false;
+  if (p.source_id === "sam-gov") {
+    // NAICS 236 = building GCs; 238 = specialty trade (subcontractor) work.
+    const codes = (p.naics_code || "").split(",").map((c) => c.trim()).filter(Boolean);
+    if (codes.length && !codes.some((c) => c.startsWith("236"))) return false;
+  }
+  return true;
+}
+
+// Open Charleston-area GC solicitations whose deadline hasn't passed, soonest first.
+function selectGcBids(projects) {
   const now = Date.now();
   return projects
-    .filter((p) => BID_SOURCE_IDS.includes(p.source_id) && BID_OPEN_STATUSES.has(p.status))
+    .filter((p) => GC_SOURCE_IDS.includes(p.source_id) && BID_OPEN_STATUSES.has(p.status))
     .filter((p) => !p.deadline || new Date(p.deadline).getTime() >= now)
+    .filter((p) => isCharlestonMetro(p) && isGcOpportunity(p))
     .sort((a, b) => {
       const da = a.deadline ? new Date(a.deadline).getTime() : Infinity;
       const db = b.deadline ? new Date(b.deadline).getTime() : Infinity;
@@ -3354,26 +3092,77 @@ function countDueWithin(projects, days) {
   return projects.filter((p) => p.deadline && new Date(p.deadline).getTime() <= cutoff).length;
 }
 
-function LandingSection({ title, audience, accent, blurb, summary, items, loading, emptyText, cardProps }) {
+// Pull ideal use, project size and ROI out of the AI highest-and-best-use analysis.
+function summarizeAnalysis(analysis) {
+  const scenarios = analysis?.scenarios || [];
+  const best = scenarios.find((s) => s.name === analysis.recommended_scenario) || scenarios[0];
+  if (!best) return null;
+  const pf = best.proforma || {};
+  const cost = Number(pf.total_development_cost) || null;
+  const value = Number(pf.projected_value) || null;
+  let roi = cost && value ? (value - cost) / cost : null;
+  if (roi === null && pf.profit_margin) {
+    const pct = parseFloat(String(pf.profit_margin));
+    if (!isNaN(pct)) roi = pct / 100;
+  }
+  return { use: best.use_type || best.name, cost, value, roi };
+}
+
+function ParcelEconomics({ parcel, analysis, status, onAnalyze }) {
+  const summary = analysis ? summarizeAnalysis(analysis) : null;
+  const acres = parcel.acres;
+  const perAcre = acres && parcel.land_value ? parcel.land_value / acres : null;
+  const stat = (label, value, color = C.text) => (
+    <div style={{ minWidth: 0 }}>
+      <div style={{ fontSize: 9, letterSpacing: 1, textTransform: "uppercase", color: C.textMuted, fontFamily: "'Space Mono', monospace" }}>{label}</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</div>
+    </div>
+  );
+  const linkBtn = {
+    background: "none", border: "none", padding: 0, color: C.blue, fontSize: 12,
+    cursor: "pointer", fontFamily: "'DM Sans', sans-serif", textDecoration: "underline",
+  };
+
+  return (
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 12,
+        marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, alignItems: "end",
+      }}
+    >
+      {stat("Lot size", acres ? `${acres.toFixed(2)} ac` : "—")}
+      {stat("Land / acre", perAcre ? fmt$(perAcre) : "—")}
+      {summary ? (
+        <>
+          {stat("Ideal use", summary.use || "—", C.sky)}
+          {stat("Project size", summary.cost ? fmt$(summary.cost) : "—", C.orange)}
+          {stat("Est. ROI", summary.roi != null ? `${Math.round(summary.roi * 100)}%` : "—",
+            summary.roi == null ? C.text : summary.roi >= 0.15 ? "#22c55e" : summary.roi >= 0 ? C.text : "#ef4444")}
+        </>
+      ) : status === "loading" ? (
+        <div style={{ gridColumn: "span 3", color: C.textSub, fontSize: 12 }}>Estimating ideal use, project size and ROI…</div>
+      ) : status === "error" ? (
+        <div style={{ gridColumn: "span 3", color: C.textMuted, fontSize: 12 }}>
+          Estimate unavailable. <button style={linkBtn} onClick={() => onAnalyze(parcel)}>Retry</button>
+        </div>
+      ) : (
+        <div style={{ gridColumn: "span 3" }}>
+          <button style={linkBtn} onClick={() => onAnalyze(parcel)}>Estimate ideal use &amp; ROI</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LandingSection({ blurb, summary, items, loading, emptyText, cardProps, renderFooter }) {
   const [showAll, setShowAll] = useState(false);
   const shown = showAll ? items : items.slice(0, LANDING_PREVIEW);
   return (
     <section style={{ minWidth: 0 }}>
-      <div style={{ borderLeft: `3px solid ${accent}`, paddingLeft: 12, marginBottom: 14 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-          <span style={{ color: C.text, fontWeight: 700, fontSize: 17 }}>{title}</span>
-          <span style={{
-            fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase",
-            color: accent, border: `1px solid ${accent}55`, background: `${accent}18`,
-            borderRadius: 5, padding: "2px 7px", fontFamily: "'Space Mono', monospace",
-          }}>
-            {audience}
-          </span>
-          <span style={{ color: C.textMuted, fontSize: 12, marginLeft: "auto" }}>
-            {loading ? "Loading…" : summary}
-          </span>
-        </div>
-        <div style={{ color: C.textSub, fontSize: 12, marginTop: 4 }}>{blurb}</div>
+      <div style={{ display: "flex", gap: 12, alignItems: "baseline", flexWrap: "wrap", marginBottom: 14 }}>
+        <div style={{ color: C.textSub, fontSize: 12, flex: "1 1 320px" }}>{blurb}</div>
+        <div style={{ color: C.textMuted, fontSize: 12 }}>{loading ? "Loading…" : summary}</div>
       </div>
       {loading ? (
         <div style={{ textAlign: "center", padding: 40 }}><div style={styles.spinner} /></div>
@@ -3386,6 +3175,7 @@ function LandingSection({ title, audience, accent, blurb, summary, items, loadin
               key={p.id}
               group={{ address: p.address || null, displayAddress: p.address, lat: p.latitude, lng: p.longitude, projects: [p] }}
               animDelay={Math.min(i, 12) * 0.03}
+              footer={renderFooter ? renderFooter(p) : null}
               {...cardProps}
             />
           ))}
@@ -3407,7 +3197,17 @@ function LandingSection({ title, audience, accent, blurb, summary, items, loadin
   );
 }
 
-function LandingTab({ parcels, parcelsLoading, bids, bidsLoading, dismissedIds, cardProps }) {
+function readHomeView() {
+  try { return localStorage.getItem(HOME_VIEW_KEY) === "gc" ? "gc" : "developer"; } catch { return "developer"; }
+}
+
+function LandingTab({ parcels, parcelsLoading, bids, bidsLoading, dismissedIds, cardProps, analyses, analysisStatus, onAnalyze }) {
+  const [view, setView] = useState(readHomeView);
+  const choose = (v) => {
+    setView(v);
+    try { localStorage.setItem(HOME_VIEW_KEY, v); } catch { /* storage unavailable */ }
+  };
+
   const parcelItems = useMemo(
     () => parcels
       .filter((p) => !dismissedIds.has(p.id))
@@ -3422,30 +3222,71 @@ function LandingTab({ parcels, parcelsLoading, bids, bidsLoading, dismissedIds, 
   const dueThisWeek = countDueWithin(bidItems, 7);
   const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
+  const tabs = [
+    { id: "developer", label: "Developers", sub: "Underutilized parcels", count: parcelsLoading ? null : parcelItems.length, accent: "#22c55e" },
+    { id: "gc",        label: "General Contractors", sub: "Out to bid", count: bidsLoading ? null : bidItems.length, accent: C.sky },
+  ];
+
   return (
-    <div className="landing-grid">
-      <LandingSection
-        title="Underutilized Parcels"
-        audience="Developer interest"
-        accent="#22c55e"
-        blurb="Commercial parcels where land value outweighs improvements: vacant lots and underbuilt sites, highest opportunity first."
-        summary={`${plural(parcelItems.length, "parcel")} · ${fmt$(landTotal)} land value`}
-        items={parcelItems}
-        loading={parcelsLoading}
-        emptyText="No underutilized commercial parcels found."
-        cardProps={cardProps}
-      />
-      <LandingSection
-        title="Out to Bid"
-        audience="GC interest"
-        accent={C.sky}
-        blurb="Active public solicitations accepting bids, soonest deadline first."
-        summary={`${plural(bidItems.length, "open bid")} · ${dueThisWeek} due this week`}
-        items={bidItems}
-        loading={bidsLoading}
-        emptyText="No open solicitations right now."
-        cardProps={cardProps}
-      />
+    <div>
+      <div role="tablist" aria-label="Home view" style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
+        {tabs.map((t) => {
+          const active = view === t.id;
+          return (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={active}
+              onClick={() => choose(t.id)}
+              style={{
+                flex: "1 1 220px", textAlign: "left", cursor: "pointer", padding: "10px 14px", borderRadius: 10,
+                border: `1px solid ${active ? t.accent : C.border}`, background: active ? `${t.accent}14` : C.surface,
+                fontFamily: "'DM Sans', sans-serif", transition: "all 0.15s",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                <span style={{ color: active ? C.text : C.textSub, fontWeight: 700, fontSize: 15 }}>{t.label}</span>
+                {t.count != null && (
+                  <span style={{ color: active ? t.accent : C.textMuted, fontWeight: 700, fontSize: 13, fontFamily: "'Space Mono', monospace" }}>{t.count}</span>
+                )}
+              </div>
+              <div style={{ color: active ? t.accent : C.textMuted, fontSize: 11, marginTop: 2, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace" }}>
+                {t.sub}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {view === "developer" ? (
+        <LandingSection
+          key="developer"
+          blurb="Commercial parcels where land value outweighs improvements, highest opportunity first. Ideal use, project size and ROI are AI estimates; treat them as a starting point, not an appraisal."
+          summary={`${plural(parcelItems.length, "parcel")} · ${fmt$(landTotal)} land value`}
+          items={parcelItems}
+          loading={parcelsLoading}
+          emptyText="No underutilized commercial parcels found."
+          cardProps={cardProps}
+          renderFooter={(p) => (
+            <ParcelEconomics
+              parcel={p}
+              analysis={analyses[p.external_id]}
+              status={analysisStatus[p.external_id]}
+              onAnalyze={onAnalyze}
+            />
+          )}
+        />
+      ) : (
+        <LandingSection
+          key="gc"
+          blurb="Open general-contractor solicitations in the Charleston area, soonest deadline first. Single-trade scopes (roofing, HVAC, paving and the like) are left out."
+          summary={`${plural(bidItems.length, "open bid")} · ${dueThisWeek} due this week`}
+          items={bidItems}
+          loading={bidsLoading}
+          emptyText="No open GC solicitations in the Charleston area right now."
+          cardProps={cardProps}
+        />
+      )}
     </div>
   );
 }
@@ -3458,6 +3299,8 @@ export default function SiteScanApp() {
   const [parcelOpportunities, setParcelOpportunities] = useState([]);
   const [parcelsLoading, setParcelsLoading] = useState(true);
   const [openBids, setOpenBids] = useState([]);
+  const [parcelAnalyses, setParcelAnalyses] = useState({});
+  const [analysisStatus, setAnalysisStatus] = useState({});
   const [bidsLoading, setBidsLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [totalUnfiltered, setTotalUnfiltered] = useState(0);
@@ -3472,9 +3315,6 @@ export default function SiteScanApp() {
   const [sources, setSources] = useState([]);
   const [dismissedIds, setDismissedIds] = useState(new Set());
   const [valueMedians, setValueMedians] = useState({});
-  const [boardProjects, setBoardProjects] = useState([]);
-  const [boardEvents, setBoardEvents]   = useState([]);
-  const [boardLoading, setBoardLoading] = useState(false);
   const debounceRef = useRef(null);
 
   const loadProjects = useCallback(async () => {
@@ -3537,16 +3377,57 @@ export default function SiteScanApp() {
         .filter(f => parcelOppScore(f.properties) >= 55)
         .map(parcelToProject);
       setParcelOpportunities(opps);
+      setParcelsLoading(false);
+      loadParcelAnalyses(opps);
+      return;
     } catch (e) { /* supplementary data — fail silently */ }
     setParcelsLoading(false);
+  };
+
+  const analyzeParcel = async (parcel) => {
+    const tms = parcel.external_id;
+    if (!tms) return;
+    setAnalysisStatus((s) => ({ ...s, [tms]: "loading" }));
+    try {
+      const result = await api(`/analyze/parcel/${encodeURIComponent(tms)}`, {
+        method: "POST",
+        body: JSON.stringify({ parcel: parcel.parcel_props }),
+      });
+      if (!result.analysis) throw new Error(result.detail || "No analysis returned");
+      setParcelAnalyses((a) => ({ ...a, [tms]: result.analysis }));
+      setAnalysisStatus((s) => ({ ...s, [tms]: "done" }));
+    } catch {
+      setAnalysisStatus((s) => ({ ...s, [tms]: "error" }));
+    }
+  };
+
+  // Show stored analyses for every parcel, then fill in the top opportunities
+  // that don't have one yet, a few at a time.
+  const loadParcelAnalyses = async (opps) => {
+    const ranked = [...opps].sort((a, b) => (b.opp_score || 0) - (a.opp_score || 0) || (b.value || 0) - (a.value || 0));
+    const tmsList = ranked.map((p) => p.external_id).filter(Boolean);
+    const cached = {};
+    for (let i = 0; i < tmsList.length; i += 150) {
+      try {
+        const d = await api(`/analyze/parcels/cached?tms=${encodeURIComponent(tmsList.slice(i, i + 150).join(","))}`);
+        Object.assign(cached, d.analyses || {});
+      } catch { /* cached analyses are optional */ }
+    }
+    setParcelAnalyses((a) => ({ ...cached, ...a }));
+
+    const queue = ranked.slice(0, AUTO_ANALYZE_TOP).filter((p) => p.external_id && !cached[p.external_id]);
+    const worker = async () => {
+      while (queue.length) await analyzeParcel(queue.shift());
+    };
+    await Promise.all([worker(), worker(), worker()]);
   };
 
   const loadOpenBids = async () => {
     setBidsLoading(true);
     try {
-      const params = new URLSearchParams({ sources: BID_SOURCE_IDS.join(","), sort_by: "posted_date", sort_dir: "desc", limit: "1000" });
+      const params = new URLSearchParams({ sources: GC_SOURCE_IDS.join(","), sort_by: "posted_date", sort_dir: "desc", limit: "1000" });
       const data = await api(`/projects?${params}`);
-      setOpenBids(selectOpenBids(data.projects || []));
+      setOpenBids(selectGcBids(data.projects || []));
     } catch (err) {
       console.error("Load open bids failed:", err);
     }
@@ -3567,20 +3448,7 @@ export default function SiteScanApp() {
     } catch (err) {}
   };
 
-  const loadBoardPipeline = async () => {
-    setBoardLoading(true);
-    try {
-      const [projData, evtData] = await Promise.all([
-        api("/boards/projects?limit=200"),
-        api("/boards/events?limit=30"),
-      ]);
-      setBoardProjects(Array.isArray(projData.projects) ? projData.projects : []);
-      setBoardEvents(Array.isArray(evtData.events) ? evtData.events : []);
-    } catch (err) {
-      console.error("Load board pipeline failed:", err);
-    }
-    setBoardLoading(false);
-  };
+
 
   const saveProject = async (projectId) => {
     await api("/projects/save", {
@@ -3618,7 +3486,6 @@ export default function SiteScanApp() {
     loadHistory();
     loadParcelOpportunities();
     loadOpenBids();
-    loadBoardPipeline();
     // Pre-populate filters from saved profile preferences
     api("/auth/me").then((data) => {
       setFilters((f) => ({
@@ -3703,8 +3570,6 @@ export default function SiteScanApp() {
         .app-nav button { white-space: nowrap; flex-shrink: 0; }
         .app-main { max-width: 1400px; margin: 0 auto; padding: 20px 32px; box-sizing: border-box; width: 100%; }
         .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
-        .landing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
-        @media (max-width: 1099px) { .landing-grid { grid-template-columns: 1fr; } }
         @media (max-width: 899px) {
           .header-wrap { flex-wrap: wrap; align-items: center; }
           .header-logo { order: 1; flex-shrink: 0; }
@@ -3712,6 +3577,11 @@ export default function SiteScanApp() {
           .app-nav { order: 3; width: 100%; }
           .app-main { padding: 16px; }
           .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 640px) {
+          .project-header { flex-wrap: wrap; }
+          .project-header-side { width: 100%; justify-content: flex-start; }
+          .project-header-side > div:last-child { width: auto !important; margin-left: auto; }
         }
         @media (max-width: 480px) {
           .app-main { padding: 12px; }
@@ -3738,7 +3608,6 @@ export default function SiteScanApp() {
               { id: "home",         label: "Home",                       icon: "🏠" },
               { id: "scanner",      label: "Scanner",                    icon: "⚡" },
               { id: "map",          label: "Map",                        icon: "🗺️" },
-              { id: "boards",       label: "Board Pipeline",             icon: "🏛️" },
               { id: "saved",        label: `Saved (${saved.length})`,    icon: "★" },
               { id: "contractors",  label: "Contractors",                icon: "🤝" },
               { id: "company",      label: "Profile",                    icon: "🏢" },
@@ -3833,20 +3702,15 @@ export default function SiteScanApp() {
             bids={openBids}
             bidsLoading={bidsLoading}
             dismissedIds={dismissedIds}
+            analyses={parcelAnalyses}
+            analysisStatus={analysisStatus}
+            onAnalyze={analyzeParcel}
             cardProps={{
               onSave: saveProject,
               savedIds,
               onDismiss: (id) => setDismissedIds((s) => new Set([...s, id])),
               valueMedians,
             }}
-          />
-        )}
-        {tab === "boards" && (
-          <BoardPipelineTab
-            projects={boardProjects}
-            events={boardEvents}
-            loading={boardLoading}
-            onRefresh={loadBoardPipeline}
           />
         )}
         {tab === "saved" && <SavedTab saved={saved} onUnsave={unsaveProject} />}
