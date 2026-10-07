@@ -314,6 +314,7 @@ function parcelToProject(feat) {
     longitude: lng,
     value: p.LAND_APPR || p.APPRVAL || null,
     category: "commercial",
+    opp_score: score,
     status: "Opportunities",
     posted_date: null,
     is_active: true,
@@ -3285,12 +3286,125 @@ function BoardPipelineTab({ projects, events, loading, onRefresh }) {
 
 // ─── MAIN APP ───────────────────────────────────────────────────────────────
 
+// ─── HOME / LANDING ─────────────────────────────────────────────────────────
+
+const BID_SOURCE_IDS = [...CLIENT_TYPE_SOURCES.government];
+const BID_OPEN_STATUSES = new Set(["Open", "Accepting Bids"]);
+const LANDING_PREVIEW = 12;
+
+// Open solicitations whose deadline hasn't passed (or isn't published), soonest first.
+function selectOpenBids(projects) {
+  const now = Date.now();
+  return projects
+    .filter((p) => BID_SOURCE_IDS.includes(p.source_id) && BID_OPEN_STATUSES.has(p.status))
+    .filter((p) => !p.deadline || new Date(p.deadline).getTime() >= now)
+    .sort((a, b) => {
+      const da = a.deadline ? new Date(a.deadline).getTime() : Infinity;
+      const db = b.deadline ? new Date(b.deadline).getTime() : Infinity;
+      return da - db || (b.value || 0) - (a.value || 0);
+    });
+}
+
+function LandingSection({ title, audience, accent, blurb, items, loading, emptyText, cardProps }) {
+  const [showAll, setShowAll] = useState(false);
+  const shown = showAll ? items : items.slice(0, LANDING_PREVIEW);
+  return (
+    <section style={{ minWidth: 0 }}>
+      <div style={{ borderLeft: `3px solid ${accent}`, paddingLeft: 12, marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ color: C.text, fontWeight: 700, fontSize: 17 }}>{title}</span>
+          <span style={{
+            fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase",
+            color: accent, border: `1px solid ${accent}55`, background: `${accent}18`,
+            borderRadius: 5, padding: "2px 7px", fontFamily: "'Space Mono', monospace",
+          }}>
+            {audience}
+          </span>
+          <span style={{ color: C.textMuted, fontSize: 12, marginLeft: "auto" }}>
+            {loading ? "Loading…" : `${items.length} found`}
+          </span>
+        </div>
+        <div style={{ color: C.textSub, fontSize: 12, marginTop: 4 }}>{blurb}</div>
+      </div>
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 40 }}><div style={styles.spinner} /></div>
+      ) : items.length === 0 ? (
+        <div style={{ color: C.textMuted, fontSize: 13, padding: "24px 0", textAlign: "center" }}>{emptyText}</div>
+      ) : (
+        <>
+          {shown.map((p, i) => (
+            <ProjectCard
+              key={p.id}
+              group={{ address: p.address || null, displayAddress: p.address, lat: p.latitude, lng: p.longitude, projects: [p] }}
+              animDelay={Math.min(i, 12) * 0.03}
+              {...cardProps}
+            />
+          ))}
+          {items.length > LANDING_PREVIEW && (
+            <button
+              onClick={() => setShowAll((v) => !v)}
+              style={{
+                width: "100%", marginTop: 4, padding: "8px 0", background: "transparent",
+                border: `1px solid ${C.border}`, borderRadius: 8, color: C.textSub,
+                fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+              }}
+            >
+              {showAll ? "Show fewer" : `Show all ${items.length}`}
+            </button>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+function LandingTab({ parcels, parcelsLoading, bids, bidsLoading, dismissedIds, cardProps }) {
+  const parcelItems = useMemo(
+    () => parcels
+      .filter((p) => !dismissedIds.has(p.id))
+      .sort((a, b) => (b.opp_score || 0) - (a.opp_score || 0) || (b.value || 0) - (a.value || 0)),
+    [parcels, dismissedIds],
+  );
+  const bidItems = useMemo(
+    () => bids.filter((p) => !dismissedIds.has(p.id)),
+    [bids, dismissedIds],
+  );
+
+  return (
+    <div className="landing-grid">
+      <LandingSection
+        title="Underutilized Parcels"
+        audience="Developer interest"
+        accent="#22c55e"
+        blurb="Commercial parcels where land value outweighs improvements: vacant lots and underbuilt sites, highest opportunity first."
+        items={parcelItems}
+        loading={parcelsLoading}
+        emptyText="No underutilized commercial parcels found."
+        cardProps={cardProps}
+      />
+      <LandingSection
+        title="Out to Bid"
+        audience="GC interest"
+        accent={C.sky}
+        blurb="Active public solicitations accepting bids, soonest deadline first."
+        items={bidItems}
+        loading={bidsLoading}
+        emptyText="No open solicitations right now."
+        cardProps={cardProps}
+      />
+    </div>
+  );
+}
+
 export default function SiteScanApp() {
   const [authed, setAuthed] = useState(!!localStorage.getItem("sitescan_token"));
-  const [tab, setTab] = useState("scanner");
+  const [tab, setTab] = useState("home");
   const [showMap, setShowMap] = useState(false);
   const [projects, setProjects] = useState([]);
   const [parcelOpportunities, setParcelOpportunities] = useState([]);
+  const [parcelsLoading, setParcelsLoading] = useState(true);
+  const [openBids, setOpenBids] = useState([]);
+  const [bidsLoading, setBidsLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [totalUnfiltered, setTotalUnfiltered] = useState(0);
   const [stats, setStats] = useState(null);
@@ -3370,6 +3484,19 @@ export default function SiteScanApp() {
         .map(parcelToProject);
       setParcelOpportunities(opps);
     } catch (e) { /* supplementary data — fail silently */ }
+    setParcelsLoading(false);
+  };
+
+  const loadOpenBids = async () => {
+    setBidsLoading(true);
+    try {
+      const params = new URLSearchParams({ sources: BID_SOURCE_IDS.join(","), sort_by: "posted_date", sort_dir: "desc", limit: "1000" });
+      const data = await api(`/projects?${params}`);
+      setOpenBids(selectOpenBids(data.projects || []));
+    } catch (err) {
+      console.error("Load open bids failed:", err);
+    }
+    setBidsLoading(false);
   };
 
   const loadSaved = async () => {
@@ -3436,6 +3563,7 @@ export default function SiteScanApp() {
     loadSaved();
     loadHistory();
     loadParcelOpportunities();
+    loadOpenBids();
     loadBoardPipeline();
     // Pre-populate filters from saved profile preferences
     api("/auth/me").then((data) => {
@@ -3521,6 +3649,8 @@ export default function SiteScanApp() {
         .app-nav button { white-space: nowrap; flex-shrink: 0; }
         .app-main { max-width: 1400px; margin: 0 auto; padding: 20px 32px; box-sizing: border-box; width: 100%; }
         .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+        .landing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+        @media (max-width: 1099px) { .landing-grid { grid-template-columns: 1fr; } }
         @media (max-width: 899px) {
           .header-wrap { flex-wrap: wrap; align-items: center; }
           .header-logo { order: 1; flex-shrink: 0; }
@@ -3551,6 +3681,7 @@ export default function SiteScanApp() {
           </div>
           <nav className="app-nav">
             {[
+              { id: "home",         label: "Home",                       icon: "🏠" },
               { id: "scanner",      label: "Scanner",                    icon: "⚡" },
               { id: "map",          label: "Map",                        icon: "🗺️" },
               { id: "boards",       label: "Board Pipeline",             icon: "🏛️" },
@@ -3640,6 +3771,21 @@ export default function SiteScanApp() {
               </div>
             )}
           </>
+        )}
+        {tab === "home" && (
+          <LandingTab
+            parcels={parcelOpportunities}
+            parcelsLoading={parcelsLoading}
+            bids={openBids}
+            bidsLoading={bidsLoading}
+            dismissedIds={dismissedIds}
+            cardProps={{
+              onSave: saveProject,
+              savedIds,
+              onDismiss: (id) => setDismissedIds((s) => new Set([...s, id])),
+              valueMedians,
+            }}
+          />
         )}
         {tab === "boards" && (
           <BoardPipelineTab
