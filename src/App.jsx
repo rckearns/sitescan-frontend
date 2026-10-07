@@ -526,13 +526,27 @@ function StatusPill({ status }) {
 
 // ─── PROJECT ROW ────────────────────────────────────────────────────────────
 
+// Hide-card button. Shown on hover/focus with a mouse; always visible on touch
+// screens (see .card-dismiss rules in the app stylesheet).
+function DismissButton({ onDismiss, label = "Hide this project" }) {
+  return (
+    <button
+      className="card-dismiss"
+      onClick={(e) => { e.stopPropagation(); onDismiss(); }}
+      title={label}
+      aria-label={label}
+    >
+      ✕
+    </button>
+  );
+}
+
 // ─── PROJECT CARD ─────────────────────────────────────────────────────────────
 // One card per project (address group). Shows the most informative permit.
 
-function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedians = {}, footer = null }) {
+function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedians = {}, footer = null, missingValueLabel = null }) {
   const { lat, lng, projects } = group;
   const [expanded, setExpanded] = useState(false);
-  const [hovered, setHovered] = useState(false);
 
   const primary = getPrimaryPermit(projects);
   const displayTitle = getDisplayTitle(primary);
@@ -544,7 +558,6 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
     : null;
   const isSaved = savedIds.has(primary.id);
   const descText = getDescText(primary);
-  const isParcel = primary.source_id === "parcel-opportunity";
 
   // Location: neighborhood for CHS permits, else agency/location
   const locationTag = primary.source_id === "charleston-permits"
@@ -564,27 +577,11 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
   return (
     <div style={{ marginBottom: 6, animation: `fadeIn 0.3s ease ${animDelay}s both` }}>
       <div
+        className="card-row"
         onClick={() => setExpanded(!expanded)}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
         style={{ ...styles.projectRow, borderLeft: `3px solid ${(maxValue || estValue) ? (sourceColors[primary.source_id] || C.border) : C.border}`, position: "relative", opacity: (maxValue || estValue) ? 1 : 0.65 }}
       >
-        {hovered && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onDismiss(primary.id); }}
-            title="Hide this project"
-            style={{
-              position: "absolute", top: 8, right: 8, background: "none",
-              border: "none", color: "#444", fontSize: 16, cursor: "pointer",
-              lineHeight: 1, padding: "2px 5px", borderRadius: 4,
-              transition: "color 0.1s",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "#ef4444"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "#444"; }}
-          >
-            ✕
-          </button>
-        )}
+        <DismissButton onDismiss={() => onDismiss(primary.id)} />
         <div className="project-header" style={styles.projectHeader}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={styles.projectTitle}>
@@ -613,10 +610,7 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
               {locationTag && (
                 <span style={{ marginLeft: 10, color: C.textSub }}>{locationTag}</span>
               )}
-              {primary.contractor && isParcel && (
-                <span style={{ marginLeft: 12, color: C.textMuted }}>Owner: {primary.contractor}</span>
-              )}
-              {primary.contractor && !isParcel && (() => {
+              {primary.contractor && (() => {
                 const names = primary.contractor.split("|").map(s => s.trim()).filter(Boolean);
                 const shown = names.slice(0, 2);
                 const extra = names.length - shown.length;
@@ -668,25 +662,17 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
                   title="Estimated from similar projects">
                   {fmtEst(estValue)}
                 </div>
+              ) : missingValueLabel ? (
+                <div style={{ color: C.textMuted, fontWeight: 400, fontSize: 12, whiteSpace: "nowrap" }}
+                  title="The solicitation does not list a contract value">
+                  {missingValueLabel}
+                </div>
               ) : (
                 <div style={{ color: C.textMuted, fontWeight: 400, fontSize: 14, fontFamily: "'JetBrains Mono', monospace" }}>—</div>
               )}
             </div>
             <div style={{ width: 110, display: "flex", justifyContent: "flex-end" }}>
-              {isParcel ? (
-                <span
-                  title="Share of appraised value that is land rather than buildings"
-                  style={{
-                    fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4, whiteSpace: "nowrap",
-                    color: parcelColor(primary.opp_score), background: `${parcelColor(primary.opp_score)}1f`,
-                    border: `1px solid ${parcelColor(primary.opp_score)}55`,
-                  }}
-                >
-                  {primary.opp_score}% underutilized
-                </span>
-              ) : (
-                <StatusPill status={primary.status} />
-              )}
+              <StatusPill status={primary.status} />
             </div>
           </div>
         </div>
@@ -700,28 +686,6 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
                 <div style={{ color: "#aaa", fontSize: 13, lineHeight: 1.6 }}>{descText}</div>
               </div>
             )}
-            {isParcel ? (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
-              <div>
-                <div style={styles.detailLabel}>Land value</div>
-                <div style={styles.detailValue}>{fmt$(primary.land_value)}</div>
-              </div>
-              <div>
-                <div style={styles.detailLabel}>Improvements</div>
-                <div style={styles.detailValue}>{primary.imp_value ? fmt$(primary.imp_value) : "None"}</div>
-              </div>
-              <div>
-                <div style={styles.detailLabel}>Parcel (TMS)</div>
-                <div style={styles.detailValue}>{primary.permit_number || "—"}</div>
-              </div>
-              {primary.contractor && (
-                <div>
-                  <div style={styles.detailLabel}>Owner</div>
-                  <div style={styles.detailValue}>{primary.contractor}</div>
-                </div>
-              )}
-            </div>
-            ) : (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
               <div>
                 <div style={styles.detailLabel}>Posted</div>
@@ -752,7 +716,6 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
                 </div>
               )}
             </div>
-            )}
             <div style={{ display: "flex", gap: 8 }}>
               {primary.source_url && (
                 <a href={primary.source_url} target="_blank" rel="noopener"
@@ -760,7 +723,7 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
                   View Source →
                 </a>
               )}
-              {!isSaved && !isParcel && (
+              {!isSaved && (
                 <button style={styles.saveBtn}
                   onClick={(e) => { e.stopPropagation(); onSave(primary.id); }}>
                   ★ Save
@@ -2790,9 +2753,11 @@ function AnalysisModal({ state, parcel, onClose }) {
                         background: C.bg, borderRadius: 8, padding: "10px 12px",
                       }}>
                         {[
-                          ["Dev Cost", pf.total_development_cost],
+                          // v2 analyses fold land into total development cost; v1 did not.
+                          [Number(data.version) >= 2 ? "Dev Cost (incl. land)" : "Dev Cost", pf.total_development_cost],
                           ["Stabilized NOI", pf.stabilized_noi],
                           ["Projected Value", pf.projected_value],
+                          ...(pf.land_cost != null ? [["Land Cost", pf.land_cost]] : []),
                           ["Hard Costs", pf.estimated_hard_cost],
                           ["Soft Costs", pf.soft_costs],
                           ["Profit Margin", pf.profit_margin, true],
@@ -3042,8 +3007,31 @@ function MapTab({ mapHeight = "calc(100vh - 230px)" }) {
 const GC_SOURCE_IDS = ["sam-gov", "scbo", "charleston-city-bids"];
 const BID_OPEN_STATUSES = new Set(["Open", "Accepting Bids"]);
 const LANDING_PREVIEW = 12;
-const AUTO_ANALYZE_TOP = 50;
 const HOME_VIEW_KEY = "yabodle_home_view";
+const HOME_PREFS_KEY = "yabodle_home_prefs";
+const HOME_DISMISSED_KEY = "yabodle_home_dismissed";
+const MAX_STORED_DISMISSED = 2000;
+
+// localStorage can throw (private mode, blocked site data); Home must work without it.
+function readStored(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw == null ? fallback : JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
+function writeStored(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage unavailable */ }
+}
+
+function readHomeDismissed() {
+  const ids = readStored(HOME_DISMISSED_KEY, []);
+  return new Set(Array.isArray(ids) ? ids.filter((id) => typeof id === "string" || typeof id === "number") : []);
+}
+function writeHomeDismissed(ids) {
+  writeStored(HOME_DISMISSED_KEY, [...ids].slice(-MAX_STORED_DISMISSED));
+}
 
 // Single-trade scopes go to subcontractors, not GCs. Matched against titles only,
 // since GC solicitations often mention trades in their descriptions.
@@ -3054,29 +3042,48 @@ function isCharlestonMetro(p) {
   return LOWCOUNTRY_RE.test(`${p.location || ""} ${p.agency || ""} ${p.title || ""} ${p.description || ""}`);
 }
 
-function isGcOpportunity(p) {
-  if (TRADE_CATEGORIES.has(p.category)) return false;
-  if (TRADE_SCOPE_RE.test(p.title || "")) return false;
+// Why a solicitation is subcontractor (single-trade) work rather than a GC job; null if it's GC work.
+function gcTradeReason(p) {
+  if (TRADE_CATEGORIES.has(p.category)) return `Trade-only: ${p.category.replace(/-/g, " ")}`;
+  const m = (p.title || "").match(TRADE_SCOPE_RE);
+  if (m) return `Trade-only: ${m[0].toLowerCase()}`;
   if (p.source_id === "sam-gov") {
     // NAICS 236 = building GCs; 238 = specialty trade (subcontractor) work.
     const codes = (p.naics_code || "").split(",").map((c) => c.trim()).filter(Boolean);
-    if (codes.length && !codes.some((c) => c.startsWith("236"))) return false;
+    if (codes.length && !codes.some((c) => c.startsWith("236"))) return `Trade-only: NAICS ${codes.join(", ")}`;
   }
-  return true;
+  return null;
 }
 
-// Open Charleston-area GC solicitations whose deadline hasn't passed, soonest first.
+// Why the GC list leaves a bid out, or null when it belongs in the list.
+function gcHiddenReason(p) {
+  const reasons = [];
+  if (!isCharlestonMetro(p)) reasons.push("Outside Charleston area");
+  const trade = gcTradeReason(p);
+  if (trade) reasons.push(trade);
+  return reasons.length ? reasons.join(" · ") : null;
+}
+
+// Open GC-source solicitations whose deadline hasn't passed, soonest first, split into
+// Charleston-area GC bids and the ones the GC filter hides (tagged with hiddenReason).
 function selectGcBids(projects) {
   const now = Date.now();
-  return projects
+  const open = projects
     .filter((p) => GC_SOURCE_IDS.includes(p.source_id) && BID_OPEN_STATUSES.has(p.status))
     .filter((p) => !p.deadline || new Date(p.deadline).getTime() >= now)
-    .filter((p) => isCharlestonMetro(p) && isGcOpportunity(p))
     .sort((a, b) => {
       const da = a.deadline ? new Date(a.deadline).getTime() : Infinity;
       const db = b.deadline ? new Date(b.deadline).getTime() : Infinity;
       return da - db || (b.value || 0) - (a.value || 0);
     });
+  const bids = [];
+  const hidden = [];
+  for (const p of open) {
+    const reason = gcHiddenReason(p);
+    if (reason) hidden.push({ ...p, hiddenReason: reason });
+    else bids.push(p);
+  }
+  return { bids, hidden };
 }
 
 function countDueWithin(projects, days) {
@@ -3084,7 +3091,10 @@ function countDueWithin(projects, days) {
   return projects.filter((p) => p.deadline && new Date(p.deadline).getTime() <= cutoff).length;
 }
 
-// Pull ideal use, project size and ROI out of the AI highest-and-best-use analysis.
+// Pull ideal use, project size and profit on cost out of the AI highest-and-best-use analysis.
+// Profit on cost = (projected value - total development cost) / total development cost.
+// Version 2 analyses include land in total_development_cost (and report land_cost);
+// version 1 left land out, so its profit on cost runs high.
 function summarizeAnalysis(analysis) {
   const scenarios = analysis?.scenarios || [];
   const best = scenarios.find((s) => s.name === analysis.recommended_scenario) || scenarios[0];
@@ -3092,12 +3102,13 @@ function summarizeAnalysis(analysis) {
   const pf = best.proforma || {};
   const cost = Number(pf.total_development_cost) || null;
   const value = Number(pf.projected_value) || null;
-  let roi = cost && value ? (value - cost) / cost : null;
-  if (roi === null && pf.profit_margin) {
+  let profitOnCost = cost && value ? (value - cost) / cost : null;
+  if (profitOnCost === null && pf.profit_margin) {
     const pct = parseFloat(String(pf.profit_margin));
-    if (!isNaN(pct)) roi = pct / 100;
+    if (!isNaN(pct)) profitOnCost = pct / 100;
   }
-  return { use: best.use_type || best.name, cost, value, roi };
+  const landCost = pf.land_cost != null && !isNaN(Number(pf.land_cost)) ? Number(pf.land_cost) : null;
+  return { use: best.use_type || best.name, cost, value, profitOnCost, landCost, includesLand: Number(analysis.version) >= 2 };
 }
 
 // Parse free-text money like "$5,000,000", "5M" or "$2.5 million" into dollars.
@@ -3126,7 +3137,7 @@ function groupForUse(use) {
 
 const PARCEL_SORTS = [
   { id: "opportunity", label: "Most underutilized" },
-  { id: "roi",         label: "Highest ROI" },
+  { id: "profit",      label: "Highest profit on cost" },
   { id: "size",        label: "Largest project" },
   { id: "lot",         label: "Largest lot" },
   { id: "perAcre",     label: "Cheapest land / acre" },
@@ -3134,7 +3145,7 @@ const PARCEL_SORTS = [
 // Rank by the chosen metric; parcels missing it go last, ties fall back to opportunity.
 function sortParcels(items, sortBy) {
   const key = {
-    roi:     (p) => p.summary?.roi,
+    profit:  (p) => p.summary?.profitOnCost,
     size:    (p) => p.summary?.cost,
     lot:     (p) => p.acres,
     perAcre: (p) => (p.perAcre ? -p.perAcre : null),
@@ -3152,30 +3163,50 @@ function sortParcels(items, sortBy) {
   });
 }
 
+// Developer sort/filters and the GC bonding toggle, remembered per browser.
+function readHomePrefs() {
+  const raw = readStored(HOME_PREFS_KEY, {});
+  const o = raw && typeof raw === "object" ? raw : {};
+  return {
+    sortBy: PARCEL_SORTS.some((s) => s.id === o.sortBy) ? o.sortBy : "opportunity",
+    useFilter: typeof o.useFilter === "string" ? o.useFilter : "",
+    hoodFilter: typeof o.hoodFilter === "string" ? o.hoodFilter : "",
+    fitsBonding: o.fitsBonding === true,
+  };
+}
+
 const chipStyle = (active, color = C.blue) => ({
   padding: "4px 11px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600,
   border: `1px solid ${active ? color : C.border}`, background: active ? `${color}22` : "transparent",
   color: active ? color : C.textSub, fontFamily: "'DM Sans', sans-serif", transition: "all 0.15s",
 });
 
+const homeLinkBtn = {
+  background: "none", border: "none", padding: 0, color: C.blue, fontSize: 12,
+  cursor: "pointer", fontFamily: "'DM Sans', sans-serif", textDecoration: "underline",
+};
+
+const fmtPct = (r) => `${Math.round(r * 100)}%`;
+
 function ParcelEconomics({ parcel, analysis, status, onAnalyze, onOpenAnalysis }) {
   const summary = analysis ? summarizeAnalysis(analysis) : null;
   const acres = parcel.acres;
   const perAcre = acres && parcel.land_value ? parcel.land_value / acres : null;
-  const stat = (label, value, color = C.text) => (
-    <div style={{ minWidth: 0 }}>
+  const stat = (label, value, color = C.text, title) => (
+    <div style={{ minWidth: 0 }} title={title}>
       <div style={{ fontSize: 9, letterSpacing: 1, textTransform: "uppercase", color: C.textMuted, fontFamily: "'Space Mono', monospace" }}>{label}</div>
       <div style={{ fontSize: 13, fontWeight: 700, color, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</div>
     </div>
   );
-  const linkBtn = {
-    background: "none", border: "none", padding: 0, color: C.blue, fontSize: 12,
-    cursor: "pointer", fontFamily: "'DM Sans', sans-serif", textDecoration: "underline",
-  };
+  // Buttons stop propagation so the card's own click handler doesn't fire a second time.
+  const act = (fn) => (e) => { e.stopPropagation(); fn(parcel); };
+  const poc = summary?.profitOnCost;
+  const pocTitle = summary
+    ? `(projected value − total development cost) ÷ total development cost${summary.includesLand ? "; cost includes land" : "; this estimate's cost excludes land"}`
+    : undefined;
 
   return (
     <div
-      onClick={(e) => e.stopPropagation()}
       style={{
         display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 12,
         marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, alignItems: "end",
@@ -3187,37 +3218,128 @@ function ParcelEconomics({ parcel, analysis, status, onAnalyze, onOpenAnalysis }
         <>
           {stat("Ideal use", summary.use || "—", C.sky)}
           {stat("Project size", summary.cost ? fmt$(summary.cost) : "—", C.orange)}
-          {stat("Est. ROI", summary.roi != null ? `${Math.round(summary.roi * 100)}%` : "—",
-            summary.roi == null ? C.text : summary.roi >= 0.15 ? "#22c55e" : summary.roi >= 0 ? C.text : "#ef4444")}
+          {stat("Profit on cost", poc != null ? fmtPct(poc) : "—",
+            poc == null ? C.text : poc >= 0.15 ? "#22c55e" : poc >= 0 ? C.text : "#ef4444", pocTitle)}
           <div>
-            <button style={linkBtn} onClick={() => onOpenAnalysis(parcel)}>
+            <button style={homeLinkBtn} onClick={act(onOpenAnalysis)}>
               See {analysis.scenarios?.length > 1 ? `all ${analysis.scenarios.length} scenarios` : "full analysis"}
             </button>
           </div>
         </>
       ) : status === "loading" ? (
-        <div style={{ gridColumn: "span 3", color: C.textSub, fontSize: 12 }}>Estimating ideal use, project size and ROI…</div>
+        <div style={{ gridColumn: "span 3", color: C.textSub, fontSize: 12 }}>Estimating ideal use, project size and profit on cost…</div>
       ) : status === "error" ? (
         <div style={{ gridColumn: "span 3", color: C.textMuted, fontSize: 12 }}>
-          Estimate unavailable. <button style={linkBtn} onClick={() => onAnalyze(parcel)}>Retry</button>
+          Estimate unavailable. <button style={homeLinkBtn} onClick={act(onAnalyze)}>Retry</button>
         </div>
       ) : (
         <div style={{ gridColumn: "span 3" }}>
-          <button style={linkBtn} onClick={() => onAnalyze(parcel)}>Estimate ideal use &amp; ROI</button>
+          <button style={homeLinkBtn} onClick={act(onAnalyze)}>Estimate ideal use &amp; profit on cost</button>
         </div>
       )}
     </div>
   );
 }
 
-function LandingSection({ blurb, summary, controls, items, loading, emptyText, cardProps, renderFooter }) {
+// One underutilized parcel on the Developers list. Clicking opens the full AI analysis,
+// or starts an estimate when the parcel doesn't have one yet.
+function ParcelCard({ parcel, analysis, status, onAnalyze, onOpenAnalysis, onDismiss, animDelay }) {
+  const color = parcelColor(parcel.opp_score);
+  const busy = status === "loading";
+  const activate = () => {
+    if (analysis) onOpenAnalysis(parcel);
+    else if (!busy) onAnalyze(parcel);
+  };
+  const action = analysis ? "open full analysis" : busy ? "estimate in progress" : "estimate ideal use and profit on cost";
+  return (
+    <div style={{ marginBottom: 6, animation: `fadeIn 0.3s ease ${animDelay}s both` }}>
+      <div
+        className="card-row"
+        role="button"
+        tabIndex={0}
+        aria-label={`${parcel.title}${parcel.address ? `, ${parcel.address}` : ""}: ${action}`}
+        onClick={activate}
+        onKeyDown={(e) => {
+          if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); activate(); }
+        }}
+        style={{
+          ...styles.projectRow, position: "relative", paddingRight: 36,
+          borderLeft: `3px solid ${color}`, cursor: busy && !analysis ? "progress" : "pointer",
+        }}
+      >
+        <DismissButton onDismiss={() => onDismiss(parcel.id)} label="Hide this parcel" />
+        <div className="project-header" style={styles.projectHeader}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={styles.projectTitle}>{parcel.title}</div>
+            <div style={{ ...styles.projectMeta, display: "flex", flexWrap: "wrap", columnGap: 12, rowGap: 2 }}>
+              {parcel.address && <span style={{ color: C.text }}>{parcel.address}</span>}
+              {parcel.hood && <span>{parcel.hood}</span>}
+              {parcel.contractor && <span style={{ color: C.textMuted }}>Owner: {parcel.contractor}</span>}
+            </div>
+          </div>
+          <div className="project-header-side" style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+            <div className="parcel-land-value" style={{ textAlign: "right" }} title="Appraised value of the land (county assessor)">
+              <div style={{ fontSize: 9, letterSpacing: 1, textTransform: "uppercase", color: C.textMuted, fontFamily: "'Space Mono', monospace" }}>
+                Land value
+              </div>
+              <div style={{ color: C.text, fontWeight: 700, fontSize: 14, fontFamily: "'JetBrains Mono', monospace", whiteSpace: "nowrap" }}>
+                {parcel.land_value ? fmt$(parcel.land_value) : "—"}
+              </div>
+            </div>
+            <div style={{ width: 110, display: "flex", justifyContent: "flex-end" }}>
+              <span
+                title="Share of appraised value that is land rather than buildings"
+                style={{
+                  fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4, whiteSpace: "nowrap",
+                  color, background: `${color}1f`, border: `1px solid ${color}55`,
+                }}
+              >
+                {parcel.opp_score}% underutilized
+              </span>
+            </div>
+          </div>
+        </div>
+        <ParcelEconomics
+          parcel={parcel}
+          analysis={analysis}
+          status={status}
+          onAnalyze={onAnalyze}
+          onOpenAnalysis={onOpenAnalysis}
+        />
+      </div>
+    </div>
+  );
+}
+
+// First LANDING_PREVIEW cards with a "Show all" toggle.
+function CardList({ items, renderItem }) {
   const [showAll, setShowAll] = useState(false);
   const shown = showAll ? items : items.slice(0, LANDING_PREVIEW);
+  return (
+    <>
+      {shown.map((p, i) => renderItem(p, Math.min(i, 12) * 0.03))}
+      {items.length > LANDING_PREVIEW && (
+        <button
+          onClick={() => setShowAll((v) => !v)}
+          style={{
+            width: "100%", marginTop: 4, padding: "8px 0", background: "transparent",
+            border: `1px solid ${C.border}`, borderRadius: 8, color: C.textSub,
+            fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+          }}
+        >
+          {showAll ? "Show fewer" : `Show all ${items.length}`}
+        </button>
+      )}
+    </>
+  );
+}
+
+function LandingSection({ blurb, summary, hiddenControl, controls, items, loading, emptyText, renderItem, after }) {
   return (
     <section style={{ minWidth: 0 }}>
       <div style={{ display: "flex", gap: 12, alignItems: "baseline", flexWrap: "wrap", marginBottom: 14 }}>
         <div style={{ color: C.textSub, fontSize: 12, flex: "1 1 320px" }}>{blurb}</div>
-        <div style={{ color: C.textMuted, fontSize: 12 }}>{loading ? "Loading…" : summary}</div>
+        <div style={{ color: C.textMuted, fontSize: 12 }}>{loading ? "Loading…" : summary}{!loading && hiddenControl}</div>
       </div>
       {!loading && controls}
       {loading ? (
@@ -3225,30 +3347,9 @@ function LandingSection({ blurb, summary, controls, items, loading, emptyText, c
       ) : items.length === 0 ? (
         <div style={{ color: C.textMuted, fontSize: 13, padding: "24px 0", textAlign: "center" }}>{emptyText}</div>
       ) : (
-        <>
-          {shown.map((p, i) => (
-            <ProjectCard
-              key={p.id}
-              group={{ address: p.address || null, displayAddress: p.address, lat: p.latitude, lng: p.longitude, projects: [p] }}
-              animDelay={Math.min(i, 12) * 0.03}
-              footer={renderFooter ? renderFooter(p) : null}
-              {...cardProps}
-            />
-          ))}
-          {items.length > LANDING_PREVIEW && (
-            <button
-              onClick={() => setShowAll((v) => !v)}
-              style={{
-                width: "100%", marginTop: 4, padding: "8px 0", background: "transparent",
-                border: `1px solid ${C.border}`, borderRadius: 8, color: C.textSub,
-                fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
-              }}
-            >
-              {showAll ? "Show fewer" : `Show all ${items.length}`}
-            </button>
-          )}
-        </>
+        <CardList items={items} renderItem={renderItem} />
       )}
+      {!loading && after}
     </section>
   );
 }
@@ -3257,13 +3358,20 @@ function readHomeView() {
   try { return localStorage.getItem(HOME_VIEW_KEY) === "gc" ? "gc" : "developer"; } catch { return "developer"; }
 }
 
-function LandingTab({ parcels, parcelsLoading, bids, bidsLoading, dismissedIds, cardProps, analyses, analysisStatus, onAnalyze, bondingCapacity, onEditProfile }) {
+function LandingTab({
+  parcels, parcelsLoading, bids, hiddenBids, bidsLoading, analyses, analysisStatus, onAnalyze,
+  bondingCapacity, onEditProfile, onSave, savedIds, dismissedIds, onDismiss, onRestore,
+}) {
   const [view, setView] = useState(readHomeView);
-  const [sortBy, setSortBy] = useState("opportunity");
-  const [useFilter, setUseFilter] = useState("");
-  const [hoodFilter, setHoodFilter] = useState("");
-  const [fitsBonding, setFitsBonding] = useState(false);
+  const [prefs, setPrefs] = useState(readHomePrefs);
   const [openAnalysis, setOpenAnalysis] = useState(null);
+  const [showHiddenBids, setShowHiddenBids] = useState(false);
+  const { sortBy, fitsBonding } = prefs;
+  const updatePrefs = (patch) => {
+    const next = { ...prefs, ...patch };
+    setPrefs(next);
+    writeStored(HOME_PREFS_KEY, next);
+  };
   const choose = (v) => {
     setView(v);
     try { localStorage.setItem(HOME_VIEW_KEY, v); } catch { /* storage unavailable */ }
@@ -3283,6 +3391,11 @@ function LandingTab({ parcels, parcelsLoading, bids, bidsLoading, dismissedIds, 
       }),
     [parcels, dismissedIds, analyses],
   );
+  const usesPresent = USE_GROUPS.filter((g) => allParcels.some((p) => p.useGroup === g.id));
+  const hoodsPresent = [...new Set(allParcels.map((p) => p.hood).filter(Boolean))].sort();
+  // A remembered filter only applies once the data offers that option, so it can't silently empty the list.
+  const useFilter = usesPresent.some((g) => g.id === prefs.useFilter) ? prefs.useFilter : "";
+  const hoodFilter = hoodsPresent.includes(prefs.hoodFilter) ? prefs.hoodFilter : "";
   const parcelItems = useMemo(
     () => sortParcels(
       allParcels.filter((p) => (!useFilter || p.useGroup === useFilter) && (!hoodFilter || p.hood === hoodFilter)),
@@ -3290,22 +3403,36 @@ function LandingTab({ parcels, parcelsLoading, bids, bidsLoading, dismissedIds, 
     ),
     [allParcels, useFilter, hoodFilter, sortBy],
   );
-  const usesPresent = USE_GROUPS.filter((g) => allParcels.some((p) => p.useGroup === g.id));
-  const hoodsPresent = [...new Set(allParcels.map((p) => p.hood).filter(Boolean))].sort();
   const estimatedCount = allParcels.filter((p) => p.summary).length;
 
   const allBids = useMemo(
     () => bids.filter((p) => !dismissedIds.has(p.id)),
     [bids, dismissedIds],
   );
-  // Bids with no published value are kept: we can't tell whether they fit.
-  const bidItems = useMemo(
-    () => (fitsBonding && bondingCapacity ? allBids.filter((p) => !p.value || p.value <= bondingCapacity) : allBids),
-    [allBids, fitsBonding, bondingCapacity],
+  const filteredOutBids = useMemo(
+    () => hiddenBids.filter((p) => !dismissedIds.has(p.id)),
+    [hiddenBids, dismissedIds],
   );
+  // Bids with no published value are kept under "Fits my bonding" (we can't tell) and marked as such.
+  const bondingOn = fitsBonding && !!bondingCapacity;
+  const bidItems = useMemo(
+    () => (bondingOn ? allBids.filter((p) => !p.value || p.value <= bondingCapacity) : allBids),
+    [allBids, bondingOn, bondingCapacity],
+  );
+  const unpublishedCount = bidItems.filter((p) => !p.value).length;
   const landTotal = parcelItems.reduce((sum, p) => sum + (p.land_value || 0), 0);
   const dueThisWeek = countDueWithin(bidItems, 7);
   const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+  // Cards the user dismissed (✕) in the current view, with a way to bring them back.
+  const viewIds = view === "developer" ? parcels.map((p) => p.id) : [...bids, ...hiddenBids].map((p) => p.id);
+  const dismissedHere = viewIds.filter((id) => dismissedIds.has(id));
+  const hiddenControl = dismissedHere.length > 0 ? (
+    <span>
+      {" · "}{dismissedHere.length} hidden ·{" "}
+      <button style={homeLinkBtn} onClick={() => onRestore(dismissedHere)}>Restore</button>
+    </span>
+  ) : null;
 
   const tabs = [
     { id: "developer", label: "Developers", sub: "Underutilized parcels", count: parcelsLoading ? null : allParcels.length, accent: "#22c55e" },
@@ -3314,26 +3441,26 @@ function LandingTab({ parcels, parcelsLoading, bids, bidsLoading, dismissedIds, 
 
   const selectStyle = {
     background: C.surface, color: C.text, border: `1px solid ${C.border}`, borderRadius: 8,
-    padding: "5px 8px", fontSize: 12, fontFamily: "'DM Sans', sans-serif",
+    padding: "5px 8px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", maxWidth: "100%",
   };
   const controlRow = { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 14 };
 
   const developerControls = (
     <div style={controlRow}>
-      <select aria-label="Sort parcels" value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={selectStyle}>
+      <select aria-label="Sort parcels" value={sortBy} onChange={(e) => updatePrefs({ sortBy: e.target.value })} style={selectStyle}>
         {PARCEL_SORTS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
       </select>
       {hoodsPresent.length > 1 && (
-        <select aria-label="Neighborhood" value={hoodFilter} onChange={(e) => setHoodFilter(e.target.value)} style={selectStyle}>
+        <select aria-label="Neighborhood" value={hoodFilter} onChange={(e) => updatePrefs({ hoodFilter: e.target.value })} style={selectStyle}>
           <option value="">All areas</option>
           {hoodsPresent.map((h) => <option key={h} value={h}>{h}</option>)}
         </select>
       )}
       {usesPresent.length > 0 && (
         <>
-          <button style={chipStyle(!useFilter)} onClick={() => setUseFilter("")}>Any use</button>
+          <button style={chipStyle(!useFilter)} onClick={() => updatePrefs({ useFilter: "" })}>Any use</button>
           {usesPresent.map((g) => (
-            <button key={g.id} style={chipStyle(useFilter === g.id)} onClick={() => setUseFilter(useFilter === g.id ? "" : g.id)}>
+            <button key={g.id} style={chipStyle(useFilter === g.id)} onClick={() => updatePrefs({ useFilter: useFilter === g.id ? "" : g.id })}>
               {g.label}
             </button>
           ))}
@@ -3341,7 +3468,7 @@ function LandingTab({ parcels, parcelsLoading, bids, bidsLoading, dismissedIds, 
       )}
       {estimatedCount < allParcels.length && (
         <span style={{ color: C.textMuted, fontSize: 11, marginLeft: "auto" }}>
-          {estimatedCount} of {allParcels.length} have estimates{(sortBy === "roi" || sortBy === "size" || useFilter) ? "; ranking and use filters cover those" : ""}
+          {estimatedCount} of {allParcels.length} have estimates{(sortBy === "profit" || sortBy === "size" || useFilter) ? "; ranking and use filters cover those" : ""}
         </span>
       )}
     </div>
@@ -3350,7 +3477,7 @@ function LandingTab({ parcels, parcelsLoading, bids, bidsLoading, dismissedIds, 
   const gcControls = (
     <div style={controlRow}>
       {bondingCapacity ? (
-        <button style={chipStyle(fitsBonding, C.sky)} onClick={() => setFitsBonding((v) => !v)} aria-pressed={fitsBonding}>
+        <button style={chipStyle(fitsBonding, C.sky)} onClick={() => updatePrefs({ fitsBonding: !fitsBonding })} aria-pressed={fitsBonding}>
           Fits my bonding ({fmt$(bondingCapacity)})
         </button>
       ) : (
@@ -3365,6 +3492,58 @@ function LandingTab({ parcels, parcelsLoading, bids, bidsLoading, dismissedIds, 
       )}
     </div>
   );
+
+  const noteStyle = (color) => ({ marginTop: 8, fontSize: 12, color });
+  const bidNote = (p) => {
+    if (bondingCapacity && p.value > bondingCapacity) {
+      return <div style={noteStyle("#f59e0b")}>Over your {fmt$(bondingCapacity)} bonding capacity</div>;
+    }
+    if (bondingOn && !p.value) {
+      return <div style={noteStyle(C.textSub)}>No published value, so it can't be checked against your bonding. Review the solicitation.</div>;
+    }
+    return null;
+  };
+  const renderBid = (p, animDelay, footer) => (
+    <ProjectCard
+      key={p.id}
+      group={{ address: p.address || null, displayAddress: p.address, lat: p.latitude, lng: p.longitude, projects: [p] }}
+      animDelay={animDelay}
+      onSave={onSave}
+      savedIds={savedIds}
+      onDismiss={onDismiss}
+      missingValueLabel="Value not published"
+      footer={footer}
+    />
+  );
+
+  const hiddenBidsBlock = filteredOutBids.length > 0 ? (
+    <div style={{ marginTop: 16 }}>
+      <div style={{ color: C.textMuted, fontSize: 12, marginBottom: 10 }}>
+        {plural(filteredOutBids.length, "bid")} hidden (trade-only or outside Charleston) ·{" "}
+        <button style={homeLinkBtn} onClick={() => setShowHiddenBids((v) => !v)} aria-expanded={showHiddenBids}>
+          {showHiddenBids ? "Hide" : "Show"}
+        </button>
+      </div>
+      {showHiddenBids && (
+        <CardList
+          items={filteredOutBids}
+          renderItem={(p, d) => renderBid(p, d, (
+            <>
+              <div style={{ marginTop: 8 }}>
+                <span style={{
+                  fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 4,
+                  color: C.textSub, background: "#ffffff0a", border: `1px solid ${C.border}`,
+                }}>
+                  Hidden: {p.hiddenReason}
+                </span>
+              </div>
+              {bidNote(p)}
+            </>
+          ))}
+        />
+      )}
+    </div>
+  ) : null;
 
   return (
     <div>
@@ -3405,20 +3584,23 @@ function LandingTab({ parcels, parcelsLoading, bids, bidsLoading, dismissedIds, 
       {view === "developer" ? (
         <LandingSection
           key="developer"
-          blurb="Commercial parcels where land value outweighs improvements, highest opportunity first. Ideal use, project size and ROI are AI estimates; treat them as a starting point, not an appraisal."
+          blurb="Commercial parcels where land value outweighs improvements, highest opportunity first. Ideal use, project size and profit on cost are AI estimates; treat them as a starting point, not an appraisal."
           summary={`${plural(parcelItems.length, "parcel")} · ${fmt$(landTotal)} land value`}
+          hiddenControl={hiddenControl}
           controls={developerControls}
           items={parcelItems}
           loading={parcelsLoading}
           emptyText="No underutilized commercial parcels found."
-          cardProps={cardProps}
-          renderFooter={(p) => (
-            <ParcelEconomics
+          renderItem={(p, animDelay) => (
+            <ParcelCard
+              key={p.id}
               parcel={p}
               analysis={analyses[p.external_id]}
               status={analysisStatus[p.external_id]}
               onAnalyze={onAnalyze}
               onOpenAnalysis={setOpenAnalysis}
+              onDismiss={onDismiss}
+              animDelay={animDelay}
             />
           )}
         />
@@ -3426,17 +3608,14 @@ function LandingTab({ parcels, parcelsLoading, bids, bidsLoading, dismissedIds, 
         <LandingSection
           key="gc"
           blurb="Open general-contractor solicitations in the Charleston area, soonest deadline first. Single-trade scopes (roofing, HVAC, paving and the like) are left out."
-          summary={`${plural(bidItems.length, "open bid")} · ${dueThisWeek} due this week`}
+          summary={`${plural(bidItems.length, "open bid")} · ${dueThisWeek} due this week${bondingOn && unpublishedCount ? ` · ${unpublishedCount} with no published value` : ""}`}
+          hiddenControl={hiddenControl}
           controls={gcControls}
           items={bidItems}
           loading={bidsLoading}
-          emptyText={fitsBonding ? "No open bids within your bonding capacity right now." : "No open GC solicitations in the Charleston area right now."}
-          cardProps={cardProps}
-          renderFooter={(p) => (bondingCapacity && p.value > bondingCapacity ? (
-            <div style={{ marginTop: 8, fontSize: 12, color: "#f59e0b" }}>
-              Over your {fmt$(bondingCapacity)} bonding capacity
-            </div>
-          ) : null)}
+          emptyText={bondingOn ? "No open bids within your bonding capacity right now." : "No open GC solicitations in the Charleston area right now."}
+          renderItem={(p, animDelay) => renderBid(p, animDelay, bidNote(p))}
+          after={hiddenBidsBlock}
         />
       )}
     </div>
@@ -3451,6 +3630,8 @@ export default function SiteScanApp() {
   const [parcelOpportunities, setParcelOpportunities] = useState([]);
   const [parcelsLoading, setParcelsLoading] = useState(true);
   const [openBids, setOpenBids] = useState([]);
+  const [hiddenBids, setHiddenBids] = useState([]);
+  const [homeDismissedIds, setHomeDismissedIds] = useState(readHomeDismissed);
   const [parcelAnalyses, setParcelAnalyses] = useState({});
   const [analysisStatus, setAnalysisStatus] = useState({});
   const [bondingCapacity, setBondingCapacity] = useState(null);
@@ -3556,11 +3737,10 @@ export default function SiteScanApp() {
     }
   };
 
-  // Show stored analyses for every parcel, then fill in the top opportunities
-  // that don't have one yet, a few at a time.
+  // Show stored analyses for every parcel. New estimates come from the backend's
+  // nightly job or the per-card "Estimate" button; the browser doesn't queue any.
   const loadParcelAnalyses = async (opps) => {
-    const ranked = [...opps].sort((a, b) => (b.opp_score || 0) - (a.opp_score || 0) || (b.value || 0) - (a.value || 0));
-    const tmsList = ranked.map((p) => p.external_id).filter(Boolean);
+    const tmsList = opps.map((p) => p.external_id).filter(Boolean);
     const cached = {};
     for (let i = 0; i < tmsList.length; i += 150) {
       try {
@@ -3569,12 +3749,6 @@ export default function SiteScanApp() {
       } catch { /* cached analyses are optional */ }
     }
     setParcelAnalyses((a) => ({ ...cached, ...a }));
-
-    const queue = ranked.slice(0, AUTO_ANALYZE_TOP).filter((p) => p.external_id && !cached[p.external_id]);
-    const worker = async () => {
-      while (queue.length) await analyzeParcel(queue.shift());
-    };
-    await Promise.all([worker(), worker(), worker()]);
   };
 
   const loadOpenBids = async () => {
@@ -3582,7 +3756,9 @@ export default function SiteScanApp() {
     try {
       const params = new URLSearchParams({ sources: GC_SOURCE_IDS.join(","), sort_by: "posted_date", sort_dir: "desc", limit: "1000" });
       const data = await api(`/projects?${params}`);
-      setOpenBids(selectGcBids(data.projects || []));
+      const { bids, hidden } = selectGcBids(data.projects || []);
+      setOpenBids(bids);
+      setHiddenBids(hidden);
     } catch (err) {
       console.error("Load open bids failed:", err);
     }
@@ -3734,10 +3910,15 @@ export default function SiteScanApp() {
           .app-main { padding: 16px; }
           .stats-grid { grid-template-columns: repeat(2, 1fr); }
         }
+        .card-dismiss { position: absolute; top: 4px; right: 4px; z-index: 1; background: none; border: none; color: #4a5a6e; font-size: 15px; line-height: 1; cursor: pointer; padding: 6px 8px; border-radius: 6px; opacity: 0; transition: opacity 0.1s, color 0.1s; font-family: inherit; }
+        .card-row:hover .card-dismiss, .card-dismiss:focus-visible { opacity: 1; }
+        .card-dismiss:hover, .card-dismiss:focus-visible { color: #ef4444; }
+        @media (hover: none) { .card-dismiss { opacity: 1; } }
         @media (max-width: 640px) {
           .project-header { flex-wrap: wrap; }
           .project-header-side { width: 100%; justify-content: flex-start; }
           .project-header-side > div:last-child { width: auto !important; margin-left: auto; }
+          .parcel-land-value { text-align: left !important; }
         }
         @media (max-width: 480px) {
           .app-main { padding: 12px; }
@@ -3849,19 +4030,27 @@ export default function SiteScanApp() {
             parcels={parcelOpportunities}
             parcelsLoading={parcelsLoading}
             bids={openBids}
+            hiddenBids={hiddenBids}
             bidsLoading={bidsLoading}
-            dismissedIds={dismissedIds}
             analyses={parcelAnalyses}
             analysisStatus={analysisStatus}
             onAnalyze={analyzeParcel}
             bondingCapacity={bondingCapacity}
             onEditProfile={() => setTab("company")}
-            cardProps={{
-              onSave: saveProject,
-              savedIds,
-              onDismiss: (id) => setDismissedIds((s) => new Set([...s, id])),
-              valueMedians,
-            }}
+            onSave={saveProject}
+            savedIds={savedIds}
+            dismissedIds={homeDismissedIds}
+            onDismiss={(id) => setHomeDismissedIds((s) => {
+              const next = new Set([...s, id]);
+              writeHomeDismissed(next);
+              return next;
+            })}
+            onRestore={(ids) => setHomeDismissedIds((s) => {
+              const next = new Set(s);
+              ids.forEach((id) => next.delete(id));
+              writeHomeDismissed(next);
+              return next;
+            })}
           />
         )}
         {tab === "saved" && <SavedTab saved={saved} onUnsave={unsaveProject} />}
