@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { MapContainer, TileLayer, CircleMarker, Popup, GeoJSON, useMap, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
 const API = (import.meta.env.VITE_API_URL || "https://sitescan-backend-production-423e.up.railway.app") + "/api/v1";
@@ -283,10 +283,6 @@ function parcelColor(score) {
   return "#3a5f85";                   // slate — fully developed (visible on dark map)
 }
 
-const COMMERCIAL_GENUSE_RE = /commercial|office|retail|hotel|restaurant|shopping|warehouse/i;
-function isCommercialParcel(props) {
-  return COMMERCIAL_GENUSE_RE.test(props.GENUSE || "");
-}
 
 function getPolygonCentroid(geometry) {
   if (geometry?.type === "Point") return geometry.coordinates;
@@ -2547,133 +2543,108 @@ function HistoryTab({ history, onRefresh }) {
 
 // ─── PARCEL LAYER ─────────────────────────────────────────────────────────────
 
-function ParcelLayer({ show, onStatus }) {
-  const map = useMap();
-  const [data, setData] = useState(null);
-  const [fetchKey, setFetchKey] = useState(0);
-  const abortRef = useRef(null);
-  const timerRef = useRef(null);
+// ─── PARCEL MAP DOTS ────────────────────────────────────────────────────────
 
-  const doFetch = useCallback(() => {
-    const zoom = map.getZoom();
-    if (zoom < 12) {
-      setData(null);
-      onStatus?.({ zoom, count: 0, loading: false, error: null });
-      return;
-    }
+// CARTO's dark basemap now requires an API key (it serves "API KEY REQUIRED"
+// tiles), so use Esri's keyless Dark Gray Canvas: base + labels layers.
+const DARK_TILES = {
+  url: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+  labelsUrl: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
+  attribution: 'Tiles &copy; <a href="https://www.esri.com">Esri</a> &mdash; Esri, HERE, Garmin, &copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+};
 
-    if (abortRef.current) abortRef.current.abort();
-    const ctrl = new AbortController();
-    abortRef.current = ctrl;
-
-    const b = map.getBounds();
-    const params = new URLSearchParams({
-      west:  String(b.getWest()),
-      south: String(b.getSouth()),
-      east:  String(b.getEast()),
-      north: String(b.getNorth()),
-      limit: "800",
-      genuse: "commercial",
-    });
-
-    const token = getToken();
-    onStatus?.({ zoom, count: 0, loading: true, error: null });
-
-    fetch(`${API}/projects/map/parcels?${params}`, {
-      signal: ctrl.signal,
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
-      .then((d) => {
-        if (!ctrl.signal.aborted) {
-          if (!d.features) {
-            console.error("[Parcels] Unexpected response — no features array:", d);
-            onStatus?.({ zoom, count: 0, loading: false, error: "Bad response from parcels API" });
-            return;
-          }
-          setData(d);
-          setFetchKey((n) => n + 1);
-          onStatus?.({ zoom, count: d.features.length, loading: false, error: null });
-        }
-      })
-      .catch((e) => {
-        if (e.name !== "AbortError") {
-          console.error("[Parcels] Fetch failed:", e);
-          onStatus?.({ zoom, count: 0, loading: false, error: e.message });
-        }
-      });
-  }, [map, onStatus]);
-
-  const schedule = useCallback(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(doFetch, 600);
-  }, [doFetch]);
-
-  useMapEvents({
-    moveend: () => show && schedule(),
-    zoomend: () => { if (show) { clearTimeout(timerRef.current); doFetch(); } },
-  });
-
-  useEffect(() => {
-    if (show) {
-      doFetch();
-    } else {
-      if (abortRef.current) abortRef.current.abort();
-      clearTimeout(timerRef.current);
-      setData(null);
-      onStatus?.({ count: 0, loading: false, zoom: map.getZoom() });
-    }
-  }, [show]); // eslint-disable-line
-
-  if (!show || !data) return null;
-
+function DarkBasemap() {
   return (
-    <GeoJSON
-      key={fetchKey}
-      data={data}
-      style={(feat) => {
-        if (!isCommercialParcel(feat.properties)) return { fillOpacity: 0, opacity: 0, weight: 0 };
-        const score = parcelOppScore(feat.properties);
-        const c = parcelColor(score);
-        return {
-          fillColor: c,
-          fillOpacity: 0.55,
-          color: "#ffffff",   // white stroke so parcel borders are always visible
-          weight: 0.8,
-          opacity: 0.5,
-        };
-      }}
-      onEachFeature={(feat, layer) => {
-        if (!isCommercialParcel(feat.properties)) return;
-        const p = feat.properties;
-        // Store parcel props for the analysis handler
-        window.__sitescanParcels = window.__sitescanParcels || {};
-        if (p.TMS) window.__sitescanParcels[p.TMS] = p;
-        const score = parcelOppScore(p);
-        const addr = [p.HOUSE, p.STREET].filter(Boolean).join(" ") || "No address";
-        const oppLabel = score >= 80 ? "🔥 High" : score >= 55 ? "📈 Medium" : "✓ Low";
-        layer.bindPopup(`
-          <div style="font-family:'DM Sans',sans-serif;min-width:230px;font-size:13px">
-            <div style="font-weight:700;margin-bottom:3px;color:#111;font-size:14px">${addr}</div>
-            <div style="color:#777;font-size:11px;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">${p.GENUSE || "Unknown use"}</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;margin-bottom:8px">
-              <div><div style="color:#999;font-size:10px;text-transform:uppercase">Land Value</div><strong>$${Number(p.LAND_APPR||0).toLocaleString()}</strong></div>
-              <div><div style="color:#999;font-size:10px;text-transform:uppercase">Improvements</div><strong>$${Number(p.IMP_APPR||0).toLocaleString()}</strong></div>
-              <div><div style="color:#999;font-size:10px;text-transform:uppercase">Total Appraisal</div><strong>$${Number(p.APPRVAL||0).toLocaleString()}</strong></div>
-              <div><div style="color:#999;font-size:10px;text-transform:uppercase">Year Built</div><strong>${p.YRBUILT || "—"}</strong></div>
-            </div>
-            <div style="background:${parcelColor(score)}20;border:1px solid ${parcelColor(score)}50;border-radius:6px;padding:6px 10px;text-align:center;font-weight:700;color:${parcelColor(score)};font-size:12px;margin-bottom:6px">
-              ${oppLabel} Opportunity · ${score}%
-            </div>
-            <div style="color:#aaa;font-size:10px;margin-bottom:8px">Owner: ${p.OWNER || "—"} &nbsp;·&nbsp; TMS: ${p.TMS || "—"}</div>
-            ${p.TMS ? `<button onclick="window.__sitescanAnalyze('${(p.TMS||'').replace(/'/g,"\\'")}')" style="width:100%;padding:7px;background:#f0a030;border:none;border-radius:6px;color:#fff;font-weight:700;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif">🔍 Generate AI Analysis</button>` : ""}
+    <>
+      <TileLayer url={DARK_TILES.url} attribution={DARK_TILES.attribution} maxZoom={19} maxNativeZoom={16} />
+      <TileLayer url={DARK_TILES.labelsUrl} maxZoom={19} maxNativeZoom={16} zIndex={650} />
+    </>
+  );
+}
+
+// Underutilized parcels as dots colored like the cards' badge. Drawn on canvas
+// (MapContainer preferCanvas) so thousands of parcels stay responsive.
+function ParcelDots({ parcels, analyses, selectedId, onSelect, renderPopup }) {
+  const map = useMap();
+  const [zoom, setZoom] = useState(map.getZoom());
+  useMapEvents({ zoomend: () => setZoom(map.getZoom()) });
+  const radius = zoom >= 16 ? 8 : zoom >= 14 ? 6 : zoom >= 12 ? 4 : 3;
+  return parcels.filter((p) => p.latitude && p.longitude).map((p) => {
+    const selected = p.id === selectedId;
+    const summary = analyses?.[p.external_id] ? summarizeAnalysis(analyses[p.external_id]) : null;
+    return (
+      <CircleMarker
+        key={p.id}
+        center={[p.latitude, p.longitude]}
+        radius={selected ? radius + 4 : radius}
+        pathOptions={{
+          fillColor: parcelColor(p.opp_score), fillOpacity: 0.85,
+          color: selected ? "#ffffff" : "#0b1220", weight: selected ? 2.5 : 0.8,
+        }}
+        eventHandlers={onSelect ? { click: () => onSelect(p) } : undefined}
+      >
+        <Tooltip direction="top" offset={[0, -4]}>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12 }}>
+            <div style={{ fontWeight: 700 }}>{p.address || p.title}</div>
+            <div>{p.title}{p.hood ? ` · ${p.hood}` : ""}</div>
+            <div>Land {fmt$(p.land_value)} · {p.opp_score}% underutilized</div>
+            {summary && (
+              <div>{summary.use}{summary.roi != null ? ` · ${Math.round(summary.roi * 100)}% profit on cost` : ""}</div>
+            )}
           </div>
-        `);
-      }}
-    />
+        </Tooltip>
+        {renderPopup && <Popup>{renderPopup(p)}</Popup>}
+      </CircleMarker>
+    );
+  });
+}
+
+function FlyToParcel({ parcel }) {
+  const map = useMap();
+  const id = parcel?.id, lat = parcel?.latitude, lng = parcel?.longitude;
+  useEffect(() => {
+    if (id && lat && lng) map.flyTo([lat, lng], Math.max(map.getZoom(), 16), { duration: 0.8 });
+  }, [map, id, lat, lng]);
+  return null;
+}
+
+function ParcelLegend() {
+  return (
+    <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 11, color: C.textSub }}>
+      {[
+        { label: "80%+ underutilized", color: parcelColor(80) },
+        { label: "55–79%", color: parcelColor(55) },
+      ].map(({ label, color }) => (
+        <span key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: color }} />
+          {label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// Developers → Map: the same filtered parcels as the list; clicking a dot shows its card.
+function ParcelMapView({ parcels, analyses, selected, onSelect, renderCard }) {
+  return (
+    <div>
+      <div style={{ borderRadius: 12, overflow: "hidden", border: `1px solid ${C.border}`, marginBottom: 8 }}>
+        <MapContainer center={CHARLESTON_CENTER} zoom={11} preferCanvas style={{ height: "min(60vh, 560px)", width: "100%" }}>
+          <DarkBasemap />
+          <ParcelDots parcels={parcels} analyses={analyses} selectedId={selected?.id} onSelect={onSelect} />
+          <FlyToParcel parcel={selected} />
+        </MapContainer>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+        <ParcelLegend />
+        <span style={{ fontSize: 11, color: C.textMuted }}>
+          {parcels.length.toLocaleString()} parcels on the map · hover for details, click to open
+        </span>
+      </div>
+      {selected
+        ? renderCard(selected)
+        : <div style={{ color: C.textMuted, fontSize: 13, textAlign: "center", padding: "12px 0" }}>Click a dot to see that parcel.</div>}
+    </div>
   );
 }
 
@@ -2830,34 +2801,11 @@ function AnalysisModal({ state, parcel, onClose }) {
 
 const CHARLESTON_CENTER = [32.7765, -79.9311];
 
-function MapTab({ mapHeight = "calc(100vh - 230px)" }) {
+function MapTab({ mapHeight = "calc(100vh - 230px)", parcels = [], analyses = {}, analysisStatus = {}, onAnalyze }) {
   const [points, setPoints] = useState([]);
   const [mapLoading, setMapLoading] = useState(true);
   const [showParcels, setShowParcels] = useState(false);
-  const [parcelStatus, setParcelStatus] = useState({ count: 0, loading: false, zoom: 12 });
-  const [analysisState, setAnalysisState] = useState(null);  // { loading, error, data }
-  const [analysisParcel, setAnalysisParcel] = useState(null);
-
-  useEffect(() => {
-    // Global handler called by Leaflet popup button (which can't use React events)
-    window.__sitescanParcels = window.__sitescanParcels || {};
-    window.__sitescanAnalyze = async (tms) => {
-      const parcel = window.__sitescanParcels[tms] || {};
-      setAnalysisParcel(parcel);
-      setAnalysisState({ loading: true, error: null, data: null });
-      try {
-        const result = await api("/analyze/parcel/" + encodeURIComponent(tms), {
-          method: "POST",
-          body: JSON.stringify({ parcel }),
-        });
-        if (result.detail) throw new Error(result.detail);
-        setAnalysisState({ loading: false, error: null, data: result.analysis });
-      } catch (e) {
-        setAnalysisState({ loading: false, error: e.message, data: null });
-      }
-    };
-    return () => { delete window.__sitescanAnalyze; };
-  }, []);
+  const [modalParcel, setModalParcel] = useState(null);
 
   useEffect(() => {
     setMapLoading(true);
@@ -2866,14 +2814,56 @@ function MapTab({ mapHeight = "calc(100vh - 230px)" }) {
       .finally(() => setMapLoading(false));
   }, []);
 
-  const parcelStatusCb = useCallback((s) => setParcelStatus(s), []);
+  // Same estimates as the Home cards: open the stored one, or start one.
+  const openParcelAnalysis = (p) => {
+    setModalParcel(p);
+    if (!analyses[p.external_id] && analysisStatus[p.external_id] !== "loading") onAnalyze?.(p);
+  };
+  const modalTms = modalParcel?.external_id;
+  const modalAnalysis = modalTms ? analyses[modalTms] : null;
+  const modalState = modalParcel
+    ? {
+        loading: !modalAnalysis && analysisStatus[modalTms] !== "error",
+        error: !modalAnalysis && analysisStatus[modalTms] === "error" ? "Estimate unavailable. Try again from the parcel." : null,
+        data: modalAnalysis,
+      }
+    : null;
+
+  const parcelPopup = (p) => {
+    const summary = analyses[p.external_id] ? summarizeAnalysis(analyses[p.external_id]) : null;
+    const color = parcelColor(p.opp_score);
+    return (
+      <div style={{ fontFamily: "'DM Sans', sans-serif", minWidth: 230, fontSize: 13 }}>
+        <div style={{ fontWeight: 700, marginBottom: 2, color: "#111", fontSize: 14 }}>{p.address || "No address"}</div>
+        <div style={{ color: "#777", fontSize: 11, marginBottom: 6 }}>{p.title}{p.hood ? ` · ${p.hood}` : ""}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 12, marginBottom: 8 }}>
+          <div><div style={{ color: "#999", fontSize: 10, textTransform: "uppercase" }}>Land value</div><strong>{fmt$(p.land_value)}</strong></div>
+          <div><div style={{ color: "#999", fontSize: 10, textTransform: "uppercase" }}>Improvements</div><strong>{p.imp_value ? fmt$(p.imp_value) : "None"}</strong></div>
+          <div><div style={{ color: "#999", fontSize: 10, textTransform: "uppercase" }}>Lot size</div><strong>{p.acres ? `${p.acres.toFixed(2)} ac` : "—"}</strong></div>
+          {summary && (
+            <div><div style={{ color: "#999", fontSize: 10, textTransform: "uppercase" }}>Profit on cost</div><strong>{summary.roi != null ? `${Math.round(summary.roi * 100)}%` : "—"}</strong></div>
+          )}
+        </div>
+        <div style={{ background: `${color}20`, border: `1px solid ${color}50`, borderRadius: 6, padding: "5px 10px", textAlign: "center", fontWeight: 700, color, fontSize: 12, marginBottom: 6 }}>
+          {p.opp_score}% underutilized{summary?.use ? ` · ${summary.use}` : ""}
+        </div>
+        <div style={{ color: "#aaa", fontSize: 10, marginBottom: 8 }}>Owner: {p.contractor || "—"} · TMS: {p.external_id || "—"}</div>
+        <button
+          onClick={() => openParcelAnalysis(p)}
+          style={{ width: "100%", padding: 7, background: "#f0a030", border: "none", borderRadius: 6, color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
+        >
+          {summary ? "See full analysis" : analysisStatus[p.external_id] === "loading" ? "Estimating…" : "Estimate ideal use & profit on cost"}
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div>
       <AnalysisModal
-        state={analysisState}
-        parcel={analysisParcel}
-        onClose={() => setAnalysisState(null)}
+        state={modalState}
+        parcel={modalParcel?.parcel_props}
+        onClose={() => setModalParcel(null)}
       />
       {/* Toolbar */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
@@ -2887,14 +2877,7 @@ function MapTab({ mapHeight = "calc(100vh - 230px)" }) {
           </span>
           {showParcels && (
             <span style={{ fontSize: 12, color: C.textSub }}>
-              {parcelStatus.loading
-                ? "⌛ Loading parcels…"
-                : parcelStatus.error
-                  ? <span style={{ color: "#ef4444" }}>⚠ Parcel error: {parcelStatus.error}</span>
-                  : parcelStatus.zoom < 12
-                    ? <span style={{ color: C.textMuted }}>🔍 Zoom in for parcels</span>
-                    : <><strong style={{ color: C.text }}>{parcelStatus.count}</strong> parcels in view</>
-              }
+              <strong style={{ color: C.text }}>{parcels.length.toLocaleString()}</strong> underutilized parcels
             </span>
           )}
         </div>
@@ -2918,18 +2901,7 @@ function MapTab({ mapHeight = "calc(100vh - 230px)" }) {
           </button>
 
           {showParcels ? (
-            <div style={{ display: "flex", gap: 10, fontSize: 11, color: C.textSub }}>
-              {[
-                { label: "Vacant / Underbuilt", color: "#f0a030", shape: "square" },
-                { label: "Mixed",               color: "#7ec8e3", shape: "square" },
-                { label: "Developed",           color: "#2d6a9f", shape: "square" },
-              ].map(({ label, color, shape }) => (
-                <span key={label} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: shape === "square" ? 2 : "50%", background: color }} />
-                  {label}
-                </span>
-              ))}
-            </div>
+            <ParcelLegend />
           ) : (
             <div style={{ display: "flex", gap: 14, fontSize: 11, color: C.textSub }}>
               {[
@@ -2953,15 +2925,12 @@ function MapTab({ mapHeight = "calc(100vh - 230px)" }) {
         <MapContainer
           center={CHARLESTON_CENTER}
           zoom={12}
+          preferCanvas
           style={{ height: mapHeight, width: "100%" }}
         >
-          <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            attribution='&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-            maxZoom={19}
-          />
-          {/* Parcel heat map layer (rendered below project dots) */}
-          <ParcelLayer show={showParcels} onStatus={parcelStatusCb} />
+          <DarkBasemap />
+          {/* Underutilized parcels (same list as Home → Developers), below project dots */}
+          {showParcels && <ParcelDots parcels={parcels} analyses={analyses} renderPopup={parcelPopup} />}
           {/* Project dots on top */}
           {points.map((p) => (
             <CircleMarker
@@ -3201,6 +3170,7 @@ function readHomePrefs() {
     useFilter: typeof o.useFilter === "string" ? o.useFilter : "",
     hoodFilter: typeof o.hoodFilter === "string" ? o.hoodFilter : "",
     fitsBonding: o.fitsBonding === true,
+    devLayout: o.devLayout === "map" ? "map" : "list",
   };
 }
 
@@ -3272,7 +3242,7 @@ function ParcelEconomics({ parcel, analysis, status, onAnalyze, onOpenAnalysis }
 
 // One underutilized parcel on the Developers list. Clicking opens the full AI analysis,
 // or starts an estimate when the parcel doesn't have one yet.
-function ParcelCard({ parcel, analysis, status, onAnalyze, onOpenAnalysis, onDismiss, animDelay }) {
+function ParcelCard({ parcel, analysis, status, onAnalyze, onOpenAnalysis, onDismiss, onShowOnMap, animDelay }) {
   const color = parcelColor(parcel.opp_score);
   const busy = status === "loading";
   const activate = () => {
@@ -3304,6 +3274,15 @@ function ParcelCard({ parcel, analysis, status, onAnalyze, onOpenAnalysis, onDis
               {parcel.address && <span style={{ color: C.text }}>{parcel.address}</span>}
               {parcel.hood && <span>{parcel.hood}</span>}
               {parcel.contractor && <span style={{ color: C.textMuted }}>Owner: {parcel.contractor}</span>}
+              {onShowOnMap && parcel.latitude && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onShowOnMap(parcel); }}
+                  style={{ ...homeLinkBtn, fontSize: 11 }}
+                  aria-label={`Show ${parcel.address || "this parcel"} on the map`}
+                >
+                  📍 Map
+                </button>
+              )}
             </div>
           </div>
           <div className="project-header-side" style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
@@ -3369,7 +3348,7 @@ function CardList({ items, renderItem }) {
   );
 }
 
-function LandingSection({ blurb, summary, hiddenControl, controls, items, loading, emptyText, renderItem, after }) {
+function LandingSection({ blurb, summary, hiddenControl, controls, items, loading, emptyText, renderItem, after, body }) {
   return (
     <section style={{ minWidth: 0 }}>
       <div style={{ display: "flex", gap: 12, alignItems: "baseline", flexWrap: "wrap", marginBottom: 14 }}>
@@ -3382,7 +3361,7 @@ function LandingSection({ blurb, summary, hiddenControl, controls, items, loadin
       ) : items.length === 0 ? (
         <div style={{ color: C.textMuted, fontSize: 13, padding: "24px 0", textAlign: "center" }}>{emptyText}</div>
       ) : (
-        <CardList items={items} renderItem={renderItem} />
+        body || <CardList items={items} renderItem={renderItem} />
       )}
       {!loading && after}
     </section>
@@ -3401,7 +3380,8 @@ function LandingTab({
   const [prefs, setPrefs] = useState(readHomePrefs);
   const [openAnalysis, setOpenAnalysis] = useState(null);
   const [showHiddenBids, setShowHiddenBids] = useState(false);
-  const { sortBy, fitsBonding } = prefs;
+  const [selectedParcelId, setSelectedParcelId] = useState(null);
+  const { sortBy, fitsBonding, devLayout } = prefs;
   const updatePrefs = (patch) => {
     const next = { ...prefs, ...patch };
     setPrefs(next);
@@ -3480,8 +3460,35 @@ function LandingTab({
   };
   const controlRow = { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 14 };
 
+  const showOnMap = (p) => {
+    setSelectedParcelId(p.id);
+    updatePrefs({ devLayout: "map" });
+  };
+  const renderParcelCard = (p, animDelay = 0) => (
+    <ParcelCard
+      key={p.id}
+      parcel={p}
+      analysis={analyses[p.external_id]}
+      status={analysisStatus[p.external_id]}
+      onAnalyze={onAnalyze}
+      onOpenAnalysis={setOpenAnalysis}
+      onDismiss={onDismiss}
+      onShowOnMap={devLayout === "list" ? showOnMap : null}
+      animDelay={animDelay}
+    />
+  );
+  const selectedParcel = selectedParcelId ? allParcels.find((p) => p.id === selectedParcelId) || null : null;
+
   const developerControls = (
     <div style={controlRow}>
+      <div role="group" aria-label="Layout" style={{ display: "flex", gap: 4, marginRight: 6 }}>
+        {[["list", "☰ List"], ["map", "🗺️ Map"]].map(([id, label]) => (
+          <button key={id} style={chipStyle(devLayout === id, "#22c55e")} aria-pressed={devLayout === id}
+            onClick={() => updatePrefs({ devLayout: id })}>
+            {label}
+          </button>
+        ))}
+      </div>
       <select aria-label="Sort parcels" value={sortBy} onChange={(e) => updatePrefs({ sortBy: e.target.value })} style={selectStyle}>
         {PARCEL_SORTS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
       </select>
@@ -3626,18 +3633,16 @@ function LandingTab({
           items={parcelItems}
           loading={parcelsLoading}
           emptyText="No underutilized commercial parcels found."
-          renderItem={(p, animDelay) => (
-            <ParcelCard
-              key={p.id}
-              parcel={p}
-              analysis={analyses[p.external_id]}
-              status={analysisStatus[p.external_id]}
-              onAnalyze={onAnalyze}
-              onOpenAnalysis={setOpenAnalysis}
-              onDismiss={onDismiss}
-              animDelay={animDelay}
+          renderItem={renderParcelCard}
+          body={devLayout === "map" ? (
+            <ParcelMapView
+              parcels={parcelItems}
+              analyses={analyses}
+              selected={selectedParcel}
+              onSelect={(p) => setSelectedParcelId(p.id)}
+              renderCard={(p) => renderParcelCard(p)}
             />
-          )}
+          ) : null}
         />
       ) : (
         <LandingSection
@@ -4136,7 +4141,13 @@ export default function SiteScanApp() {
           </div>
           {/* Map content */}
           <div style={{ flex: 1, padding: "16px 24px", overflow: "hidden", minHeight: 0 }}>
-            <MapTab mapHeight="calc(100vh - 116px)" />
+            <MapTab
+              mapHeight="calc(100vh - 116px)"
+              parcels={parcelOpportunities}
+              analyses={parcelAnalyses}
+              analysisStatus={analysisStatus}
+              onAnalyze={analyzeParcel}
+            />
           </div>
         </div>
       )}
