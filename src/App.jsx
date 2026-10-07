@@ -3171,6 +3171,7 @@ function readHomePrefs() {
     hoodFilter: typeof o.hoodFilter === "string" ? o.hoodFilter : "",
     fitsBonding: o.fitsBonding === true,
     devLayout: o.devLayout === "map" ? "map" : "list",
+    gcSub: o.gcSub === "bids" ? "bids" : "pipeline",
   };
 }
 
@@ -3372,6 +3373,271 @@ function readHomeView() {
   try { return localStorage.getItem(HOME_VIEW_KEY) === "gc" ? "gc" : "developer"; } catch { return "developer"; }
 }
 
+// ─── GC PIPELINE ────────────────────────────────────────────────────────────
+
+const GC_STAGE_LABELS = {
+  land: "Land acquisition approved",
+  phase1: "Phase I approved (pre-design)",
+  "ae-selection": "Architect selection",
+  "board-concept": "City board · concept",
+  "board-final": "City board · final",
+  phase2: "Phase II approved (construction budget)",
+  "cmr-solicitation": "CM at Risk solicitation",
+  "design-build-solicitation": "Design-build solicitation",
+  bid: "Out to bid",
+  other: "Update",
+};
+const GC_SOURCE_LABELS = {
+  jbrc: "Joint Bond Review Committee",
+  sfaa: "State Fiscal Accountability Authority",
+  "scbo-ae": "SCBO · A/E",
+  "scbo-construction": "SCBO",
+  board: "City board",
+};
+const GC_DELIVERY_OPTIONS = [
+  { id: "cmr", label: "CM at Risk" },
+  { id: "design-build", label: "Design-build" },
+  { id: "qualifications", label: "Qualifications-based" },
+  { id: "design-bid-build", label: "Hard bid" },
+];
+const GC_TYPE_OPTIONS = [
+  { id: "higher-ed", label: "Higher ed" }, { id: "k12", label: "K-12" }, { id: "healthcare", label: "Healthcare" },
+  { id: "government", label: "Government" }, { id: "commercial", label: "Commercial" },
+  { id: "hospitality", label: "Hospitality" }, { id: "multifamily", label: "Multifamily" },
+  { id: "industrial", label: "Industrial" },
+];
+const GC_MIN_VALUES = [0, 500000, 1000000, 5000000, 10000000, 25000000];
+const DEFAULT_GC_PREFS = {
+  gc_delivery_methods: ["cmr", "design-build", "qualifications"],
+  gc_exclude_wood_frame: true,
+  gc_min_value: 1000000,
+  gc_project_types: [],
+  gc_show_unconfirmed: true,
+};
+const gcDeliveryLabel = (id) => (GC_DELIVERY_OPTIONS.find((o) => o.id === id) || {}).label || "Not stated";
+const fmtDay = (iso) => (iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—");
+
+function GcPrefsPanel({ prefs, onSave }) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(prefs);
+  const [saving, setSaving] = useState(false);
+  const toggleIn = (key, id) => setDraft((d) => {
+    const list = d[key] || [];
+    return { ...d, [key]: list.includes(id) ? list.filter((x) => x !== id) : [...list, id] };
+  });
+  const summary = [
+    (prefs.gc_delivery_methods || []).map(gcDeliveryLabel).join(" · ") || "Any delivery",
+    prefs.gc_exclude_wood_frame ? "no wood frame" : null,
+    prefs.gc_min_value ? `${fmt$(prefs.gc_min_value)}+` : null,
+    (prefs.gc_project_types || []).length ? prefs.gc_project_types.map((t) => (GC_TYPE_OPTIONS.find((o) => o.id === t) || {}).label || t).join(", ") : null,
+    "Charleston area",
+  ].filter(Boolean).join(" · ");
+  const label = { fontSize: 11, color: C.textMuted, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 };
+  return (
+    <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 14px", marginBottom: 14, background: C.surface }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
+        <span style={{ color: C.textSub, fontSize: 12 }}>Your profile:</span>
+        <span style={{ color: C.text, fontSize: 12, flex: 1 }}>{summary}</span>
+        <button style={homeLinkBtn} onClick={() => { setDraft(prefs); setOpen((v) => !v); }}>{open ? "Close" : "Edit"}</button>
+      </div>
+      {open && (
+        <div style={{ marginTop: 12, display: "grid", gap: 14 }}>
+          <div>
+            <div style={label}>Delivery methods</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {GC_DELIVERY_OPTIONS.map((o) => (
+                <button key={o.id} aria-pressed={(draft.gc_delivery_methods || []).includes(o.id)}
+                  style={chipStyle((draft.gc_delivery_methods || []).includes(o.id), C.sky)}
+                  onClick={() => toggleIn("gc_delivery_methods", o.id)}>{o.label}</button>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
+            <label style={{ color: C.text, fontSize: 13, display: "flex", gap: 6, alignItems: "center" }}>
+              <input type="checkbox" checked={!!draft.gc_exclude_wood_frame}
+                onChange={(e) => setDraft((d) => ({ ...d, gc_exclude_wood_frame: e.target.checked }))} />
+              Exclude wood frame
+            </label>
+            <label style={{ color: C.text, fontSize: 13, display: "flex", gap: 6, alignItems: "center" }}>
+              Minimum value
+              <select value={draft.gc_min_value || 0}
+                onChange={(e) => setDraft((d) => ({ ...d, gc_min_value: Number(e.target.value) }))}
+                style={{ background: C.surface, color: C.text, border: `1px solid ${C.border}`, borderRadius: 6, padding: "3px 6px" }}>
+                {GC_MIN_VALUES.map((v) => <option key={v} value={v}>{v ? `${fmt$(v)}+` : "Any"}</option>)}
+              </select>
+            </label>
+            <label style={{ color: C.text, fontSize: 13, display: "flex", gap: 6, alignItems: "center" }}>
+              <input type="checkbox" checked={draft.gc_show_unconfirmed !== false}
+                onChange={(e) => setDraft((d) => ({ ...d, gc_show_unconfirmed: e.target.checked }))} />
+              Show unconfirmed matches
+            </label>
+          </div>
+          <div>
+            <div style={label}>Project types (none selected = any)</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {GC_TYPE_OPTIONS.map((o) => (
+                <button key={o.id} aria-pressed={(draft.gc_project_types || []).includes(o.id)}
+                  style={chipStyle((draft.gc_project_types || []).includes(o.id))}
+                  onClick={() => toggleIn("gc_project_types", o.id)}>{o.label}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <button
+              disabled={saving}
+              onClick={async () => { setSaving(true); await onSave(draft); setSaving(false); setOpen(false); }}
+              style={{ ...styles.saveBtn, opacity: saving ? 0.6 : 1 }}
+            >
+              {saving ? "Saving…" : "Save preferences"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PipelineCard({ project: p }) {
+  const [showAll, setShowAll] = useState(false);
+  const matchColor_ = p.match === "match" ? "#22c55e" : p.match === "unconfirmed" ? "#f59e0b" : C.textMuted;
+  const matchLabel = p.match === "match" ? "Matches your profile" : p.match === "unconfirmed" ? "Unconfirmed" : "Not a match";
+  const events = p.events || [];
+  const shownEvents = showAll ? [...events].reverse() : [...events].reverse().slice(0, 3);
+  const fact = (k, v, title) => (
+    <div style={{ minWidth: 0 }} title={title}>
+      <div style={{ fontSize: 9, letterSpacing: 1, textTransform: "uppercase", color: C.textMuted, fontFamily: "'Space Mono', monospace" }}>{k}</div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{v}</div>
+    </div>
+  );
+  const basis = (b) => (b === "stated" ? "" : b === "inferred" ? " (likely)" : "");
+  const budget = p.estimate ? `${p.estimate_basis === "inferred" ? "~" : ""}${fmt$(p.estimate)}` : "Not published";
+  const construction = p.construction_type === "non-wood" ? "Non-wood" : p.construction_type === "wood" ? "Wood frame" : "Not confirmed";
+  return (
+    <div className="card-row" style={{ ...styles.projectRow, marginBottom: 8, borderLeft: `3px solid ${matchColor_}`, cursor: "default" }}>
+      <div className="project-header" style={styles.projectHeader}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={styles.projectTitle}>{p.title || "Untitled project"}</div>
+          <div style={{ ...styles.projectMeta, display: "flex", flexWrap: "wrap", columnGap: 12, rowGap: 2 }}>
+            {p.owner && <span style={{ color: C.text }}>{p.owner}</span>}
+            {p.pip_number && <span>State project {p.pip_number}</span>}
+            {(p.address || p.city) && <span>{[p.address, p.city].filter(Boolean).join(", ")}</span>}
+          </div>
+        </div>
+        <div className="project-header-side" style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4, whiteSpace: "nowrap",
+            color: matchColor_, background: `${matchColor_}1f`, border: `1px solid ${matchColor_}55` }}>
+            {matchLabel}
+          </span>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginTop: 10 }}>
+        {fact("Stage", GC_STAGE_LABELS[p.current_stage] || "Update")}
+        {fact("Delivery", `${gcDeliveryLabel(p.delivery_method)}${basis(p.delivery_basis)}`)}
+        {fact("Construction", construction, p.construction_reason)}
+        {fact("Budget", budget)}
+        {p.next_deadline && fact("Next deadline", fmtDay(p.next_deadline))}
+      </div>
+      {p.summary && <div style={{ color: C.textSub, fontSize: 12, marginTop: 10, lineHeight: 1.5 }}>{p.summary}</div>}
+      {p.match !== "match" && (p.match_reasons || []).length > 0 && (
+        <div style={{ color: matchColor_, fontSize: 11, marginTop: 6 }}>{p.match_reasons.join(" · ")}</div>
+      )}
+      {events.length > 0 && (
+        <div style={{ marginTop: 10, borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
+          {shownEvents.map((e, i) => (
+            <div key={i} style={{ display: "flex", gap: 10, fontSize: 12, padding: "3px 0", flexWrap: "wrap" }}>
+              <span style={{ color: C.textMuted, width: 92, flexShrink: 0 }}>{fmtDay(e.date)}</span>
+              <span style={{ color: C.sky, flexShrink: 0 }}>{GC_STAGE_LABELS[e.stage] || "Update"}</span>
+              <span style={{ color: C.textSub, flex: 1, minWidth: 160 }}>
+                {e.url ? <a href={e.url} target="_blank" rel="noopener noreferrer" style={{ color: C.textSub }}>{e.title || GC_SOURCE_LABELS[e.source]}</a> : (e.title || GC_SOURCE_LABELS[e.source])}
+                <span style={{ color: C.textMuted }}> · {GC_SOURCE_LABELS[e.source] || e.source}</span>
+              </span>
+            </div>
+          ))}
+          {events.length > 3 && (
+            <button style={{ ...homeLinkBtn, fontSize: 11 }} onClick={() => setShowAll((v) => !v)}>
+              {showAll ? "Show less" : `Show all ${events.length} updates`}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GcPipelineSection() {
+  const [prefs, setPrefs] = useState(null);
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+  const [showExcluded, setShowExcluded] = useState(false);
+
+  const load = useCallback(async (includeExcluded) => {
+    setError(null);
+    try {
+      const d = await api(`/pipeline/projects${includeExcluded ? "?include_excluded=true" : ""}`);
+      if (!Array.isArray(d?.projects)) throw new Error(d?.detail || "Pipeline unavailable");
+      setData(d);
+    } catch (e) {
+      setError(e.message);
+    }
+  }, []);
+
+  useEffect(() => {
+    api("/auth/me")
+      .then((me) => setPrefs({ ...DEFAULT_GC_PREFS, ...Object.fromEntries(Object.entries(me || {}).filter(([k, v]) => k.startsWith("gc_") && v != null)) }))
+      .catch(() => setPrefs(DEFAULT_GC_PREFS));
+  }, []);
+  useEffect(() => { load(showExcluded); }, [load, showExcluded]);
+
+  const savePrefs = async (next) => {
+    await api("/auth/me", { method: "PATCH", body: JSON.stringify(next) });
+    setPrefs(next);
+    await load(showExcluded);
+  };
+
+  const all = data?.projects || [];
+  const showUnconfirmed = prefs?.gc_show_unconfirmed !== false;
+  const visible = all.filter((p) => p.match === "match" || (p.match === "unconfirmed" && showUnconfirmed) || (p.match === "excluded" && showExcluded));
+  const counts = data?.counts || { match: 0, unconfirmed: 0, excluded: 0 };
+  const total = counts.match + counts.unconfirmed + counts.excluded;
+
+  return (
+    <section>
+      <div style={{ color: C.textSub, fontSize: 12, marginBottom: 12 }}>
+        Charleston-area projects from first state approval or city board review through the CM at Risk / design-build solicitation,
+        matched to your profile. Delivery method, construction type and budget come from the documents where stated; otherwise they're AI estimates.
+      </div>
+      {prefs && <GcPrefsPanel prefs={prefs} onSave={savePrefs} />}
+      {error ? (
+        <div style={{ color: C.textMuted, fontSize: 13, padding: "24px 0", textAlign: "center" }}>
+          The pipeline isn't available yet ({error}).
+        </div>
+      ) : !data ? (
+        <div style={{ textAlign: "center", padding: 40 }}><div style={styles.spinner} /></div>
+      ) : total === 0 ? (
+        <div style={{ color: C.textMuted, fontSize: 13, padding: "24px 0", textAlign: "center" }}>
+          No pipeline projects yet. The pipeline fills in after its first daily run.
+        </div>
+      ) : (
+        <>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "baseline", fontSize: 12, color: C.textMuted, marginBottom: 10 }}>
+            <span><strong style={{ color: "#22c55e" }}>{counts.match}</strong> matching</span>
+            <span><strong style={{ color: "#f59e0b" }}>{counts.unconfirmed}</strong> unconfirmed{showUnconfirmed ? "" : " (hidden)"}</span>
+            <span>
+              {counts.excluded} not matching ·{" "}
+              <button style={{ ...homeLinkBtn, fontSize: 12 }} onClick={() => setShowExcluded((v) => !v)}>
+                {showExcluded ? "Hide" : "Show"}
+              </button>
+            </span>
+          </div>
+          {visible.length === 0
+            ? <div style={{ color: C.textMuted, fontSize: 13, padding: "24px 0", textAlign: "center" }}>Nothing matches your profile right now.</div>
+            : visible.map((p) => <PipelineCard key={p.id} project={p} />)}
+        </>
+      )}
+    </section>
+  );
+}
+
 function LandingTab({
   parcels, parcelsLoading, bids, hiddenBids, bidsLoading, analyses, analysisStatus, onAnalyze,
   bondingCapacity, onEditProfile, onSave, savedIds, dismissedIds, onDismiss, onRestore,
@@ -3381,7 +3647,7 @@ function LandingTab({
   const [openAnalysis, setOpenAnalysis] = useState(null);
   const [showHiddenBids, setShowHiddenBids] = useState(false);
   const [selectedParcelId, setSelectedParcelId] = useState(null);
-  const { sortBy, fitsBonding, devLayout } = prefs;
+  const { sortBy, fitsBonding, devLayout, gcSub } = prefs;
   const updatePrefs = (patch) => {
     const next = { ...prefs, ...patch };
     setPrefs(next);
@@ -3451,7 +3717,7 @@ function LandingTab({
 
   const tabs = [
     { id: "developer", label: "Developers", sub: "Underutilized parcels", count: parcelsLoading ? null : allParcels.length, accent: "#22c55e" },
-    { id: "gc",        label: "General Contractors", sub: "Out to bid", count: bidsLoading ? null : bidItems.length, accent: C.sky },
+    { id: "gc",        label: "General Contractors", sub: "Pipeline & open bids", count: null, accent: C.sky },
   ];
 
   const selectStyle = {
@@ -3645,6 +3911,15 @@ function LandingTab({
           ) : null}
         />
       ) : (
+        <>
+        <div role="group" aria-label="GC view" style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+          {[["pipeline", "Pipeline"], ["bids", `Open bids${bidsLoading ? "" : ` (${bidItems.length})`}`]].map(([id, label]) => (
+            <button key={id} aria-pressed={gcSub === id} style={chipStyle(gcSub === id, C.sky)} onClick={() => updatePrefs({ gcSub: id })}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {gcSub === "pipeline" ? <GcPipelineSection /> : (
         <LandingSection
           key="gc"
           blurb="Open general-contractor solicitations in the Charleston area, soonest deadline first. Single-trade scopes (roofing, HVAC, paving and the like) are left out."
@@ -3657,6 +3932,8 @@ function LandingTab({
           renderItem={(p, animDelay) => renderBid(p, animDelay, bidNote(p))}
           after={hiddenBidsBlock}
         />
+        )}
+        </>
       )}
     </div>
   );
