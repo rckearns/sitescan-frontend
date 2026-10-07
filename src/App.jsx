@@ -392,13 +392,28 @@ const statusColors = {
   Opportunities: "#22c55e",
 };
 
+// Sign-in token. Falls back to memory when the browser blocks storage
+// (private modes, strict settings), so the app still works for that visit.
+let memoryToken = null;
+function getToken() {
+  try { return localStorage.getItem("sitescan_token"); } catch { return memoryToken; }
+}
+function setToken(token) {
+  memoryToken = token;
+  try { localStorage.setItem("sitescan_token", token); } catch { /* memory only */ }
+}
+function clearToken() {
+  memoryToken = null;
+  try { localStorage.removeItem("sitescan_token"); } catch { /* nothing stored */ }
+}
+
 async function api(path, opts = {}) {
-  const token = localStorage.getItem("sitescan_token");
+  const token = getToken();
   const headers = { "Content-Type": "application/json", ...opts.headers };
   if (token) headers["Authorization"] = `Bearer ${token}`;
   const res = await fetch(`${API}${path}`, { ...opts, headers });
   if (res.status === 401) {
-    localStorage.removeItem("sitescan_token");
+    clearToken();
     window.location.reload();
   }
   return res.json();
@@ -427,7 +442,7 @@ function AuthScreen({ onAuth }) {
         body: JSON.stringify(body),
       });
       if (data.access_token) {
-        localStorage.setItem("sitescan_token", data.access_token);
+        setToken(data.access_token);
         onAuth(data.access_token);
       } else {
         setError(data.detail || "Auth failed");
@@ -2272,7 +2287,7 @@ function SOQSection({ org }) {
     if (!pmId || !superId) { setErr("Select a Project Manager and Superintendent first."); return; }
     setGenerating(true); setErr("");
     try {
-      const token = localStorage.getItem("sitescan_token");
+      const token = getToken();
       const res = await fetch(`${API}/profile/soq/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -2353,7 +2368,7 @@ function BidAssistSection() {
   const uploadPdf = async (fileList) => {
     setParsing(true); setErr("");
     try {
-      const token = localStorage.getItem("sitescan_token");
+      const token = getToken();
       const form = new FormData();
       Array.from(fileList).forEach((f) => form.append("files", f));
       const res = await fetch(`${API}/profile/bid-assist/parse-pdf`, {
@@ -2561,7 +2576,7 @@ function ParcelLayer({ show, onStatus }) {
       genuse: "commercial",
     });
 
-    const token = localStorage.getItem("sitescan_token");
+    const token = getToken();
     onStatus?.({ zoom, count: 0, loading: true, error: null });
 
     fetch(`${API}/projects/map/parcels?${params}`, {
@@ -3456,7 +3471,7 @@ function LandingTab({
 
   const tabs = [
     { id: "developer", label: "Developers", sub: "Underutilized parcels", count: parcelsLoading ? null : allParcels.length, accent: "#22c55e" },
-    { id: "gc",        label: "General Contractors", sub: "Out to bid", count: bidsLoading ? null : allBids.length, accent: C.sky },
+    { id: "gc",        label: "General Contractors", sub: "Out to bid", count: bidsLoading ? null : bidItems.length, accent: C.sky },
   ];
 
   const selectStyle = {
@@ -3643,7 +3658,7 @@ function LandingTab({
 }
 
 export default function SiteScanApp() {
-  const [authed, setAuthed] = useState(!!localStorage.getItem("sitescan_token"));
+  const [authed, setAuthed] = useState(!!getToken());
   const [tab, setTab] = useState("home");
   const [showMap, setShowMap] = useState(false);
   const [projects, setProjects] = useState([]);
@@ -3830,7 +3845,7 @@ export default function SiteScanApp() {
   };
 
   const logout = () => {
-    localStorage.removeItem("sitescan_token");
+    clearToken();
     setAuthed(false);
   };
 
