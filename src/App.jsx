@@ -777,13 +777,13 @@ function ProjectCard({ group, onSave, savedIds, animDelay, onDismiss, valueMedia
 
 // ─── STATS BAR ──────────────────────────────────────────────────────────────
 
-function StatsBar({ stats, onBidsOpen }) {
+function StatsBar({ stats }) {
   if (!stats) return null;
   return (
     <div className="stats-grid">
       <div style={{ ...styles.statBox, borderLeft: `3px solid ${C.blue}` }}>
         <div style={styles.statNumber}>{stats.total_projects}</div>
-        <div style={styles.statLabel}>Active Projects</div>
+        <div style={styles.statLabel}>Active Permits</div>
       </div>
       <div style={{ ...styles.statBox, borderLeft: `3px solid ${C.orange}` }}>
         <div style={{ ...styles.statNumber, color: C.orange }}>{fmt$(stats.total_pipeline_value)}</div>
@@ -792,14 +792,6 @@ function StatsBar({ stats, onBidsOpen }) {
       <div style={{ ...styles.statBox, borderLeft: `3px solid ${C.sky}` }}>
         <div style={{ ...styles.statNumber, color: C.sky }}>{stats.new_this_week}</div>
         <div style={styles.statLabel}>New This Week</div>
-      </div>
-      <div
-        onClick={onBidsOpen}
-        style={{ ...styles.statBox, borderLeft: `3px solid #22c55e`, cursor: onBidsOpen ? "pointer" : "default" }}
-        title={onBidsOpen ? "Show open bids" : undefined}
-      >
-        <div style={{ ...styles.statNumber, color: "#22c55e" }}>{stats.bids_open}</div>
-        <div style={styles.statLabel}>Bids Open</div>
       </div>
     </div>
   );
@@ -1328,7 +1320,7 @@ function FilterBar({ filters, setFilters }) {
       {/* Client type + region */}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: "1 1 100%", alignItems: "center" }}>
         <span style={rowLabel}>Client</span>
-        {CLIENT_TYPES.map(({ id, label }) => (
+        {CLIENT_TYPES.filter((t) => t.id !== "government").map(({ id, label }) => (
           <button key={id} onClick={() => toggle("clientTypes", id)} style={chip((filters.clientTypes || []).includes(id), C.orange)}>
             {label}
           </button>
@@ -3108,7 +3100,65 @@ function summarizeAnalysis(analysis) {
   return { use: best.use_type || best.name, cost, value, roi };
 }
 
-function ParcelEconomics({ parcel, analysis, status, onAnalyze }) {
+// Parse free-text money like "$5,000,000", "5M" or "$2.5 million" into dollars.
+function parseMoney(text) {
+  if (!text) return null;
+  const m = String(text).replace(/,/g, "").match(/(\d+(?:\.\d+)?)\s*(m|mm|million|k|thousand)?\b/i);
+  if (!m) return null;
+  const n = parseFloat(m[1]);
+  const unit = (m[2] || "").toLowerCase();
+  const dollars = unit.startsWith("m") ? n * 1e6 : unit.startsWith("k") || unit === "thousand" ? n * 1e3 : n;
+  return dollars > 0 ? dollars : null;
+}
+
+const USE_GROUPS = [
+  { id: "mixed",       label: "Mixed-use",   re: /mixed/i },
+  { id: "hotel",       label: "Hotel",       re: /hotel|hospitality|lodging|\binn\b/i },
+  { id: "multifamily", label: "Multifamily", re: /multi-?family|apartment|residential|housing|condo|townhome/i },
+  { id: "retail",      label: "Retail",      re: /retail|restaurant|shopping|food/i },
+  { id: "office",      label: "Office",      re: /office|medical/i },
+  { id: "industrial",  label: "Industrial",  re: /industrial|warehouse|flex|logistic|storage/i },
+];
+function groupForUse(use) {
+  if (!use) return null;
+  return (USE_GROUPS.find((g) => g.re.test(use)) || { id: "other" }).id;
+}
+
+const PARCEL_SORTS = [
+  { id: "opportunity", label: "Most underutilized" },
+  { id: "roi",         label: "Highest ROI" },
+  { id: "size",        label: "Largest project" },
+  { id: "lot",         label: "Largest lot" },
+  { id: "perAcre",     label: "Cheapest land / acre" },
+];
+// Rank by the chosen metric; parcels missing it go last, ties fall back to opportunity.
+function sortParcels(items, sortBy) {
+  const key = {
+    roi:     (p) => p.summary?.roi,
+    size:    (p) => p.summary?.cost,
+    lot:     (p) => p.acres,
+    perAcre: (p) => (p.perAcre ? -p.perAcre : null),
+  }[sortBy];
+  return [...items].sort((a, b) => {
+    if (key) {
+      const ka = key(a), kb = key(b);
+      if (ka != null || kb != null) {
+        if (ka == null) return 1;
+        if (kb == null) return -1;
+        if (kb !== ka) return kb - ka;
+      }
+    }
+    return (b.opp_score || 0) - (a.opp_score || 0) || (b.value || 0) - (a.value || 0);
+  });
+}
+
+const chipStyle = (active, color = C.blue) => ({
+  padding: "4px 11px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600,
+  border: `1px solid ${active ? color : C.border}`, background: active ? `${color}22` : "transparent",
+  color: active ? color : C.textSub, fontFamily: "'DM Sans', sans-serif", transition: "all 0.15s",
+});
+
+function ParcelEconomics({ parcel, analysis, status, onAnalyze, onOpenAnalysis }) {
   const summary = analysis ? summarizeAnalysis(analysis) : null;
   const acres = parcel.acres;
   const perAcre = acres && parcel.land_value ? parcel.land_value / acres : null;
@@ -3139,6 +3189,11 @@ function ParcelEconomics({ parcel, analysis, status, onAnalyze }) {
           {stat("Project size", summary.cost ? fmt$(summary.cost) : "—", C.orange)}
           {stat("Est. ROI", summary.roi != null ? `${Math.round(summary.roi * 100)}%` : "—",
             summary.roi == null ? C.text : summary.roi >= 0.15 ? "#22c55e" : summary.roi >= 0 ? C.text : "#ef4444")}
+          <div>
+            <button style={linkBtn} onClick={() => onOpenAnalysis(parcel)}>
+              See {analysis.scenarios?.length > 1 ? `all ${analysis.scenarios.length} scenarios` : "full analysis"}
+            </button>
+          </div>
         </>
       ) : status === "loading" ? (
         <div style={{ gridColumn: "span 3", color: C.textSub, fontSize: 12 }}>Estimating ideal use, project size and ROI…</div>
@@ -3155,7 +3210,7 @@ function ParcelEconomics({ parcel, analysis, status, onAnalyze }) {
   );
 }
 
-function LandingSection({ blurb, summary, items, loading, emptyText, cardProps, renderFooter }) {
+function LandingSection({ blurb, summary, controls, items, loading, emptyText, cardProps, renderFooter }) {
   const [showAll, setShowAll] = useState(false);
   const shown = showAll ? items : items.slice(0, LANDING_PREVIEW);
   return (
@@ -3164,6 +3219,7 @@ function LandingSection({ blurb, summary, items, loading, emptyText, cardProps, 
         <div style={{ color: C.textSub, fontSize: 12, flex: "1 1 320px" }}>{blurb}</div>
         <div style={{ color: C.textMuted, fontSize: 12 }}>{loading ? "Loading…" : summary}</div>
       </div>
+      {!loading && controls}
       {loading ? (
         <div style={{ textAlign: "center", padding: 40 }}><div style={styles.spinner} /></div>
       ) : items.length === 0 ? (
@@ -3201,34 +3257,122 @@ function readHomeView() {
   try { return localStorage.getItem(HOME_VIEW_KEY) === "gc" ? "gc" : "developer"; } catch { return "developer"; }
 }
 
-function LandingTab({ parcels, parcelsLoading, bids, bidsLoading, dismissedIds, cardProps, analyses, analysisStatus, onAnalyze }) {
+function LandingTab({ parcels, parcelsLoading, bids, bidsLoading, dismissedIds, cardProps, analyses, analysisStatus, onAnalyze, bondingCapacity, onEditProfile }) {
   const [view, setView] = useState(readHomeView);
+  const [sortBy, setSortBy] = useState("opportunity");
+  const [useFilter, setUseFilter] = useState("");
+  const [hoodFilter, setHoodFilter] = useState("");
+  const [fitsBonding, setFitsBonding] = useState(false);
+  const [openAnalysis, setOpenAnalysis] = useState(null);
   const choose = (v) => {
     setView(v);
     try { localStorage.setItem(HOME_VIEW_KEY, v); } catch { /* storage unavailable */ }
   };
 
-  const parcelItems = useMemo(
+  const allParcels = useMemo(
     () => parcels
       .filter((p) => !dismissedIds.has(p.id))
-      .sort((a, b) => (b.opp_score || 0) - (a.opp_score || 0) || (b.value || 0) - (a.value || 0)),
-    [parcels, dismissedIds],
+      .map((p) => {
+        const summary = analyses[p.external_id] ? summarizeAnalysis(analyses[p.external_id]) : null;
+        return {
+          ...p, summary,
+          useGroup: groupForUse(summary?.use),
+          hood: getNeighborhood(p.latitude, p.longitude),
+          perAcre: p.acres && p.land_value ? p.land_value / p.acres : null,
+        };
+      }),
+    [parcels, dismissedIds, analyses],
   );
-  const bidItems = useMemo(
+  const parcelItems = useMemo(
+    () => sortParcels(
+      allParcels.filter((p) => (!useFilter || p.useGroup === useFilter) && (!hoodFilter || p.hood === hoodFilter)),
+      sortBy,
+    ),
+    [allParcels, useFilter, hoodFilter, sortBy],
+  );
+  const usesPresent = USE_GROUPS.filter((g) => allParcels.some((p) => p.useGroup === g.id));
+  const hoodsPresent = [...new Set(allParcels.map((p) => p.hood).filter(Boolean))].sort();
+  const estimatedCount = allParcels.filter((p) => p.summary).length;
+
+  const allBids = useMemo(
     () => bids.filter((p) => !dismissedIds.has(p.id)),
     [bids, dismissedIds],
+  );
+  // Bids with no published value are kept: we can't tell whether they fit.
+  const bidItems = useMemo(
+    () => (fitsBonding && bondingCapacity ? allBids.filter((p) => !p.value || p.value <= bondingCapacity) : allBids),
+    [allBids, fitsBonding, bondingCapacity],
   );
   const landTotal = parcelItems.reduce((sum, p) => sum + (p.land_value || 0), 0);
   const dueThisWeek = countDueWithin(bidItems, 7);
   const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
   const tabs = [
-    { id: "developer", label: "Developers", sub: "Underutilized parcels", count: parcelsLoading ? null : parcelItems.length, accent: "#22c55e" },
-    { id: "gc",        label: "General Contractors", sub: "Out to bid", count: bidsLoading ? null : bidItems.length, accent: C.sky },
+    { id: "developer", label: "Developers", sub: "Underutilized parcels", count: parcelsLoading ? null : allParcels.length, accent: "#22c55e" },
+    { id: "gc",        label: "General Contractors", sub: "Out to bid", count: bidsLoading ? null : allBids.length, accent: C.sky },
   ];
+
+  const selectStyle = {
+    background: C.surface, color: C.text, border: `1px solid ${C.border}`, borderRadius: 8,
+    padding: "5px 8px", fontSize: 12, fontFamily: "'DM Sans', sans-serif",
+  };
+  const controlRow = { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 14 };
+
+  const developerControls = (
+    <div style={controlRow}>
+      <select aria-label="Sort parcels" value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={selectStyle}>
+        {PARCEL_SORTS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+      </select>
+      {hoodsPresent.length > 1 && (
+        <select aria-label="Neighborhood" value={hoodFilter} onChange={(e) => setHoodFilter(e.target.value)} style={selectStyle}>
+          <option value="">All areas</option>
+          {hoodsPresent.map((h) => <option key={h} value={h}>{h}</option>)}
+        </select>
+      )}
+      {usesPresent.length > 0 && (
+        <>
+          <button style={chipStyle(!useFilter)} onClick={() => setUseFilter("")}>Any use</button>
+          {usesPresent.map((g) => (
+            <button key={g.id} style={chipStyle(useFilter === g.id)} onClick={() => setUseFilter(useFilter === g.id ? "" : g.id)}>
+              {g.label}
+            </button>
+          ))}
+        </>
+      )}
+      {estimatedCount < allParcels.length && (
+        <span style={{ color: C.textMuted, fontSize: 11, marginLeft: "auto" }}>
+          {estimatedCount} of {allParcels.length} have estimates{(sortBy === "roi" || sortBy === "size" || useFilter) ? "; ranking and use filters cover those" : ""}
+        </span>
+      )}
+    </div>
+  );
+
+  const gcControls = (
+    <div style={controlRow}>
+      {bondingCapacity ? (
+        <button style={chipStyle(fitsBonding, C.sky)} onClick={() => setFitsBonding((v) => !v)} aria-pressed={fitsBonding}>
+          Fits my bonding ({fmt$(bondingCapacity)})
+        </button>
+      ) : (
+        <span style={{ color: C.textMuted, fontSize: 12 }}>
+          <button
+            onClick={onEditProfile}
+            style={{ background: "none", border: "none", padding: 0, color: C.blue, cursor: "pointer", fontSize: 12, textDecoration: "underline", fontFamily: "inherit" }}
+          >
+            Add your bonding capacity
+          </button>{" "}to filter out bids that are too big.
+        </span>
+      )}
+    </div>
+  );
 
   return (
     <div>
+      <AnalysisModal
+        state={openAnalysis ? { loading: false, error: null, data: analyses[openAnalysis.external_id] } : null}
+        parcel={openAnalysis?.parcel_props}
+        onClose={() => setOpenAnalysis(null)}
+      />
       <div role="tablist" aria-label="Home view" style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
         {tabs.map((t) => {
           const active = view === t.id;
@@ -3263,6 +3407,7 @@ function LandingTab({ parcels, parcelsLoading, bids, bidsLoading, dismissedIds, 
           key="developer"
           blurb="Commercial parcels where land value outweighs improvements, highest opportunity first. Ideal use, project size and ROI are AI estimates; treat them as a starting point, not an appraisal."
           summary={`${plural(parcelItems.length, "parcel")} · ${fmt$(landTotal)} land value`}
+          controls={developerControls}
           items={parcelItems}
           loading={parcelsLoading}
           emptyText="No underutilized commercial parcels found."
@@ -3273,6 +3418,7 @@ function LandingTab({ parcels, parcelsLoading, bids, bidsLoading, dismissedIds, 
               analysis={analyses[p.external_id]}
               status={analysisStatus[p.external_id]}
               onAnalyze={onAnalyze}
+              onOpenAnalysis={setOpenAnalysis}
             />
           )}
         />
@@ -3281,10 +3427,16 @@ function LandingTab({ parcels, parcelsLoading, bids, bidsLoading, dismissedIds, 
           key="gc"
           blurb="Open general-contractor solicitations in the Charleston area, soonest deadline first. Single-trade scopes (roofing, HVAC, paving and the like) are left out."
           summary={`${plural(bidItems.length, "open bid")} · ${dueThisWeek} due this week`}
+          controls={gcControls}
           items={bidItems}
           loading={bidsLoading}
-          emptyText="No open GC solicitations in the Charleston area right now."
+          emptyText={fitsBonding ? "No open bids within your bonding capacity right now." : "No open GC solicitations in the Charleston area right now."}
           cardProps={cardProps}
+          renderFooter={(p) => (bondingCapacity && p.value > bondingCapacity ? (
+            <div style={{ marginTop: 8, fontSize: 12, color: "#f59e0b" }}>
+              Over your {fmt$(bondingCapacity)} bonding capacity
+            </div>
+          ) : null)}
         />
       )}
     </div>
@@ -3301,6 +3453,7 @@ export default function SiteScanApp() {
   const [openBids, setOpenBids] = useState([]);
   const [parcelAnalyses, setParcelAnalyses] = useState({});
   const [analysisStatus, setAnalysisStatus] = useState({});
+  const [bondingCapacity, setBondingCapacity] = useState(null);
   const [bidsLoading, setBidsLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [totalUnfiltered, setTotalUnfiltered] = useState(0);
@@ -3332,6 +3485,8 @@ export default function SiteScanApp() {
       const data = await api(`/projects?${params}`);
       const allProjects = data.projects || [];
       const filtered = allProjects.filter(p => {
+        // Bids and parcel opportunities live on Home; this tab is permit activity.
+        if (!PERMIT_SOURCES.has(p.source_id)) return false;
         if (!projectMatchesClientTypes(p, filters.clientTypes || [])) return false;
         if ((filters.minValue || 0) > 0 && p.value && p.value < filters.minValue) return false;
         if ((filters.categories || []).length) {
@@ -3348,7 +3503,7 @@ export default function SiteScanApp() {
       });
       setProjects(filtered);
       setTotal(filtered.length);
-      setTotalUnfiltered(allProjects.length);
+      setTotalUnfiltered(allProjects.filter((p) => PERMIT_SOURCES.has(p.source_id)).length);
       setValueMedians(buildValueMedians(allProjects));
 
       // Extract unique categories and sources
@@ -3486,6 +3641,7 @@ export default function SiteScanApp() {
     loadHistory();
     loadParcelOpportunities();
     loadOpenBids();
+    api("/profile/org").then((org) => setBondingCapacity(parseMoney(org?.bonding_capacity))).catch(() => {});
     // Pre-populate filters from saved profile preferences
     api("/auth/me").then((data) => {
       setFilters((f) => ({
@@ -3569,7 +3725,7 @@ export default function SiteScanApp() {
         .app-nav::-webkit-scrollbar { display: none; }
         .app-nav button { white-space: nowrap; flex-shrink: 0; }
         .app-main { max-width: 1400px; margin: 0 auto; padding: 20px 32px; box-sizing: border-box; width: 100%; }
-        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
         @media (max-width: 899px) {
           .header-wrap { flex-wrap: wrap; align-items: center; }
           .header-logo { order: 1; flex-shrink: 0; }
@@ -3606,7 +3762,7 @@ export default function SiteScanApp() {
           <nav className="app-nav">
             {[
               { id: "home",         label: "Home",                       icon: "🏠" },
-              { id: "scanner",      label: "Scanner",                    icon: "⚡" },
+              { id: "scanner",      label: "Permits",                    icon: "🏗️" },
               { id: "map",          label: "Map",                        icon: "🗺️" },
               { id: "saved",        label: `Saved (${saved.length})`,    icon: "★" },
               { id: "contractors",  label: "Contractors",                icon: "🤝" },
@@ -3634,7 +3790,7 @@ export default function SiteScanApp() {
       <main className="app-main">
         {tab === "scanner" && (
           <>
-            <StatsBar stats={liveStats} onBidsOpen={() => setFilters(f => ({ ...f, clientTypes: ["government"] }))} />
+            <StatsBar stats={liveStats} />
             <FilterBar
               filters={filters}
               setFilters={setFilters}
@@ -3642,8 +3798,8 @@ export default function SiteScanApp() {
             <div style={styles.resultHeader}>
               <span style={{ color: "#888", fontSize: 13 }}>
                 {totalUnfiltered > 0 && total < totalUnfiltered
-                  ? <><span style={{ color: C.text, fontWeight: 600 }}>{total}</span> of {totalUnfiltered} projects</>
-                  : <>{total} project{total !== 1 ? "s" : ""}</>
+                  ? <><span style={{ color: C.text, fontWeight: 600 }}>{total}</span> of {totalUnfiltered} permits</>
+                  : <>{total} permit{total !== 1 ? "s" : ""}</>
                 }
                 {filters.search && ` matching "${filters.search}"`}
               </span>
@@ -3667,20 +3823,13 @@ export default function SiteScanApp() {
             ) : projects.length === 0 ? (
               <div style={{ textAlign: "center", padding: 60, color: "#555" }}>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
-                <div>No projects found. Try running a scan or adjusting filters.</div>
+                <div>No permits found. Try running a scan or adjusting filters.</div>
               </div>
             ) : (
               <div>
-                {groupByAddress([
-                  ...projects.filter((p) => !isSubpermit(p) && !dismissedIds.has(p.id)),
-                  ...parcelOpportunities.filter(p => {
-                    if (!projectMatchesClientTypes(p, filters.clientTypes || [])) return false;
-                    if ((filters.minValue || 0) > 0 && p.value && p.value < filters.minValue) return false;
-                    if ((filters.statuses || []).length && filters.statuses.includes("Opportunities")) return false;
-                    if (dismissedIds.has(p.id)) return false;
-                    return true;
-                  }),
-                ]).map((group, i) => (
+                {groupByAddress(
+                  projects.filter((p) => !isSubpermit(p) && !dismissedIds.has(p.id)),
+                ).map((group, i) => (
                   <ProjectCard
                     key={group.address ?? `noaddr-${i}`}
                     group={group}
@@ -3705,6 +3854,8 @@ export default function SiteScanApp() {
             analyses={parcelAnalyses}
             analysisStatus={analysisStatus}
             onAnalyze={analyzeParcel}
+            bondingCapacity={bondingCapacity}
+            onEditProfile={() => setTab("company")}
             cardProps={{
               onSave: saveProject,
               savedIds,
