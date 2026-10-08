@@ -3229,6 +3229,7 @@ function readHomePrefs() {
     fitsBonding: o.fitsBonding === true,
     devLayout: o.devLayout === "map" ? "map" : "list",
     gcSub: o.gcSub === "bids" ? "bids" : "pipeline",
+    showBuilt: o.showBuilt === true,
   };
 }
 
@@ -3300,6 +3301,24 @@ function ParcelEconomics({ parcel, analysis, status, onAnalyze, onOpenAnalysis }
 
 // One underutilized parcel on the Developers list. Clicking opens the full AI analysis,
 // or starts an estimate when the parcel doesn't have one yet.
+// A City permit for new construction on the parcel: built or being built, so not an open opportunity.
+function ConstructionBadge({ c }) {
+  const done = c.status === "completed";
+  const when = done ? (c.finaled ? `completed ${c.finaled}` : "completed") : `permitted ${c.issued || ""}`.trim();
+  const tip = [c.permit && `Permit ${c.permit}`, c.description].filter(Boolean).join(": ");
+  return (
+    <div title={tip} style={{ marginTop: 6, fontSize: 11, color: "#f59e0b", lineHeight: 1.4 }}>
+      <span style={{
+        fontWeight: 700, padding: "1px 7px", borderRadius: 4, marginRight: 6,
+        background: "#f59e0b1f", border: "1px solid #f59e0b55",
+      }}>
+        {done ? "Built" : "Under construction"}
+      </span>
+      New construction {when}{c.valuation ? ` · ${fmt$(c.valuation)}` : ""}
+    </div>
+  );
+}
+
 function ParcelCard({ parcel, analysis, status, onAnalyze, onOpenAnalysis, onDismiss, onShowOnMap, animDelay }) {
   const color = parcelColor(parcel.opp_score);
   const busy = status === "loading";
@@ -3342,6 +3361,7 @@ function ParcelCard({ parcel, analysis, status, onAnalyze, onOpenAnalysis, onDis
                 </button>
               )}
             </div>
+            {parcel.construction && <ConstructionBadge c={parcel.construction} />}
           </div>
           <div className="project-header-side" style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
             <div className="parcel-land-value" style={{ textAlign: "right" }} title="Appraised value of the land (county assessor)">
@@ -3704,7 +3724,7 @@ function LandingTab({
   const [openAnalysis, setOpenAnalysis] = useState(null);
   const [showHiddenBids, setShowHiddenBids] = useState(false);
   const [selectedParcelId, setSelectedParcelId] = useState(null);
-  const { sortBy, fitsBonding, devLayout, gcSub } = prefs;
+  const { sortBy, fitsBonding, devLayout, gcSub, showBuilt } = prefs;
   const updatePrefs = (patch) => {
     const next = { ...prefs, ...patch };
     setPrefs(next);
@@ -3724,6 +3744,7 @@ function LandingTab({
           ...p, summary,
           useGroup: groupForUse(summary?.use),
           hood: parcelArea(p),
+          construction: p.parcel_props?.CONSTRUCTION || null,
           perAcre: p.acres && p.land_value ? p.land_value / p.acres : null,
         };
       }),
@@ -3736,11 +3757,14 @@ function LandingTab({
   const hoodFilter = hoodsPresent.includes(prefs.hoodFilter) ? prefs.hoodFilter : "";
   const parcelItems = useMemo(
     () => sortParcels(
-      allParcels.filter((p) => (!useFilter || p.useGroup === useFilter) && (!hoodFilter || p.hood === hoodFilter)),
+      allParcels.filter((p) => (showBuilt || !p.construction)
+        && (!useFilter || p.useGroup === useFilter) && (!hoodFilter || p.hood === hoodFilter)),
       sortBy,
     ),
-    [allParcels, useFilter, hoodFilter, sortBy],
+    [allParcels, useFilter, hoodFilter, sortBy, showBuilt],
   );
+  // City permits show new construction on these since 2021, so they're no longer open opportunities.
+  const builtCount = allParcels.filter((p) => p.construction).length;
   const estimatedCount = allParcels.filter((p) => p.summary).length;
 
   const allBids = useMemo(
@@ -3773,7 +3797,7 @@ function LandingTab({
   ) : null;
 
   const tabs = [
-    { id: "developer", label: "Developers", sub: "Underutilized parcels", count: parcelsLoading ? null : allParcels.length, accent: "#22c55e" },
+    { id: "developer", label: "Developers", sub: "Underutilized parcels", count: parcelsLoading ? null : allParcels.length - builtCount, accent: "#22c55e" },
     { id: "gc",        label: "General Contractors", sub: "Pipeline & open bids", count: null, accent: C.sky },
   ];
 
@@ -3830,6 +3854,13 @@ function LandingTab({
             </button>
           ))}
         </>
+      )}
+      {builtCount > 0 && (
+        <button style={chipStyle(showBuilt, "#f59e0b")} aria-pressed={showBuilt}
+          onClick={() => updatePrefs({ showBuilt: !showBuilt })}
+          title="Parcels where City of Charleston permits show new construction since 2021">
+          {showBuilt ? "Hide" : "Show"} {builtCount} with recent construction
+        </button>
       )}
       {estimatedCount < allParcels.length && (
         <span style={{ color: C.textMuted, fontSize: 11, marginLeft: "auto" }}>
