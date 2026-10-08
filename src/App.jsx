@@ -260,7 +260,7 @@ function groupByTitle(addressGroups) {
 // ─── PARCEL OPPORTUNITY HELPERS ───────────────────────────────────────────────
 
 // Score 0–100: how underimproved is this parcel relative to its land value?
-// Vacant land = 95 (max opportunity), full build = ~5.
+// Vacant land = 100 (max opportunity), full build = ~5. Mirrors backend opportunity_score.
 function parcelOppScore(props) {
   const genuse = (props.GENUSE || "").toLowerCase();
   if (genuse.includes("undevelopable")) return 3;
@@ -269,11 +269,40 @@ function parcelOppScore(props) {
   const imp  = parseFloat(props.IMP_APPR)  || 0;
 
   if (land === 0 && imp === 0) return 50;   // unknown
-  if (imp === 0)  return 95;                // vacant land → maximum opportunity
+  if (imp === 0)  return 100;               // vacant land → maximum opportunity
   if (land === 0) return 15;               // improvements only, no land value recorded
 
   const impRatio = imp / (land + imp);
   return Math.max(3, Math.round((1 - impRatio) * 100));
+}
+
+// v3 analyses: zoning fit per scenario, the assumptions behind each pro forma, and City zoning.
+const ZONING_FIT_LABELS = {
+  by_right:       { label: "By right",       color: "#4caf7a" },
+  needs_approval: { label: "Needs approval", color: "#f0a030" },
+  not_allowed:    { label: "Not allowed",    color: "#e0605a" },
+};
+
+function assumptionsLine(a) {
+  if (!a || !a.gross_sf) return null;
+  const parts = [`${Number(a.gross_sf).toLocaleString()} GSF`];
+  if (a.units) parts.push(`${a.units} ${a.unit_label || "units"}`);
+  if (a.hard_cost_psf) parts.push(`$${Number(a.hard_cost_psf).toLocaleString()}/SF hard`);
+  if (a.soft_cost_pct != null) {
+    const pct = Number(a.soft_cost_pct) > 1 ? Number(a.soft_cost_pct) : Number(a.soft_cost_pct) * 100;
+    parts.push(`${Math.round(pct)}% soft`);
+  }
+  return parts.join(" · ");
+}
+
+function zoningSummary(z) {
+  if (!z) return null;
+  const parts = [];
+  if (z.base_zoning) parts.push(z.base_zoning);
+  if (z.height_district) parts.push(/^stor/i.test(z.height_type || "") ? `${z.height_district}-story height district` : `height district ${z.height_district}`);
+  parts.push(z.accommodations_overlay ? `Accommodations Overlay ${z.accommodations_overlay}` : "no Accommodations Overlay");
+  if (z.old_and_historic) parts.push("Old & Historic District (BAR)");
+  return parts.join(" · ");
 }
 
 function parcelColor(score) {
@@ -2709,6 +2738,11 @@ function AnalysisModal({ state, parcel, onClose }) {
                   📍 {data.location_context}
                 </p>
               )}
+              {zoningSummary(data.zoning) && (
+                <p style={{ margin: "8px 0 0", color: C.textSub, fontSize: 13, lineHeight: 1.5 }}>
+                  🏛 {zoningSummary(data.zoning)}
+                </p>
+              )}
             </div>
 
             {/* Scenarios */}
@@ -2730,13 +2764,28 @@ function AnalysisModal({ state, parcel, onClose }) {
                         <span style={{ fontWeight: 700, fontSize: 15, color: C.text }}>{s.name}</span>
                         {isRec && (
                           <span style={{
-                            background: C.orange, color: "#fff", fontSize: 10, fontWeight: 700,
+                            background: data.pencils === false ? "#b4413a" : C.orange, color: "#fff", fontSize: 10, fontWeight: 700,
                             borderRadius: 4, padding: "2px 7px", textTransform: "uppercase",
-                          }}>Recommended</span>
+                          }}>{data.pencils === false ? "Best option · doesn't pencil" : "Recommended"}</span>
+                        )}
+                        {ZONING_FIT_LABELS[s.zoning_fit] && (
+                          <span style={{
+                            border: `1px solid ${ZONING_FIT_LABELS[s.zoning_fit].color}`, color: ZONING_FIT_LABELS[s.zoning_fit].color,
+                            fontSize: 10, fontWeight: 700, borderRadius: 4, padding: "1px 6px", textTransform: "uppercase",
+                          }}>{ZONING_FIT_LABELS[s.zoning_fit].label}</span>
                         )}
                         <span style={{ fontSize: 11, color: C.textMuted, marginLeft: "auto" }}>{s.use_type}</span>
                       </div>
                       <p style={{ margin: "0 0 12px", color: C.textSub, fontSize: 13, lineHeight: 1.55 }}>{s.description}</p>
+                      {s.zoning_notes && (
+                        <p style={{ margin: "-6px 0 10px", color: C.textSub, fontSize: 12, lineHeight: 1.5 }}>🏛 {s.zoning_notes}</p>
+                      )}
+                      {assumptionsLine(s.assumptions) && (
+                        <div style={{ margin: "-4px 0 10px", fontSize: 12, color: C.textSub, lineHeight: 1.5 }}>
+                          <span style={{ fontFamily: "'Space Mono', monospace", color: C.text }}>{assumptionsLine(s.assumptions)}</span>
+                          {s.assumptions?.noi_basis && <div style={{ color: C.textMuted }}>NOI: {s.assumptions.noi_basis}</div>}
+                        </div>
+                      )}
                       {/* Proforma grid */}
                       <div style={{
                         display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8,
@@ -2750,7 +2799,7 @@ function AnalysisModal({ state, parcel, onClose }) {
                           ...(pf.land_cost != null ? [["Land Cost", pf.land_cost]] : []),
                           ["Hard Costs", pf.estimated_hard_cost],
                           ["Soft Costs", pf.soft_costs],
-                          ["Profit Margin", pf.profit_margin, true],
+                          ["Profit on Cost", pf.profit_margin, true],
                         ].map(([label, val, isStr]) => (
                           <div key={label}>
                             <div style={{ fontSize: 10, color: C.textMuted, textTransform: "uppercase", letterSpacing: ".06em" }}>{label}</div>
@@ -2764,6 +2813,14 @@ function AnalysisModal({ state, parcel, onClose }) {
                             <div style={{ fontSize: 10, color: C.textMuted, textTransform: "uppercase", letterSpacing: ".06em" }}>Cap Rate</div>
                             <div style={{ fontWeight: 700, color: C.text, fontSize: 13, fontFamily: "'Space Mono', monospace" }}>
                               {pf.cap_rate}%
+                            </div>
+                          </div>
+                        )}
+                        {pf.yield_on_cost != null && (
+                          <div>
+                            <div style={{ fontSize: 10, color: C.textMuted, textTransform: "uppercase", letterSpacing: ".06em" }}>Yield on Cost</div>
+                            <div style={{ fontWeight: 700, color: C.text, fontSize: 13, fontFamily: "'Space Mono', monospace" }}>
+                              {pf.yield_on_cost}%
                             </div>
                           </div>
                         )}
