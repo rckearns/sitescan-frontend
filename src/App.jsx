@@ -2858,7 +2858,7 @@ function AnalysisModal({ state, parcel, onClose }) {
 
 const CHARLESTON_CENTER = [32.7765, -79.9311];
 
-function MapTab({ mapHeight = "calc(100vh - 230px)", parcels = [], analyses = {}, analysisStatus = {}, onAnalyze }) {
+function MapTab({ mapHeight = "calc(100vh - 230px)", parcels = [], analyses = {}, analysisStatus = {}, analysisErrors = {}, onAnalyze }) {
   const [points, setPoints] = useState([]);
   const [mapLoading, setMapLoading] = useState(true);
   const [showParcels, setShowParcels] = useState(false);
@@ -2881,7 +2881,7 @@ function MapTab({ mapHeight = "calc(100vh - 230px)", parcels = [], analyses = {}
   const modalState = modalParcel
     ? {
         loading: !modalAnalysis && analysisStatus[modalTms] !== "error",
-        error: !modalAnalysis && analysisStatus[modalTms] === "error" ? "Estimate unavailable. Try again from the parcel." : null,
+        error: !modalAnalysis && analysisStatus[modalTms] === "error" ? `Estimate unavailable: ${analysisErrors[modalTms] || "request failed"}. Try again from the parcel.` : null,
         data: modalAnalysis,
       }
     : null;
@@ -3246,7 +3246,7 @@ const homeLinkBtn = {
 
 const fmtPct = (r) => `${Math.round(r * 100)}%`;
 
-function ParcelEconomics({ parcel, analysis, status, onAnalyze, onOpenAnalysis }) {
+function ParcelEconomics({ parcel, analysis, status, error, onAnalyze, onOpenAnalysis }) {
   const summary = analysis ? summarizeAnalysis(analysis) : null;
   const acres = parcel.acres;
   const perAcre = acres && parcel.land_value ? parcel.land_value / acres : null;
@@ -3288,7 +3288,7 @@ function ParcelEconomics({ parcel, analysis, status, onAnalyze, onOpenAnalysis }
         <div style={{ gridColumn: "span 3", color: C.textSub, fontSize: 12 }}>Estimating ideal use, project size and profit on cost…</div>
       ) : status === "error" ? (
         <div style={{ gridColumn: "span 3", color: C.textMuted, fontSize: 12 }}>
-          Estimate unavailable. <button style={homeLinkBtn} onClick={act(onAnalyze)}>Retry</button>
+          Estimate unavailable{error ? `: ${error}` : ""}. <button style={homeLinkBtn} onClick={act(onAnalyze)}>Retry</button>
         </div>
       ) : (
         <div style={{ gridColumn: "span 3" }}>
@@ -3319,7 +3319,7 @@ function ConstructionBadge({ c }) {
   );
 }
 
-function ParcelCard({ parcel, analysis, status, onAnalyze, onOpenAnalysis, onDismiss, onShowOnMap, animDelay }) {
+function ParcelCard({ parcel, analysis, status, error, onAnalyze, onOpenAnalysis, onDismiss, onShowOnMap, animDelay }) {
   const color = parcelColor(parcel.opp_score);
   const busy = status === "loading";
   const activate = () => {
@@ -3389,6 +3389,7 @@ function ParcelCard({ parcel, analysis, status, onAnalyze, onOpenAnalysis, onDis
           parcel={parcel}
           analysis={analysis}
           status={status}
+          error={error}
           onAnalyze={onAnalyze}
           onOpenAnalysis={onOpenAnalysis}
         />
@@ -3716,7 +3717,7 @@ function GcPipelineSection() {
 }
 
 function LandingTab({
-  parcels, parcelsLoading, bids, hiddenBids, bidsLoading, analyses, analysisStatus, onAnalyze,
+  parcels, parcelsLoading, bids, hiddenBids, bidsLoading, analyses, analysisStatus, analysisErrors = {}, onAnalyze,
   bondingCapacity, onEditProfile, onSave, savedIds, dismissedIds, onDismiss, onRestore,
 }) {
   const [view, setView] = useState(readHomeView);
@@ -3817,6 +3818,7 @@ function LandingTab({
       parcel={p}
       analysis={analyses[p.external_id]}
       status={analysisStatus[p.external_id]}
+      error={analysisErrors[p.external_id]}
       onAnalyze={onAnalyze}
       onOpenAnalysis={setOpenAnalysis}
       onDismiss={onDismiss}
@@ -4039,6 +4041,7 @@ export default function SiteScanApp() {
   const [homeDismissedIds, setHomeDismissedIds] = useState(readHomeDismissed);
   const [parcelAnalyses, setParcelAnalyses] = useState({});
   const [analysisStatus, setAnalysisStatus] = useState({});
+  const [analysisErrors, setAnalysisErrors] = useState({});
   const [bondingCapacity, setBondingCapacity] = useState(null);
   const [bidsLoading, setBidsLoading] = useState(true);
   const [total, setTotal] = useState(0);
@@ -4138,10 +4141,13 @@ export default function SiteScanApp() {
         method: "POST",
         body: JSON.stringify({ parcel: parcel.parcel_props }),
       });
-      if (!result.analysis) throw new Error(result.detail || "No analysis returned");
+      if (!result.analysis) throw new Error(typeof result.detail === "string" ? result.detail : "No analysis returned");
       setParcelAnalyses((a) => ({ ...a, [tms]: result.analysis }));
       setAnalysisStatus((s) => ({ ...s, [tms]: "done" }));
-    } catch {
+    } catch (e) {
+      // A non-JSON reply (gateway timeout page) throws a SyntaxError from res.json().
+      const reason = e instanceof SyntaxError ? "The server didn't respond in time" : e.message || "Request failed";
+      setAnalysisErrors((m) => ({ ...m, [tms]: reason }));
       setAnalysisStatus((s) => ({ ...s, [tms]: "error" }));
     }
   };
@@ -4443,6 +4449,7 @@ export default function SiteScanApp() {
             bidsLoading={bidsLoading}
             analyses={parcelAnalyses}
             analysisStatus={analysisStatus}
+            analysisErrors={analysisErrors}
             onAnalyze={analyzeParcel}
             bondingCapacity={bondingCapacity}
             onEditProfile={() => setTab("company")}
@@ -4511,6 +4518,7 @@ export default function SiteScanApp() {
               parcels={parcelOpportunities}
               analyses={parcelAnalyses}
               analysisStatus={analysisStatus}
+              analysisErrors={analysisErrors}
               onAnalyze={analyzeParcel}
             />
           </div>
