@@ -2011,7 +2011,7 @@ function useApiGet(path, isValid = () => true) {
   return { loading: false, data: res.data, failed: res.failed };
 }
 
-const CONTRACTOR_VIEWS = [["trades", "By trade"], ["gcs", "GC leaderboard"], ["subs", "Proven subs"], ["mine", "My list"]];
+const CONTRACTOR_VIEWS = [["trades", "By trade"], ["gcs", "GC leaderboard"], ["awards", "State awards"], ["subs", "Proven subs"], ["mine", "My list"]];
 
 // The user's saved GCs and subs (the /contractors list), shared by every view in the tab.
 const MyContractorsContext = createContext(null);
@@ -2061,6 +2061,7 @@ function ContractorsTab() {
         ))}
       </div>
       {view === "gcs" ? <GcLeaderboard />
+        : view === "awards" ? <StateAwards />
         : view === "subs" ? <ProvenSubs />
         : view === "mine" ? <MyContractorList />
         : <PermitContractorsSection />}
@@ -2097,6 +2098,87 @@ function MyContractorList() {
         <ContractorSection type="sub" label="Subcontractors" contractors={mine.list} onAdd={mine.add} onEdit={mine.edit} onDelete={mine.remove} />
         <ContractorSection type="gc" label="General contractors" contractors={mine.list} onAdd={mine.add} onEdit={mine.edit} onDelete={mine.remove} />
       </div>
+    </div>
+  );
+}
+
+const AWARD_TYPE_LABELS = { award: "Awarded", selection: "Selected", shortlist: "Shortlisted", prequalified: "Prequalified" };
+const AWARD_DELIVERY_LABELS = {
+  "design-bid-build": "Hard bid", cmr: "CM at Risk", "design-build": "Design-build",
+  professional: "A/E", idq: "IDQ", "task-order": "Task order", other: "",
+};
+
+// Who's winning and who's being shortlisted on state jobs (CofC, The Citadel, Trident Tech),
+// from the award notices agencies post. Collected daily from Oct 2026 on.
+function StateAwards() {
+  const [role, setRole] = useState("construction");
+  const [open, setOpen] = useState(null);
+  const { data, loading, failed } = useApiGet(`/awards?role=${role}`, (d) => Array.isArray(d?.firms));
+  const firms = data?.firms || [];
+  const noticeLine = (n) => [
+    AWARD_TYPE_LABELS[n.notice_type] || n.notice_type,
+    AWARD_DELIVERY_LABELS[n.delivery],
+    n.amount ? fmt$(n.amount) : "",
+  ].filter(Boolean).join(" · ");
+  return (
+    <div>
+      <div style={{ color: C.textSub, fontSize: 12, marginBottom: 12 }}>
+        Firms shortlisted and awarded on state jobs, read from the notices {data?.agencies?.join(", ") || "local agencies"} post.
+        Agencies take notices down after a few weeks, so this builds up from October 2026. MUSC posts only on paper and isn't included.
+      </div>
+      <div role="group" aria-label="Firm type" style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+        {[["construction", "GCs, CMs & design-builders"], ["design", "Architects & engineers"], ["all", "All"]].map(([id, label]) => (
+          <button key={id} aria-pressed={role === id} style={chipStyle(role === id, C.orange)} onClick={() => setRole(id)}>{label}</button>
+        ))}
+        {data && <span style={{ color: C.textMuted, fontSize: 12, alignSelf: "center" }}>{data.total_notices} notices · {firms.length} firms</span>}
+      </div>
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 40 }}><div style={styles.spinner} /></div>
+      ) : failed ? (
+        <div style={{ color: C.textMuted, fontSize: 13, padding: 24, textAlign: "center" }}>Couldn't load awards. Try again shortly.</div>
+      ) : firms.length === 0 ? (
+        <div style={{ color: C.textMuted, fontSize: 13, padding: 24, textAlign: "center", border: `1px dashed ${C.border}`, borderRadius: 10 }}>
+          No notices collected yet. The first run happens shortly after each deploy, then daily.
+        </div>
+      ) : (
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+          {firms.map((f, i) => {
+            const isOpen = open === f.key;
+            return (
+              <div key={f.key} style={{ borderTop: i ? `1px solid ${C.border}` : "none" }}>
+                <button type="button" className="card-row" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : f.key)} style={{
+                  display: "block", width: "100%", textAlign: "left", padding: "11px 16px", background: "transparent",
+                  border: "none", cursor: "pointer", fontFamily: "inherit", color: "inherit",
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+                    <span style={{ fontWeight: 700, fontSize: 14, color: C.text }}>{f.name}</span>
+                    {f.awarded_value > 0 && <span style={{ color: C.orange, fontFamily: "'JetBrains Mono', monospace", fontSize: 13 }}>{fmt$(f.awarded_value)}</span>}
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 14px", fontSize: 12, color: C.textSub, marginTop: 3 }}>
+                    {f.awards > 0 && <span style={{ color: "#22c55e" }}>{f.awards} award{f.awards === 1 ? "" : "s"}</span>}
+                    {f.shortlists > 0 && <span>{f.shortlists} shortlist{f.shortlists === 1 ? "" : "s"}</span>}
+                    {f.prequalified > 0 && <span>{f.prequalified} prequalified</span>}
+                    <span style={{ color: C.textMuted }}>{f.agencies.join(", ")}</span>
+                    {f.last_date && <span style={{ color: C.textMuted }}>Last {fmtDate(f.last_date)}</span>}
+                  </div>
+                </button>
+                {isOpen && (
+                  <div style={{ padding: "0 16px 12px 16px" }}>
+                    {f.notices.map((n, j) => (
+                      <div key={j} style={{ fontSize: 12, padding: "5px 0", borderTop: `1px dashed ${C.border}` }}>
+                        <span style={{ color: C.textMuted, marginRight: 8 }}>{n.posted_date ? fmtDate(n.posted_date) : "—"}</span>
+                        <span style={{ color: C.text }}>{n.project_name || n.project_number}</span>
+                        <span style={{ color: C.textMuted }}> · {n.agency} · {noticeLine(n)}</span>
+                        {n.source_url && <> · <a href={n.source_url} target="_blank" rel="noopener noreferrer" style={{ color: C.blue }}>Notice</a></>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -3903,6 +3985,7 @@ const GC_STAGE_LABELS = {
   "cmr-solicitation": "CM at Risk solicitation",
   "design-build-solicitation": "Design-build solicitation",
   bid: "Out to bid",
+  award: "Shortlist / award",
   other: "Update",
 };
 const GC_SOURCE_LABELS = {
@@ -3911,6 +3994,7 @@ const GC_SOURCE_LABELS = {
   "scbo-ae": "SCBO · A/E",
   "scbo-construction": "SCBO",
   board: "City board",
+  award: "Agency notice",
 };
 const GC_DELIVERY_OPTIONS = [
   { id: "cmr", label: "CM at Risk" },
