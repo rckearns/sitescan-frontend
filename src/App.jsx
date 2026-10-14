@@ -4127,13 +4127,21 @@ function LikelyCompetitors({ project: p }) {
   const minValue = p.estimate ? Math.max(1000000, Math.round(p.estimate * 0.25)) : 5000000;
   const params = new URLSearchParams({ min_value: minValue, days: 1825, limit: 5 });
   if (cats.length) params.set("categories", cats.join(","));
-  const { data, failed } = useApiGet(`/directory/gc-leaders?${params}`, (d) => Array.isArray(d?.contractors));
+  const narrow = useApiGet(`/directory/gc-leaders?${params}`, (d) => Array.isArray(d?.contractors));
+  // Nothing that type and size locally (e.g. $40M+ higher-ed): widen to any commercial job of $10M+.
+  const widen = narrow.data && narrow.data.contractors.length === 0;
+  const broad = useApiGet(widen ? "/directory/gc-leaders?min_value=10000000&days=1825&limit=5" : null,
+    (d) => Array.isArray(d?.contractors));
+  const data = widen ? broad.data : narrow.data;
+  const failed = narrow.failed || broad.failed;
   const rows = data?.contractors || null;
   return (
     <div style={{ marginTop: 8, fontSize: 12 }}>
       <ContractorDetail contractor={selected} onClose={() => setSelected(null)} />
       <div style={{ color: C.textMuted, marginBottom: 4 }}>
-        GCs who've built {cats.length ? "this type of building" : "commercial jobs"} of {fmt$(minValue)}+ locally in the last 5 years:
+        {widen
+          ? `No local ${cats.length ? "jobs of this type" : "jobs"} of ${fmt$(minValue)}+ in the last 5 years. GCs on any commercial job of $10M+:`
+          : `GCs who've built ${cats.length ? "this type of building" : "commercial jobs"} of ${fmt$(minValue)}+ locally in the last 5 years:`}
       </div>
       {failed ? <span style={{ color: C.textMuted }}>Couldn't load.</span>
         : !rows ? <span style={{ color: C.textMuted }}>Loading…</span>
