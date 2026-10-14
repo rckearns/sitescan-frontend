@@ -2618,7 +2618,7 @@ function ParcelDots({ parcels, analyses, selectedId, onSelect, renderPopup }) {
             <div>{p.title}{p.hood ? ` · ${p.hood}` : ""}</div>
             <div>Land {fmt$(p.land_value)} · {p.opp_score}% underutilized</div>
             {summary && (
-              <div>{summary.use}{summary.roi != null ? ` · ${Math.round(summary.roi * 100)}% profit on cost` : ""}</div>
+              <div>{summary.use}{summary.profitOnCost != null ? ` · ${fmtPct(summary.profitOnCost)} profit on cost` : ""}</div>
             )}
           </div>
         </Tooltip>
@@ -2898,7 +2898,7 @@ function MapTab({ mapHeight = "calc(100vh - 230px)", parcels = [], analyses = {}
           <div><div style={{ color: "#999", fontSize: 10, textTransform: "uppercase" }}>Improvements</div><strong>{p.imp_value ? fmt$(p.imp_value) : "None"}</strong></div>
           <div><div style={{ color: "#999", fontSize: 10, textTransform: "uppercase" }}>Lot size</div><strong>{p.acres ? `${p.acres.toFixed(2)} ac` : "—"}</strong></div>
           {summary && (
-            <div><div style={{ color: "#999", fontSize: 10, textTransform: "uppercase" }}>Profit on cost</div><strong>{summary.roi != null ? `${Math.round(summary.roi * 100)}%` : "—"}</strong></div>
+            <div><div style={{ color: "#999", fontSize: 10, textTransform: "uppercase" }}>Profit on cost</div><strong>{summary.profitOnCost != null ? fmtPct(summary.profitOnCost) : "—"}</strong></div>
           )}
         </div>
         <div style={{ background: `${color}20`, border: `1px solid ${color}50`, borderRadius: 6, padding: "5px 10px", textAlign: "center", fontWeight: 700, color, fontSize: 12, marginBottom: 6 }}>
@@ -3766,7 +3766,9 @@ function LandingTab({
   );
   // City permits show new construction on these since 2021, so they're no longer open opportunities.
   const builtCount = allParcels.filter((p) => p.construction).length;
-  const estimatedCount = allParcels.filter((p) => p.summary).length;
+  // Counted over the parcels the list can show (recent construction only when that's switched on).
+  const listable = showBuilt ? allParcels : allParcels.filter((p) => !p.construction);
+  const estimatedCount = listable.filter((p) => p.summary).length;
 
   const allBids = useMemo(
     () => bids.filter((p) => !dismissedIds.has(p.id)),
@@ -3864,9 +3866,9 @@ function LandingTab({
           {showBuilt ? "Hide" : "Show"} {builtCount} with recent construction
         </button>
       )}
-      {estimatedCount < allParcels.length && (
+      {estimatedCount < listable.length && (
         <span style={{ color: C.textMuted, fontSize: 11, marginLeft: "auto" }}>
-          {estimatedCount} of {allParcels.length} have estimates{(sortBy === "profit" || sortBy === "size" || useFilter) ? "; ranking and use filters cover those" : ""}
+          {estimatedCount} of {listable.length} have estimates{(sortBy === "profit" || sortBy === "size" || useFilter) ? "; ranking and use filters cover those" : ""}
         </span>
       )}
     </div>
@@ -4039,6 +4041,12 @@ export default function SiteScanApp() {
   const [openBids, setOpenBids] = useState([]);
   const [hiddenBids, setHiddenBids] = useState([]);
   const [homeDismissedIds, setHomeDismissedIds] = useState(readHomeDismissed);
+  // The Map overlay shows the same parcels as Home → Developers by default:
+  // nothing the user dismissed, and nothing with recent construction.
+  const mapParcels = useMemo(
+    () => parcelOpportunities.filter((p) => !homeDismissedIds.has(p.id) && !p.parcel_props?.CONSTRUCTION),
+    [parcelOpportunities, homeDismissedIds],
+  );
   const [parcelAnalyses, setParcelAnalyses] = useState({});
   const [analysisStatus, setAnalysisStatus] = useState({});
   const [analysisErrors, setAnalysisErrors] = useState({});
@@ -4515,7 +4523,7 @@ export default function SiteScanApp() {
           <div style={{ flex: 1, padding: "16px 24px", overflow: "hidden", minHeight: 0 }}>
             <MapTab
               mapHeight="calc(100vh - 116px)"
-              parcels={parcelOpportunities}
+              parcels={mapParcels}
               analyses={parcelAnalyses}
               analysisStatus={analysisStatus}
               analysisErrors={analysisErrors}
