@@ -1489,25 +1489,42 @@ const MIN_VALUE_THRESHOLDS = [
   { label: "> $1M total",    value: 1000000 },
 ];
 
-function TradeContractorCard({ contractor }) {
+function LicensedBadge({ licenses }) {
+  if (!licenses || licenses.length === 0) return null;
+  const tip = licenses.map((l) => [l.trade_label || l.classification, l.license_number && `#${l.license_number}`, l.license_status]
+    .filter(Boolean).join(" ")).join("; ");
+  return (
+    <span title={`SC contractor license: ${tip}`} style={{
+      fontSize: 9, fontWeight: 700, color: C.blue,
+      background: `${C.blue}18`, border: `1px solid ${C.blue}30`,
+      borderRadius: 6, padding: "1px 5px", marginLeft: 8, verticalAlign: "middle", whiteSpace: "nowrap",
+    }}>
+      Licensed
+    </span>
+  );
+}
+
+function TradeContractorCard({ contractor, tradeLabel, onOpen }) {
   const pct = contractor.market_share_pct || 0;
   const shareColor = pct >= 25 ? C.orange : pct >= 10 ? C.blue : C.textMuted;
-  const hasLicenses = contractor.licenses && contractor.licenses.length > 0;
   const hasAka = contractor.also_known_as && contractor.also_known_as.length > 0;
   return (
-    <div style={{ padding: "13px 16px", display: "flex", alignItems: "center", gap: 12, borderTop: `1px solid ${C.border}` }}>
+    <button
+      type="button"
+      className="card-row"
+      onClick={() => onOpen(contractor)}
+      aria-label={`${contractor.name}: show permits`}
+      style={{
+        padding: "13px 16px", display: "flex", alignItems: "center", gap: 12, borderTop: `1px solid ${C.border}`,
+        width: "100%", textAlign: "left", background: "transparent", border: "none",
+        borderTopStyle: "solid", borderTopWidth: 1, borderTopColor: C.border,
+        cursor: "pointer", fontFamily: "inherit", color: "inherit",
+      }}
+    >
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 700, fontSize: 13, color: C.text, marginBottom: 5 }}>
           {contractor.name}
-          {hasLicenses && (
-            <span style={{
-              fontSize: 9, fontWeight: 700, color: C.blue,
-              background: `${C.blue}18`, border: `1px solid ${C.blue}30`,
-              borderRadius: 6, padding: "1px 5px", marginLeft: 8, verticalAlign: "middle",
-            }}>
-              LLR
-            </span>
-          )}
+          <LicensedBadge licenses={contractor.licenses} />
         </div>
 
         {/* Market share bar */}
@@ -1515,7 +1532,10 @@ function TradeContractorCard({ contractor }) {
           <div style={{ flex: 1, height: 4, background: `${C.border}`, borderRadius: 2, overflow: "hidden" }}>
             <div style={{ width: `${Math.min(pct, 100)}%`, height: "100%", background: shareColor, borderRadius: 2, transition: "width 0.4s ease" }} />
           </div>
-          <span style={{ fontSize: 11, fontWeight: 700, color: shareColor, fontFamily: "'JetBrains Mono', monospace", minWidth: 38, textAlign: "right" }}>
+          <span
+            title={`Share of all ${tradeLabel || "trade"} permit value`}
+            style={{ fontSize: 11, fontWeight: 700, color: shareColor, fontFamily: "'JetBrains Mono', monospace", minWidth: 38, textAlign: "right" }}
+          >
             {pct.toFixed(1)}%
           </span>
         </div>
@@ -1544,7 +1564,8 @@ function TradeContractorCard({ contractor }) {
           </div>
         )}
       </div>
-    </div>
+      <span aria-hidden="true" style={{ color: C.textMuted, fontSize: 14 }}>›</span>
+    </button>
   );
 }
 
@@ -1555,6 +1576,7 @@ function PermitContractorsSection() {
   const [sortBy, setSortBy] = useState("total_permit_value");
   const [minValue, setMinValue] = useState(0);
   const [openTrades, setOpenTrades] = useState(new Set());
+  const [selected, setSelected] = useState(null);
 
   const toggleTrade = (trade) => setOpenTrades((prev) => {
     const next = new Set(prev);
@@ -1635,6 +1657,7 @@ function PermitContractorsSection() {
 
   return (
     <div>
+      <ContractorDetail contractor={selected} onClose={() => setSelected(null)} />
       {/* Summary bar */}
       {tradeData && (
         <div style={{
@@ -1644,7 +1667,8 @@ function PermitContractorsSection() {
           fontSize: 12, color: C.textSub,
         }}>
           <span style={{ flex: 1 }}>
-            {tradeData.total_contractors} contractors across {tradeData.total_trades} trades
+            {tradeData.total_contractors} contractors across {tradeData.total_trades} trades, from building permits.
+            {" "}Percentages are each company's share of its trade's permit value.
           </span>
         </div>
       )}
@@ -1688,12 +1712,13 @@ function PermitContractorsSection() {
       {!loading && tradeGroups.length > 0 && (
         <div style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(460px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fill, minmax(min(460px, 100%), 1fr))",
           gap: 24,
           alignItems: "start",
         }}>
           {tradeGroups.map(({ tradeId, label, contractors, totalValue }) => {
-            const isOpen = openTrades.has(tradeId);
+            // While searching, groups with a match open on their own.
+            const isOpen = openTrades.has(tradeId) || !!search;
             return (
               <div key={tradeId} style={{
                 background: C.surface,
@@ -1701,12 +1726,15 @@ function PermitContractorsSection() {
                 borderRadius: 12,
                 overflow: "hidden",
               }}>
-                <div
+                <button
+                  type="button"
                   onClick={() => toggleTrade(tradeId)}
+                  aria-expanded={isOpen}
+                  disabled={!!search}
                   style={{
-                    display: "flex", alignItems: "center", gap: 8,
-                    padding: "12px 16px",
-                    cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: 8, width: "100%",
+                    padding: "12px 16px", border: "none", textAlign: "left", fontFamily: "inherit",
+                    cursor: search ? "default" : "pointer",
                     borderBottom: isOpen ? `1px solid ${C.border}` : "none",
                     background: isOpen ? `${C.navy}40` : "transparent",
                     userSelect: "none",
@@ -1731,11 +1759,11 @@ function PermitContractorsSection() {
                   <span style={{ color: C.textMuted, fontSize: 11, marginLeft: 4 }}>
                     {isOpen ? "\u25B2" : "\u25BC"}
                   </span>
-                </div>
+                </button>
                 {isOpen && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                     {contractors.map((c) => (
-                      <TradeContractorCard key={c.name} contractor={c} />
+                      <TradeContractorCard key={c.key || c.name} contractor={c} tradeLabel={label} onOpen={setSelected} />
                     ))}
                   </div>
                 )}
@@ -1961,41 +1989,230 @@ function ContractorSection({ type, label, contractors, onAdd, onEdit, onDelete }
   );
 }
 
+const CONTRACTOR_VIEWS = [["trades", "By trade"], ["gcs", "GC leaderboard"]];
+
 function ContractorsTab() {
-  const [contractors, setContractors] = useState([]);
+  const [view, setView] = useState(() => {
+    try { return localStorage.getItem("contractors_view") === "gcs" ? "gcs" : "trades"; } catch { return "trades"; }
+  });
+  const choose = (v) => {
+    setView(v);
+    try { localStorage.setItem("contractors_view", v); } catch { /* storage unavailable */ }
+  };
+  return (
+    <div>
+      <div role="group" aria-label="Contractors view" style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+        {CONTRACTOR_VIEWS.map(([id, label]) => (
+          <button key={id} aria-pressed={view === id} style={chipStyle(view === id, C.sky)} onClick={() => choose(id)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {view === "gcs" ? <GcLeaderboard /> : <PermitContractorsSection />}
+    </div>
+  );
+}
+
+const catName = (id) => (ALL_CATEGORIES.find((c) => c.id === id)?.label
+  || String(id || "other").replace(/-/g, " ").replace(/\b\w/g, (ch) => ch.toUpperCase()));
+
+const LEADER_MIN_VALUES = [[1000000, "$1M+"], [5000000, "$5M+"], [10000000, "$10M+"], [25000000, "$25M+"]];
+const GC_WINDOWS = [[365, "Last 12 months"], [730, "Last 2 years"], [1825, "Last 5 years"], [0, "All time"]];
+
+// General contractors winning large commercial permits: who you're competing with.
+function GcLeaderboard() {
+  const [minValue, setMinValue] = useState(1000000);
+  const [days, setDays] = useState(730);
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [selected, setSelected] = useState(null);
 
-  const load = async () => {
+  useEffect(() => {
     setLoading(true);
-    try {
-      const data = await api("/contractors");
-      setContractors(Array.isArray(data) ? data : []);
-    } catch (e) { /* ignore */ }
-    setLoading(false);
+    setFailed(false);
+    api(`/directory/gc-leaders?min_value=${minValue}&days=${days}`)
+      .then((d) => { if (!Array.isArray(d?.contractors)) throw new Error(); setData(d); })
+      .catch(() => setFailed(true))
+      .finally(() => setLoading(false));
+  }, [minValue, days]);
+
+  const selectStyle = {
+    background: C.surface, color: C.text, border: `1px solid ${C.border}`, borderRadius: 8,
+    padding: "6px 10px", fontSize: 13, fontFamily: "'DM Sans', sans-serif",
   };
+  const rows = data?.contractors || [];
+  const top = rows[0]?.total_value || 1;
 
-  useEffect(() => { load(); }, []);
+  return (
+    <div>
+      <ContractorDetail contractor={selected} onClose={() => setSelected(null)} />
+      <div style={{ color: C.textSub, fontSize: 12, marginBottom: 12 }}>
+        General contractors on commercial building permits (City of Charleston, North Charleston, Mount Pleasant),
+        ranked by total permit value. Residential permits and specialty trades are left out.
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+        <select aria-label="Smallest permit" value={minValue} onChange={(e) => setMinValue(Number(e.target.value))} style={selectStyle}>
+          {LEADER_MIN_VALUES.map(([v, l]) => <option key={v} value={v}>Permits {l}</option>)}
+        </select>
+        <select aria-label="Time window" value={days} onChange={(e) => setDays(Number(e.target.value))} style={selectStyle}>
+          {GC_WINDOWS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+        {data && !loading && <span style={{ color: C.textMuted, fontSize: 12, alignSelf: "center" }}>{data.total} contractors</span>}
+      </div>
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 40 }}><div style={styles.spinner} /></div>
+      ) : failed ? (
+        <div style={{ color: C.textMuted, fontSize: 13, padding: 24, textAlign: "center" }}>Couldn't load the leaderboard. Try again shortly.</div>
+      ) : rows.length === 0 ? (
+        <div style={{ color: C.textMuted, fontSize: 13, padding: 24, textAlign: "center", border: `1px dashed ${C.border}`, borderRadius: 10 }}>
+          No commercial permits that size in this window.
+        </div>
+      ) : (
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+          {rows.map((c, i) => (
+            <button
+              key={c.key}
+              type="button"
+              className="card-row"
+              onClick={() => setSelected(c)}
+              aria-label={`${c.name}: show permits`}
+              style={{
+                display: "flex", gap: 12, alignItems: "flex-start", width: "100%", textAlign: "left",
+                padding: "12px 16px", background: "transparent", border: "none", fontFamily: "inherit", color: "inherit",
+                borderTop: i ? `1px solid ${C.border}` : "none", cursor: "pointer",
+              }}
+            >
+              <span style={{ color: C.textMuted, fontFamily: "'JetBrains Mono', monospace", fontSize: 12, minWidth: 22, paddingTop: 1 }}>{i + 1}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+                  <span style={{ fontWeight: 700, fontSize: 14, color: C.text, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</span>
+                  <span style={{ color: C.orange, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", fontSize: 13, whiteSpace: "nowrap" }}>{fmt$(c.total_value)}</span>
+                </div>
+                <div style={{ height: 4, background: C.border, borderRadius: 2, margin: "6px 0", overflow: "hidden" }}>
+                  <div style={{ width: `${Math.max(2, (c.total_value / top) * 100)}%`, height: "100%", background: C.orange }} />
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 14px", fontSize: 12, color: C.textSub }}>
+                  <span>{c.job_count} job{c.job_count === 1 ? "" : "s"}</span>
+                  <span>Typical {fmt$(c.median_value)}</span>
+                  <span>Largest {fmt$(c.largest_value)}</span>
+                  {c.last_date && <span style={{ color: C.textMuted }}>Last {fmtDate(c.last_date)}</span>}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+                  {Object.entries(c.categories || {}).slice(0, 4).map(([cat, n]) => (
+                    <span key={cat} style={{ fontSize: 10, color: C.textSub, border: `1px solid ${C.border}`, borderRadius: 4, padding: "1px 6px" }}>
+                      {catName(cat)} · {n}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
-  const handleAdd = async (data) => {
-    const created = await api("/contractors", { method: "POST", body: JSON.stringify(data) });
-    setContractors((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
-  };
+// One contractor's permits: totals, a map and the list. `contractor` needs `key` and `name`.
+function ContractorDetail({ contractor, onClose }) {
+  const [data, setData] = useState(null);
+  const [failed, setFailed] = useState(false);
+  const key = contractor?.key;
 
-  const handleEdit = async (id, data) => {
-    const updated = await api(`/contractors/${id}`, { method: "PATCH", body: JSON.stringify(data) });
-    setContractors((prev) => prev.map((c) => (c.id === id ? updated : c)));
-  };
+  useEffect(() => {
+    if (!key) return;
+    setData(null);
+    setFailed(false);
+    api(`/directory/trades/contractor?key=${encodeURIComponent(key)}`)
+      .then((d) => { if (!Array.isArray(d?.permits)) throw new Error(); setData(d); })
+      .catch(() => setFailed(true));
+  }, [key]);
 
-  const handleDelete = async (id) => {
-    await api(`/contractors/${id}`, { method: "DELETE" });
-    setContractors((prev) => prev.filter((c) => c.id !== id));
-  };
+  useEffect(() => {
+    if (!contractor) return undefined;
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [contractor, onClose]);
 
-  if (loading) {
-    return <div style={{ textAlign: "center", padding: 60, color: C.textMuted }}>Loading…</div>;
-  }
+  if (!contractor) return null;
+  const permits = data?.permits || [];
+  const located = permits.filter((p) => p.latitude && p.longitude);
+  const bounds = located.length > 1 ? located.map((p) => [p.latitude, p.longitude]) : null;
 
-  return <PermitContractorsSection />;
+  return (
+    <div
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+    >
+      <div role="dialog" aria-modal="true" aria-label={contractor.name} style={{
+        background: C.surface, borderRadius: 16, border: `1px solid ${C.border}`, width: "100%", maxWidth: 780,
+        maxHeight: "90vh", overflowY: "auto", padding: 24, position: "relative",
+      }}>
+        <button onClick={onClose} aria-label="Close" style={{ position: "absolute", top: 14, right: 14, background: "transparent", border: "none", color: C.textSub, fontSize: 20, cursor: "pointer" }}>✕</button>
+        <div style={{ fontSize: 11, color: C.textMuted, textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 4 }}>Contractor</div>
+        <h2 style={{ margin: "0 32px 4px 0", color: C.text, fontSize: 20 }}>
+          {contractor.name}<LicensedBadge licenses={contractor.licenses} />
+        </h2>
+        {contractor.also_known_as?.length > 0 && (
+          <div style={{ fontSize: 11, color: C.textMuted, fontStyle: "italic", marginBottom: 6 }}>aka {contractor.also_known_as.join(", ")}</div>
+        )}
+        {failed ? (
+          <div style={{ color: C.textMuted, padding: "30px 0", textAlign: "center" }}>Couldn't load this contractor's permits.</div>
+        ) : !data ? (
+          <div style={{ textAlign: "center", padding: 40 }}><div style={styles.spinner} /></div>
+        ) : (
+          <>
+            <div style={{ display: "flex", gap: 20, flexWrap: "wrap", margin: "10px 0 14px", fontSize: 13, color: C.textSub }}>
+              <span><strong style={{ color: C.text }}>{data.permit_count}</strong> permits</span>
+              <span><strong style={{ color: C.orange }}>{fmt$(data.total_value)}</strong> total</span>
+              {permits[0]?.date && <span>Most recent {fmtDate(permits[0].date)}</span>}
+            </div>
+            {located.length > 0 && (
+              <div style={{ height: 240, borderRadius: 10, overflow: "hidden", border: `1px solid ${C.border}`, marginBottom: 14 }}>
+                <MapContainer
+                  {...(bounds ? { bounds, boundsOptions: { padding: [24, 24], maxZoom: 15 } } : { center: [located[0].latitude, located[0].longitude], zoom: 15 })}
+                  style={{ height: "100%", width: "100%" }}
+                  scrollWheelZoom={false}
+                >
+                  <DarkBasemap />
+                  {located.map((p) => (
+                    <CircleMarker key={p.id} center={[p.latitude, p.longitude]} radius={6}
+                      pathOptions={{ color: C.orange, fillColor: C.orange, fillOpacity: 0.7, weight: 1 }}>
+                      <Tooltip>{p.address || p.title}{p.value ? ` · ${fmt$(p.value)}` : ""}</Tooltip>
+                    </CircleMarker>
+                  ))}
+                </MapContainer>
+              </div>
+            )}
+            {permits.length === 0 ? (
+              <div style={{ color: C.textMuted, fontSize: 13 }}>No permits found under this name.</div>
+            ) : (
+              <div>
+                {permits.map((p) => (
+                  <div key={p.id} style={{ display: "flex", gap: 12, padding: "9px 0", borderTop: `1px solid ${C.border}`, fontSize: 13 }}>
+                    <span style={{ color: C.textMuted, fontSize: 12, minWidth: 92, whiteSpace: "nowrap" }}>{fmtDate(p.date)}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: C.text }}>{p.address || p.title}</div>
+                      <div style={{ color: C.textMuted, fontSize: 11 }}>
+                        {[catName(p.category), p.city, p.permit_number].filter(Boolean).join(" · ")}
+                        {p.source_url && <> · <a href={p.source_url} target="_blank" rel="noopener noreferrer" style={{ color: C.blue }}>Source</a></>}
+                      </div>
+                    </div>
+                    <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace", fontSize: 12, whiteSpace: "nowrap" }}>{p.value ? fmt$(p.value) : "—"}</span>
+                  </div>
+                ))}
+                {data.permit_count > permits.length && (
+                  <div style={{ color: C.textMuted, fontSize: 12, paddingTop: 8 }}>Showing the {permits.length} most recent of {data.permit_count}.</div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
 
 
