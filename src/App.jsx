@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, createContext, useContext } from "react";
 import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -1763,7 +1763,8 @@ function PermitContractorsSection() {
                 {isOpen && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                     {contractors.map((c) => (
-                      <TradeContractorCard key={c.key || c.name} contractor={c} tradeLabel={label} onOpen={setSelected} />
+                      <TradeContractorCard key={c.key || c.name} contractor={c} tradeLabel={label}
+                        onOpen={(x) => setSelected({ ...x, kind: tradeId === "general" ? "gc" : "sub", specialty: tradeId === "general" ? "" : label })} />
                     ))}
                   </div>
                 )}
@@ -1989,27 +1990,185 @@ function ContractorSection({ type, label, contractors, onAdd, onEdit, onDelete }
   );
 }
 
-const CONTRACTOR_VIEWS = [["trades", "By trade"], ["gcs", "GC leaderboard"]];
+// GET `path` (null = nothing to load). The result is tied to the path it came from,
+// so a stale response never shows under a newer request.
+function useApiGet(path, isValid = () => true) {
+  const [res, setRes] = useState({ path: null });
+  useEffect(() => {
+    if (!path) return undefined;
+    let live = true;
+    api(path)
+      .then((d) => { if (live) setRes({ path, data: isValid(d) ? d : null, failed: !isValid(d) }); })
+      .catch(() => { if (live) setRes({ path, data: null, failed: true }); });
+    return () => { live = false; };
+  }, [path]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!path || res.path !== path) return { loading: !!path, data: null, failed: false };
+  return { loading: false, data: res.data, failed: res.failed };
+}
+
+const CONTRACTOR_VIEWS = [["trades", "By trade"], ["gcs", "GC leaderboard"], ["subs", "Proven subs"], ["mine", "My list"]];
+
+// The user's saved GCs and subs (the /contractors list), shared by every view in the tab.
+const MyContractorsContext = createContext(null);
+const nameKey = (n) => String(n || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+function useMyContractorsState() {
+  const [list, setList] = useState([]);
+  useEffect(() => {
+    api("/contractors").then((d) => setList(Array.isArray(d) ? d : [])).catch(() => {});
+  }, []);
+  const add = async (data) => {
+    const created = await api("/contractors", { method: "POST", body: JSON.stringify(data) });
+    if (created?.id) setList((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+    return created;
+  };
+  const edit = async (id, data) => {
+    const updated = await api(`/contractors/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+    if (updated?.id) setList((prev) => prev.map((c) => (c.id === id ? updated : c)));
+  };
+  const remove = async (id) => {
+    await api(`/contractors/${id}`, { method: "DELETE" });
+    setList((prev) => prev.filter((c) => c.id !== id));
+  };
+  const savedNames = useMemo(() => new Set(list.map((c) => nameKey(c.name))), [list]);
+  return { list, add, edit, remove, savedNames };
+}
 
 function ContractorsTab() {
+  const mine = useMyContractorsState();
   const [view, setView] = useState(() => {
-    try { return localStorage.getItem("contractors_view") === "gcs" ? "gcs" : "trades"; } catch { return "trades"; }
+    try {
+      const v = localStorage.getItem("contractors_view");
+      return CONTRACTOR_VIEWS.some(([id]) => id === v) ? v : "trades";
+    } catch { return "trades"; }
   });
   const choose = (v) => {
     setView(v);
     try { localStorage.setItem("contractors_view", v); } catch { /* storage unavailable */ }
   };
   return (
-    <div>
-      <div role="group" aria-label="Contractors view" style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+    <MyContractorsContext.Provider value={mine}>
+      <div role="group" aria-label="Contractors view" style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
         {CONTRACTOR_VIEWS.map(([id, label]) => (
           <button key={id} aria-pressed={view === id} style={chipStyle(view === id, C.sky)} onClick={() => choose(id)}>
-            {label}
+            {label}{id === "mine" && mine.list.length ? ` (${mine.list.length})` : ""}
           </button>
         ))}
       </div>
-      {view === "gcs" ? <GcLeaderboard /> : <PermitContractorsSection />}
+      {view === "gcs" ? <GcLeaderboard />
+        : view === "subs" ? <ProvenSubs />
+        : view === "mine" ? <MyContractorList />
+        : <PermitContractorsSection />}
+    </MyContractorsContext.Provider>
+  );
+}
+
+function csvCell(v) {
+  const t = String(v ?? "");
+  return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+}
+
+function MyContractorList() {
+  const mine = useContext(MyContractorsContext);
+  const exportCsv = () => {
+    const cols = ["name", "type", "specialty", "phone", "email", "website", "notes"];
+    const rows = [cols.join(","), ...mine.list.map((c) => cols.map((k) => csvCell(k === "type" ? (c.type === "gc" ? "GC" : "Sub") : c[k])).join(","))];
+    const url = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "yabodle-contractors.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
+        <div style={{ color: C.textSub, fontSize: 12, flex: 1, minWidth: 240 }}>
+          Your bid list. Add companies here or with ☆ Save on any contractor's page, then export for bid invitations.
+        </div>
+        {mine.list.length > 0 && <button style={chipStyle(false, C.sky)} onClick={exportCsv}>⬇ Export CSV</button>}
+      </div>
+      <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+        <ContractorSection type="sub" label="Subcontractors" contractors={mine.list} onAdd={mine.add} onEdit={mine.edit} onDelete={mine.remove} />
+        <ContractorSection type="gc" label="General contractors" contractors={mine.list} onAdd={mine.add} onEdit={mine.edit} onDelete={mine.remove} />
+      </div>
     </div>
+  );
+}
+
+const PROVEN_MIN_VALUES = [[1000000, "$1M+"], [5000000, "$5M+"], [10000000, "$10M+"], [25000000, "$25M+"]];
+
+// Trade contractors with permits on large commercial jobs: subs proven at that scale.
+function ProvenSubs() {
+  const [minValue, setMinValue] = useState(5000000);
+  const [days, setDays] = useState(1825);
+  const [selected, setSelected] = useState(null);
+  const { data, loading, failed } = useApiGet(`/directory/subs?min_value=${minValue}&days=${days}`, (d) => !!d?.trades);
+
+  const selectStyle = {
+    background: C.surface, color: C.text, border: `1px solid ${C.border}`, borderRadius: 8,
+    padding: "6px 10px", fontSize: 13, fontFamily: "'DM Sans', sans-serif",
+  };
+  const trades = Object.entries(data?.trades || {});
+
+  return (
+    <div>
+      <ContractorDetail contractor={selected} onClose={() => setSelected(null)} />
+      <div style={{ color: C.textSub, fontSize: 12, marginBottom: 12 }}>
+        Electrical, plumbing, mechanical, fire and roofing contractors who pulled permits on large commercial jobs,
+        matched to the job by parcel and date. City of Charleston permits only.
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+        <select aria-label="Smallest job" value={minValue} onChange={(e) => setMinValue(Number(e.target.value))} style={selectStyle}>
+          {PROVEN_MIN_VALUES.map(([v, l]) => <option key={v} value={v}>Jobs {l}</option>)}
+        </select>
+        <select aria-label="Time window" value={days} onChange={(e) => setDays(Number(e.target.value))} style={selectStyle}>
+          {GC_WINDOWS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+        {data && !loading && <span style={{ color: C.textMuted, fontSize: 12, alignSelf: "center" }}>{data.jobs_checked} jobs checked</span>}
+      </div>
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 40 }}><div style={styles.spinner} /></div>
+      ) : failed ? (
+        <div style={{ color: C.textMuted, fontSize: 13, padding: 24, textAlign: "center" }}>Couldn't load subs. Try again shortly.</div>
+      ) : trades.length === 0 ? (
+        <div style={{ color: C.textMuted, fontSize: 13, padding: 24, textAlign: "center", border: `1px dashed ${C.border}`, borderRadius: 10 }}>
+          No trade permits matched to jobs that size yet.
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(360px, 100%), 1fr))", gap: 16, alignItems: "start" }}>
+          {trades.map(([trade, t]) => (
+            <div key={trade} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+              <div style={{ padding: "10px 14px", fontWeight: 700, color: C.text, fontSize: 14, borderBottom: `1px solid ${C.border}` }}>
+                {t.label} <span style={{ color: C.textMuted, fontWeight: 400, fontSize: 12 }}>· {t.total}</span>
+              </div>
+              {t.subs.map((sub) => (
+                <SubRow key={sub.key} sub={sub} onOpen={() => setSelected({ key: sub.key, name: sub.name, kind: "sub", specialty: t.label })} />
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SubRow({ sub, onOpen }) {
+  return (
+    <button type="button" className="card-row" onClick={onOpen} aria-label={`${sub.name}: show permits`} style={{
+      display: "block", width: "100%", textAlign: "left", padding: "9px 14px", background: "transparent",
+      border: "none", borderTop: `1px solid ${C.border}`, cursor: "pointer", fontFamily: "inherit", color: "inherit",
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+        <span style={{ color: C.text, fontWeight: 600, fontSize: 13 }}>{sub.name}</span>
+        <span style={{ color: C.orange, fontSize: 12, whiteSpace: "nowrap" }}>{sub.job_count} job{sub.job_count === 1 ? "" : "s"}</span>
+      </div>
+      <div style={{ color: C.textMuted, fontSize: 11, marginTop: 2 }}>
+        {sub.gcs?.length ? `For ${sub.gcs.slice(0, 3).join(", ")}${sub.gcs.length > 3 ? "…" : ""}` : ""}
+        {sub.job_value ? ` · ${fmt$(sub.job_value)} of jobs` : ""}
+        {sub.last_date ? ` · last ${fmtDate(sub.last_date)}` : ""}
+      </div>
+    </button>
   );
 }
 
@@ -2023,19 +2182,9 @@ const GC_WINDOWS = [[365, "Last 12 months"], [730, "Last 2 years"], [1825, "Last
 function GcLeaderboard() {
   const [minValue, setMinValue] = useState(1000000);
   const [days, setDays] = useState(730);
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
   const [selected, setSelected] = useState(null);
-
-  useEffect(() => {
-    setLoading(true);
-    setFailed(false);
-    api(`/directory/gc-leaders?min_value=${minValue}&days=${days}`)
-      .then((d) => { if (!Array.isArray(d?.contractors)) throw new Error(); setData(d); })
-      .catch(() => setFailed(true))
-      .finally(() => setLoading(false));
-  }, [minValue, days]);
+  const { data, loading, failed } = useApiGet(`/directory/gc-leaders?min_value=${minValue}&days=${days}`,
+    (d) => Array.isArray(d?.contractors));
 
   const selectStyle = {
     background: C.surface, color: C.text, border: `1px solid ${C.border}`, borderRadius: 8,
@@ -2075,7 +2224,7 @@ function GcLeaderboard() {
               key={c.key}
               type="button"
               className="card-row"
-              onClick={() => setSelected(c)}
+              onClick={() => setSelected({ ...c, kind: "gc" })}
               aria-label={`${c.name}: show permits`}
               style={{
                 display: "flex", gap: 12, alignItems: "flex-start", width: "100%", textAlign: "left",
@@ -2114,20 +2263,70 @@ function GcLeaderboard() {
   );
 }
 
-// One contractor's permits: totals, a map and the list. `contractor` needs `key` and `name`.
-function ContractorDetail({ contractor, onClose }) {
-  const [data, setData] = useState(null);
-  const [failed, setFailed] = useState(false);
-  const key = contractor?.key;
+function SaveContractorButton({ contractor }) {
+  const mine = useContext(MyContractorsContext);
+  const [busy, setBusy] = useState(false);
+  if (!mine) return null;
+  const saved = mine.savedNames.has(nameKey(contractor.name));
+  const save = async () => {
+    setBusy(true);
+    try {
+      await mine.add({ name: contractor.name, type: contractor.kind === "sub" ? "sub" : "gc", specialty: contractor.specialty || "", phone: "", email: "", website: "", notes: "" });
+    } finally { setBusy(false); }
+  };
+  return saved ? (
+    <span style={{ fontSize: 12, color: "#22c55e" }}>★ In your list</span>
+  ) : (
+    <button style={chipStyle(false, C.orange)} onClick={save} disabled={busy}>☆ Save to my list</button>
+  );
+}
 
-  useEffect(() => {
-    if (!key) return;
-    setData(null);
-    setFailed(false);
-    api(`/directory/trades/contractor?key=${encodeURIComponent(key)}`)
-      .then((d) => { if (!Array.isArray(d?.permits)) throw new Error(); setData(d); })
-      .catch(() => setFailed(true));
-  }, [key]);
+// Trade contractors who've pulled permits on this GC's jobs, grouped by trade.
+function GcSubs({ gcKey, onOpen }) {
+  const { data, failed } = useApiGet(gcKey ? `/directory/trades/contractor/subs?key=${encodeURIComponent(gcKey)}` : null,
+    (d) => !!d?.trades);
+  const trades = Object.entries(data?.trades || {});
+  return (
+    <div style={{ marginTop: 18, borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
+      <div style={{ fontWeight: 700, color: C.text, fontSize: 14, marginBottom: 4 }}>Subs on their jobs</div>
+      <div style={{ color: C.textMuted, fontSize: 11, marginBottom: 8 }}>
+        Trade permits on the same parcel within two years of their building permits. City of Charleston only.
+      </div>
+      {failed ? (
+        <div style={{ color: C.textMuted, fontSize: 12 }}>Couldn't load subs.</div>
+      ) : !data ? (
+        <div style={{ color: C.textMuted, fontSize: 12 }}>Finding subs…</div>
+      ) : trades.length === 0 ? (
+        <div style={{ color: C.textMuted, fontSize: 12 }}>No trade permits matched to their jobs.</div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(220px, 100%), 1fr))", gap: 12 }}>
+          {trades.map(([trade, t]) => (
+            <div key={trade}>
+              <div style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: C.textMuted, fontFamily: "'Space Mono', monospace", marginBottom: 4 }}>{t.label}</div>
+              {t.subs.slice(0, 5).map((sub) => (
+                <button key={sub.key} style={{ ...homeLinkBtn, display: "block", fontSize: 12, textAlign: "left", marginBottom: 3 }}
+                  onClick={() => onOpen({ key: sub.key, name: sub.name, kind: "sub", specialty: t.label })}>
+                  {sub.name} <span style={{ color: C.textMuted }}>· {sub.job_count} job{sub.job_count === 1 ? "" : "s"}</span>
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// One contractor's permits: totals, a map and the list. `contractor` needs `key` and `name`.
+function ContractorDetail({ contractor: initial, onClose }) {
+  // Subs opened from this page, newest last; tied to the contractor the page was opened for.
+  const [nav, setNav] = useState({ root: null, stack: [] });
+  const stack = nav.root === initial ? nav.stack : [];
+  const setStack = (f) => setNav({ root: initial, stack: f(stack) });
+  const contractor = stack.length ? stack[stack.length - 1] : initial;
+  const key = contractor?.key;
+  const { data, failed } = useApiGet(key ? `/directory/trades/contractor?key=${encodeURIComponent(key)}` : null,
+    (d) => Array.isArray(d?.permits));
 
   useEffect(() => {
     if (!contractor) return undefined;
@@ -2151,10 +2350,18 @@ function ContractorDetail({ contractor, onClose }) {
         maxHeight: "90vh", overflowY: "auto", padding: 24, position: "relative",
       }}>
         <button onClick={onClose} aria-label="Close" style={{ position: "absolute", top: 14, right: 14, background: "transparent", border: "none", color: C.textSub, fontSize: 20, cursor: "pointer" }}>✕</button>
-        <div style={{ fontSize: 11, color: C.textMuted, textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 4 }}>Contractor</div>
+        {stack.length > 0 && (
+          <button style={{ ...homeLinkBtn, fontSize: 12, marginBottom: 6 }} onClick={() => setStack((st) => st.slice(0, -1))}>
+            ← Back to {(stack.length > 1 ? stack[stack.length - 2] : initial).name}
+          </button>
+        )}
+        <div style={{ fontSize: 11, color: C.textMuted, textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 4 }}>
+          {contractor.kind === "sub" ? `Subcontractor${contractor.specialty ? ` · ${contractor.specialty}` : ""}` : contractor.kind === "gc" ? "General contractor" : "Contractor"}
+        </div>
         <h2 style={{ margin: "0 32px 4px 0", color: C.text, fontSize: 20 }}>
           {contractor.name}<LicensedBadge licenses={contractor.licenses} />
         </h2>
+        <SaveContractorButton contractor={contractor} />
         {contractor.also_known_as?.length > 0 && (
           <div style={{ fontSize: 11, color: C.textMuted, fontStyle: "italic", marginBottom: 6 }}>aka {contractor.also_known_as.join(", ")}</div>
         )}
@@ -2207,6 +2414,9 @@ function ContractorDetail({ contractor, onClose }) {
                   <div style={{ color: C.textMuted, fontSize: 12, paddingTop: 8 }}>Showing the {permits.length} most recent of {data.permit_count}.</div>
                 )}
               </div>
+            )}
+            {contractor.kind !== "sub" && (
+              <GcSubs gcKey={key} onOpen={(sub) => setStack((st) => [...st, sub])} />
             )}
           </>
         )}
@@ -3792,8 +4002,44 @@ function GcPrefsPanel({ prefs, onSave }) {
   );
 }
 
+// Permit categories that correspond to each pipeline building type.
+const PIPELINE_PERMIT_CATEGORIES = {
+  "higher-ed": ["education", "institutional"], k12: ["education"], healthcare: ["healthcare"],
+  government: ["government", "institutional"], commercial: ["office", "retail", "restaurant", "commercial", "mixed-use"],
+  hospitality: ["hotel"], multifamily: ["multi-family", "mixed-use"], industrial: ["industrial"],
+};
+
+// GCs who've built this kind of building locally at a comparable size.
+function LikelyCompetitors({ project: p }) {
+  const [selected, setSelected] = useState(null);
+  const cats = PIPELINE_PERMIT_CATEGORIES[p.building_type] || [];
+  const minValue = p.estimate ? Math.max(1000000, Math.round(p.estimate * 0.25)) : 5000000;
+  const params = new URLSearchParams({ min_value: minValue, days: 1825, limit: 5 });
+  if (cats.length) params.set("categories", cats.join(","));
+  const { data, failed } = useApiGet(`/directory/gc-leaders?${params}`, (d) => Array.isArray(d?.contractors));
+  const rows = data?.contractors || null;
+  return (
+    <div style={{ marginTop: 8, fontSize: 12 }}>
+      <ContractorDetail contractor={selected} onClose={() => setSelected(null)} />
+      <div style={{ color: C.textMuted, marginBottom: 4 }}>
+        GCs who've built {cats.length ? "this type of building" : "commercial jobs"} of {fmt$(minValue)}+ locally in the last 5 years:
+      </div>
+      {failed ? <span style={{ color: C.textMuted }}>Couldn't load.</span>
+        : !rows ? <span style={{ color: C.textMuted }}>Loading…</span>
+        : rows.length === 0 ? <span style={{ color: C.textMuted }}>None found in local permits.</span>
+        : rows.map((c) => (
+          <button key={c.key} style={{ ...homeLinkBtn, display: "block", fontSize: 12, textAlign: "left", marginBottom: 2 }}
+            onClick={() => setSelected({ ...c, kind: "gc" })}>
+            {c.name} <span style={{ color: C.textMuted }}>· {c.job_count} job{c.job_count === 1 ? "" : "s"}, largest {fmt$(c.largest_value)}</span>
+          </button>
+        ))}
+    </div>
+  );
+}
+
 function PipelineCard({ project: p }) {
   const [showAll, setShowAll] = useState(false);
+  const [showCompetitors, setShowCompetitors] = useState(false);
   const matchColor_ = p.match === "match" ? "#22c55e" : p.match === "unconfirmed" ? "#f59e0b" : C.textMuted;
   const matchLabel = p.match === "match" ? "Matches your profile" : p.match === "unconfirmed" ? "Unconfirmed" : "Not a match";
   const events = p.events || [];
@@ -3836,6 +4082,10 @@ function PipelineCard({ project: p }) {
       {p.match !== "match" && (p.match_reasons || []).length > 0 && (
         <div style={{ color: matchColor_, fontSize: 11, marginTop: 6 }}>{p.match_reasons.join(" · ")}</div>
       )}
+      <button style={{ ...homeLinkBtn, fontSize: 11, marginTop: 8 }} aria-expanded={showCompetitors} onClick={() => setShowCompetitors((v) => !v)}>
+        {showCompetitors ? "Hide likely competitors" : "Likely competitors"}
+      </button>
+      {showCompetitors && <LikelyCompetitors project={p} />}
       {events.length > 0 && (
         <div style={{ marginTop: 10, borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
           {shownEvents.map((e, i) => (
