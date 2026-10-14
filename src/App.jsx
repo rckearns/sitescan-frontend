@@ -1543,8 +1543,13 @@ function TradeContractorCard({ contractor, tradeLabel, onOpen }) {
         {/* Stats row */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 16px", fontSize: 12 }}>
           <span style={{ color: C.textMuted }}>
-            {contractor.permit_count} permit{contractor.permit_count !== 1 ? "s" : ""}
+            {contractor.job_count ?? contractor.permit_count} job{(contractor.job_count ?? contractor.permit_count) !== 1 ? "s" : ""}
           </span>
+          {contractor.open_jobs > 0 && (
+            <span style={{ color: C.sky }} title="Jobs with a permit still open (issued, in review) in the last 3 years">
+              {contractor.open_jobs} active now
+            </span>
+          )}
           {contractor.total_permit_value > 0 && (
             <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>
               {fmt$(contractor.total_permit_value)}
@@ -2372,9 +2377,16 @@ function ContractorDetail({ contractor: initial, onClose }) {
         ) : (
           <>
             <div style={{ display: "flex", gap: 20, flexWrap: "wrap", margin: "10px 0 14px", fontSize: 13, color: C.textSub }}>
-              <span><strong style={{ color: C.text }}>{data.permit_count}</strong> permits</span>
+              <span title={`${data.permit_count} permits; phase permits on one site count as one job`}>
+                <strong style={{ color: C.text }}>{data.job_count ?? data.permit_count}</strong> jobs
+              </span>
               <span><strong style={{ color: C.orange }}>{fmt$(data.total_value)}</strong> total</span>
-              {permits[0]?.date && <span>Most recent {fmtDate(permits[0].date)}</span>}
+              {data.open_jobs > 0 && (
+                <span title="Jobs with a permit still open (issued, in review) in the last 3 years">
+                  <strong style={{ color: C.sky }}>{data.open_jobs}</strong> active now
+                </span>
+              )}
+              {(permits[0]?.last_date || permits[0]?.date) && <span>Most recent {fmtDate(permits[0].last_date || permits[0].date)}</span>}
             </div>
             {located.length > 0 && (
               <div style={{ height: 240, borderRadius: 10, overflow: "hidden", border: `1px solid ${C.border}`, marginBottom: 14 }}>
@@ -2403,15 +2415,16 @@ function ContractorDetail({ contractor: initial, onClose }) {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ color: C.text }}>{p.address || p.title}</div>
                       <div style={{ color: C.textMuted, fontSize: 11 }}>
-                        {[catName(p.category), p.city, p.permit_number].filter(Boolean).join(" · ")}
+                        {[catName(p.category), p.city, p.permit_count > 1 ? `${p.permit_count} permits` : p.permit_number,
+                          p.open ? "active" : ""].filter(Boolean).join(" · ")}
                         {p.source_url && <> · <a href={p.source_url} target="_blank" rel="noopener noreferrer" style={{ color: C.blue }}>Source</a></>}
                       </div>
                     </div>
                     <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace", fontSize: 12, whiteSpace: "nowrap" }}>{p.value ? fmt$(p.value) : "—"}</span>
                   </div>
                 ))}
-                {data.permit_count > permits.length && (
-                  <div style={{ color: C.textMuted, fontSize: 12, paddingTop: 8 }}>Showing the {permits.length} most recent of {data.permit_count}.</div>
+                {(data.job_count ?? data.permit_count) > permits.length && (
+                  <div style={{ color: C.textMuted, fontSize: 12, paddingTop: 8 }}>Showing the {permits.length} most recent of {data.job_count ?? data.permit_count} jobs.</div>
                 )}
               </div>
             )}
@@ -4009,6 +4022,97 @@ const PIPELINE_PERMIT_CATEGORIES = {
   hospitality: ["hotel"], multifamily: ["multi-family", "mixed-use"], industrial: ["industrial"],
 };
 
+// Trades a GC usually needs covered, and how to recognize them in a saved sub's specialty.
+const SUB_LIST_TRADES = [
+  ["electrical", "Electrical", /electric/i], ["mechanical", "Mechanical / HVAC", /mechanic|hvac|air\b|heating|cooling/i],
+  ["plumbing", "Plumbing & gas", /plumb|gas\b/i], ["fire-sprinkler", "Fire protection & alarm", /fire|sprinkler|alarm/i],
+  ["roofing", "Roofing", /roof/i], ["masonry", "Masonry", /mason|brick|stone/i], ["concrete", "Concrete", /concrete/i],
+  ["windows-doors", "Glass, windows & doors", /glass|glaz|window|door|curtain/i],
+  ["drywall-finishes", "Drywall, paint & finishes", /drywall|paint|finish|plaster/i],
+  ["grading-sitework", "Sitework & utilities", /site|grading|utilit|paving|excavat/i],
+];
+
+// For one pipeline project: by trade, the user's saved subs plus subs proven on similar
+// local jobs. Tick the ones to invite and export the list.
+function ProjectSubList({ project: p }) {
+  const mine = useMyContractorsState();
+  const cats = PIPELINE_PERMIT_CATEGORIES[p.building_type] || [];
+  const minValue = p.estimate ? Math.max(1000000, Math.round(p.estimate * 0.25)) : 5000000;
+  const params = new URLSearchParams({ min_value: minValue, days: 1825 });
+  if (cats.length) params.set("categories", cats.join(","));
+  const { data, failed } = useApiGet(`/directory/subs?${params}`, (d) => !!d?.trades);
+  const [picked, setPicked] = useState({});   // `${trade}|${name}` -> row, for export
+
+  const rowsFor = (id, rx) => {
+    const saved = mine.list.filter((c) => c.type === "sub" && rx.test(c.specialty || "")).map((c) => ({
+      name: c.name, source: "My list", phone: c.phone, email: c.email, jobs: null,
+    }));
+    const savedNames = new Set(saved.map((r) => nameKey(r.name)));
+    const suggested = (data?.trades?.[id]?.subs || []).filter((s) => !savedNames.has(nameKey(s.name))).slice(0, 4)
+      .map((s) => ({ name: s.name, source: "Suggested", jobs: s.job_count, gcs: s.gcs }));
+    return [...saved, ...suggested];
+  };
+  const toggle = (k, row) => setPicked((m) => {
+    const next = { ...m };
+    if (next[k]) delete next[k]; else next[k] = row;
+    return next;
+  });
+  const exportCsv = () => {
+    const rows = [["trade", "name", "source", "phone", "email", "similar jobs"].join(","),
+      ...Object.values(picked).map((r) => [r.trade, r.name, r.source, r.phone, r.email, r.jobs ?? ""].map(csvCell).join(","))];
+    const url = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(p.title || "project").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-subs.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+  const covered = SUB_LIST_TRADES.filter(([id]) => Object.values(picked).some((r) => r.tradeId === id)).length;
+
+  return (
+    <div style={{ marginTop: 8, fontSize: 12, border: `1px solid ${C.border}`, borderRadius: 8, padding: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+        <span style={{ color: C.textMuted }}>
+          Your saved subs, plus subs on {cats.length ? "similar" : "commercial"} local jobs of {fmt$(minValue)}+. Tick the ones to invite.
+        </span>
+        <span style={{ color: C.textSub }}>{covered} of {SUB_LIST_TRADES.length} trades covered</span>
+      </div>
+      {failed && <div style={{ color: C.textMuted }}>Couldn't load suggestions; your saved subs are still listed.</div>}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(240px, 100%), 1fr))", gap: 10 }}>
+        {SUB_LIST_TRADES.map(([id, label, rx]) => {
+          const rows = rowsFor(id, rx);
+          return (
+            <div key={id}>
+              <div style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: C.textMuted, fontFamily: "'Space Mono', monospace", marginBottom: 3 }}>{label}</div>
+              {rows.length === 0 ? (
+                <div style={{ color: C.textMuted }}>{data || failed ? "None yet" : "Loading…"}</div>
+              ) : rows.map((r) => {
+                const k = `${id}|${r.name}`;
+                return (
+                  <label key={k} style={{ display: "flex", gap: 6, alignItems: "baseline", color: C.textSub, cursor: "pointer", marginBottom: 2 }}>
+                    <input type="checkbox" checked={!!picked[k]} onChange={() => toggle(k, { ...r, trade: label, tradeId: id })} />
+                    <span>
+                      <span style={{ color: C.text }}>{r.name}</span>
+                      <span style={{ color: r.source === "My list" ? "#22c55e" : C.textMuted }}>
+                        {r.source === "My list" ? " · my list" : ` · ${r.jobs} similar job${r.jobs === 1 ? "" : "s"}`}
+                      </span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ marginTop: 8 }}>
+        <button style={chipStyle(false, C.sky)} disabled={!Object.keys(picked).length} onClick={exportCsv}>
+          ⬇ Export {Object.keys(picked).length || ""} to CSV
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // GCs who've built this kind of building locally at a comparable size.
 function LikelyCompetitors({ project: p }) {
   const [selected, setSelected] = useState(null);
@@ -4040,6 +4144,7 @@ function LikelyCompetitors({ project: p }) {
 function PipelineCard({ project: p }) {
   const [showAll, setShowAll] = useState(false);
   const [showCompetitors, setShowCompetitors] = useState(false);
+  const [showSubs, setShowSubs] = useState(false);
   const matchColor_ = p.match === "match" ? "#22c55e" : p.match === "unconfirmed" ? "#f59e0b" : C.textMuted;
   const matchLabel = p.match === "match" ? "Matches your profile" : p.match === "unconfirmed" ? "Unconfirmed" : "Not a match";
   const events = p.events || [];
@@ -4082,10 +4187,16 @@ function PipelineCard({ project: p }) {
       {p.match !== "match" && (p.match_reasons || []).length > 0 && (
         <div style={{ color: matchColor_, fontSize: 11, marginTop: 6 }}>{p.match_reasons.join(" · ")}</div>
       )}
-      <button style={{ ...homeLinkBtn, fontSize: 11, marginTop: 8 }} aria-expanded={showCompetitors} onClick={() => setShowCompetitors((v) => !v)}>
-        {showCompetitors ? "Hide likely competitors" : "Likely competitors"}
-      </button>
+      <div style={{ display: "flex", gap: 14, marginTop: 8 }}>
+        <button style={{ ...homeLinkBtn, fontSize: 11 }} aria-expanded={showCompetitors} onClick={() => setShowCompetitors((v) => !v)}>
+          {showCompetitors ? "Hide likely competitors" : "Likely competitors"}
+        </button>
+        <button style={{ ...homeLinkBtn, fontSize: 11 }} aria-expanded={showSubs} onClick={() => setShowSubs((v) => !v)}>
+          {showSubs ? "Hide sub list" : "Build sub list"}
+        </button>
+      </div>
       {showCompetitors && <LikelyCompetitors project={p} />}
+      {showSubs && <ProjectSubList project={p} />}
       {events.length > 0 && (
         <div style={{ marginTop: 10, borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
           {shownEvents.map((e, i) => (
