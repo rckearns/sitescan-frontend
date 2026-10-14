@@ -4040,7 +4040,12 @@ function ProjectSubList({ project: p }) {
   const minValue = p.estimate ? Math.max(1000000, Math.round(p.estimate * 0.25)) : 5000000;
   const params = new URLSearchParams({ min_value: minValue, days: 1825 });
   if (cats.length) params.set("categories", cats.join(","));
-  const { data, failed } = useApiGet(`/directory/subs?${params}`, (d) => !!d?.trades);
+  const narrow = useApiGet(`/directory/subs?${params}`, (d) => !!d?.trades);
+  // Few local jobs of this type and size (e.g. $20M+ higher-ed): widen to any commercial job of $5M+.
+  const tooFew = narrow.data && narrow.data.jobs_checked < 5;
+  const broad = useApiGet(tooFew ? "/directory/subs?min_value=5000000&days=1825" : null, (d) => !!d?.trades);
+  const data = tooFew ? broad.data : narrow.data;
+  const failed = narrow.failed || broad.failed;
   const [picked, setPicked] = useState({});   // `${trade}|${name}` -> row, for export
 
   const rowsFor = (id, rx) => {
@@ -4073,7 +4078,9 @@ function ProjectSubList({ project: p }) {
     <div style={{ marginTop: 8, fontSize: 12, border: `1px solid ${C.border}`, borderRadius: 8, padding: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
         <span style={{ color: C.textMuted }}>
-          Your saved subs, plus subs on {cats.length ? "similar" : "commercial"} local jobs of {fmt$(minValue)}+. Tick the ones to invite.
+          {tooFew
+            ? `Your saved subs, plus subs on local commercial jobs of $5M+ (only ${narrow.data.jobs_checked} similar jobs of ${fmt$(minValue)}+ locally). Tick the ones to invite.`
+            : `Your saved subs, plus subs on ${cats.length ? "similar" : "commercial"} local jobs of ${fmt$(minValue)}+. Tick the ones to invite.`}
         </span>
         <span style={{ color: C.textSub }}>{covered} of {SUB_LIST_TRADES.length} trades covered</span>
       </div>
@@ -4094,7 +4101,7 @@ function ProjectSubList({ project: p }) {
                     <span>
                       <span style={{ color: C.text }}>{r.name}</span>
                       <span style={{ color: r.source === "My list" ? "#22c55e" : C.textMuted }}>
-                        {r.source === "My list" ? " · my list" : ` · ${r.jobs} similar job${r.jobs === 1 ? "" : "s"}`}
+                        {r.source === "My list" ? " · my list" : ` · ${r.jobs} ${tooFew ? "" : "similar "}job${r.jobs === 1 ? "" : "s"}`}
                       </span>
                     </span>
                   </label>
