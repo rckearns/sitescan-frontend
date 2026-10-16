@@ -292,7 +292,34 @@ function assumptionsLine(a) {
     const pct = Number(a.soft_cost_pct) > 1 ? Number(a.soft_cost_pct) : Number(a.soft_cost_pct) * 100;
     parts.push(`${Math.round(pct)}% soft`);
   }
+  if (a.build_months) parts.push(`${a.build_months}-mo build`);
+  if (String(a.exit).toLowerCase() === "sell" && a.sale_price_psf) {
+    parts.push(`${Number(a.saleable_sf || 0).toLocaleString()} SF sold at $${Number(a.sale_price_psf).toLocaleString()}/SF`);
+  }
   return parts.join(" · ");
+}
+
+// "Pencils if …": what each key input would have to be for profit on cost to reach the threshold.
+function breakevenLines(pf, threshold = 0.15) {
+  const be = pf?.breakeven;
+  if (!be) return [];
+  const pct = (x) => `${x > 0 ? "+" : ""}${Math.round(x * 100)}%`;
+  const out = [];
+  if (pf.exit === "sell" && be.sale_price_psf) {
+    out.push(`sale price reaches $${be.sale_price_psf.toLocaleString()}/SF (${pct(be.sale_price_change_pct)})`);
+  }
+  if (pf.exit !== "sell" && be.stabilized_noi) {
+    out.push(`NOI reaches ${fmt$(be.stabilized_noi)} (${pct(be.noi_change_pct)})`);
+    if (be.exit_cap_rate >= 3) out.push(`exit cap rate is ${be.exit_cap_rate}% or lower`);   // below 3% isn't a real market
+  }
+  if (be.max_land_cost) out.push(`land costs ${fmt$(be.max_land_cost)} or less`);
+  else out.push("no land price works on its own");
+  if (be.max_hard_cost_psf) out.push(`hard cost is $${be.max_hard_cost_psf}/SF or less`);
+  const lead = pf.pencils ? `Clears ${Math.round(threshold * 100)}% as long as` : `Reaches ${Math.round(threshold * 100)}% profit on cost if`;
+  return [`${lead} ${out.join("; or ")}.`,
+    be.rate_plus_1pt_profit_on_cost != null
+      ? `Each +1 point on the construction loan rate moves profit on cost to ${Math.round(be.rate_plus_1pt_profit_on_cost * 100)}%.`
+      : null].filter(Boolean);
 }
 
 function zoningSummary(z) {
@@ -3207,7 +3234,7 @@ function ParcelMapView({ parcels, analyses, selected, onSelect, renderCard }) {
 
 // ─── ANALYSIS MODAL ─────────────────────────────────────────────────────────
 
-function AnalysisModal({ state, parcel, onClose }) {
+function AnalysisModal({ state, parcel, onClose, onRerun }) {
   if (!state) return null;
   const { loading, error, data } = state;
   const addr = [parcel?.HOUSE, parcel?.STREET].filter(Boolean).join(" ") || "Commercial Parcel";
@@ -3273,6 +3300,13 @@ function AnalysisModal({ state, parcel, onClose }) {
               )}
             </div>
 
+            {Number(data.version) < 4 && onRerun && (
+              <div style={{ marginBottom: 14, fontSize: 12, color: C.textSub, background: C.surfaceHi, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 12px" }}>
+                This estimate was made before build-to-sell scenarios were added; its numbers now include financing.{" "}
+                <button style={homeLinkBtn} onClick={onRerun}>Re-run estimate</button>
+              </div>
+            )}
+
             {/* Scenarios */}
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: C.textSub, textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 12 }}>
@@ -3302,6 +3336,11 @@ function AnalysisModal({ state, parcel, onClose }) {
                             fontSize: 10, fontWeight: 700, borderRadius: 4, padding: "1px 6px", textTransform: "uppercase",
                           }}>{ZONING_FIT_LABELS[s.zoning_fit].label}</span>
                         )}
+                        {pf.exit && (
+                          <span style={{ fontSize: 10, fontWeight: 700, color: C.sky, border: `1px solid ${C.sky}55`, borderRadius: 4, padding: "1px 6px", textTransform: "uppercase" }}>
+                            {pf.exit === "sell" ? "Build to sell" : "Hold & lease"}
+                          </span>
+                        )}
                         <span style={{ fontSize: 11, color: C.textMuted, marginLeft: "auto" }}>{s.use_type}</span>
                       </div>
                       <p style={{ margin: "0 0 12px", color: C.textSub, fontSize: 13, lineHeight: 1.55 }}>{s.description}</p>
@@ -3311,7 +3350,8 @@ function AnalysisModal({ state, parcel, onClose }) {
                       {assumptionsLine(s.assumptions) && (
                         <div style={{ margin: "-4px 0 10px", fontSize: 12, color: C.textSub, lineHeight: 1.5 }}>
                           <span style={{ fontFamily: "'Space Mono', monospace", color: C.text }}>{assumptionsLine(s.assumptions)}</span>
-                          {s.assumptions?.noi_basis && <div style={{ color: C.textMuted }}>NOI: {s.assumptions.noi_basis}</div>}
+                          {pf.exit !== "sell" && s.assumptions?.noi_basis && <div style={{ color: C.textMuted }}>NOI: {s.assumptions.noi_basis}</div>}
+                          {pf.exit === "sell" && s.assumptions?.sale_basis && <div style={{ color: C.textMuted }}>Sales: {s.assumptions.sale_basis}</div>}
                         </div>
                       )}
                       {/* Proforma grid */}
@@ -3322,11 +3362,13 @@ function AnalysisModal({ state, parcel, onClose }) {
                         {[
                           // v2 analyses fold land into total development cost; v1 did not.
                           [Number(data.version) >= 2 ? "Dev Cost (incl. land)" : "Dev Cost", pf.total_development_cost],
-                          ["Stabilized NOI", pf.stabilized_noi],
-                          ["Projected Value", pf.projected_value],
+                          ...(pf.exit === "sell"
+                            ? [["Gross Sales", pf.gross_sales], ["Net Sales", pf.projected_value]]
+                            : [["Stabilized NOI", pf.stabilized_noi], ["Projected Value", pf.projected_value]]),
                           ...(pf.land_cost != null ? [["Land Cost", pf.land_cost]] : []),
                           ["Hard Costs", pf.estimated_hard_cost],
                           ["Soft Costs", pf.soft_costs],
+                          ...(pf.financing_cost != null ? [["Financing", pf.financing_cost]] : []),
                           ["Profit on Cost", pf.profit_margin, true],
                         ].map(([label, val, isStr]) => (
                           <div key={label}>
@@ -3353,6 +3395,17 @@ function AnalysisModal({ state, parcel, onClose }) {
                           </div>
                         )}
                       </div>
+                      {breakevenLines(pf, data.pencil_threshold).map((line, k) => (
+                        <div key={k} style={{ marginTop: 8, fontSize: 12, color: k === 0 ? C.text : C.textMuted, lineHeight: 1.5 }}>
+                          {k === 0 ? "⚖ " : ""}{line}
+                        </div>
+                      ))}
+                      {pf.financing && (
+                        <div style={{ marginTop: 4, fontSize: 11, color: C.textMuted }}>
+                          Financing assumed: {Math.round(pf.financing.loan_to_cost * 100)}% loan-to-cost at {(pf.financing.interest_rate * 100).toFixed(1)}%,
+                          {" "}{pf.financing.build_months}-month build, {pf.financing.entitlement_months} months of approvals before construction.
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -3449,6 +3502,7 @@ function MapTab({ mapHeight = "calc(100vh - 230px)", parcels = [], analyses = {}
         state={modalState}
         parcel={modalParcel?.parcel_props}
         onClose={() => setModalParcel(null)}
+        onRerun={modalParcel ? () => onAnalyze?.(modalParcel, { refresh: true }) : null}
       />
       {/* Toolbar */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
@@ -3685,7 +3739,8 @@ function summarizeAnalysis(analysis) {
   const pf = best.proforma || {};
   const cost = Number(pf.total_development_cost) || null;
   const value = Number(pf.projected_value) || null;
-  let profitOnCost = cost && value ? (value - cost) / cost : null;
+  let profitOnCost = typeof pf.profit_on_cost === "number" ? pf.profit_on_cost
+    : cost && value ? (value - cost) / cost : null;
   if (profitOnCost === null && pf.profit_margin) {
     const pct = parseFloat(String(pf.profit_margin));
     if (!isNaN(pct)) profitOnCost = pct / 100;
@@ -4637,9 +4692,14 @@ function LandingTab({
   return (
     <div>
       <AnalysisModal
-        state={openAnalysis ? { loading: false, error: null, data: analyses[openAnalysis.external_id] } : null}
+        state={openAnalysis ? {
+          loading: analysisStatus[openAnalysis.external_id] === "loading",
+          error: analysisStatus[openAnalysis.external_id] === "error" ? `Estimate unavailable: ${analysisErrors[openAnalysis.external_id] || "request failed"}` : null,
+          data: analysisStatus[openAnalysis.external_id] === "loading" ? null : analyses[openAnalysis.external_id],
+        } : null}
         parcel={openAnalysis?.parcel_props}
         onClose={() => setOpenAnalysis(null)}
+        onRerun={openAnalysis ? () => onAnalyze(openAnalysis, { refresh: true }) : null}
       />
       <div role="tablist" aria-label="Home view" style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
         {tabs.map((t) => {
@@ -4829,12 +4889,12 @@ export default function SiteScanApp() {
     setParcelsLoading(false);
   };
 
-  const analyzeParcel = async (parcel) => {
+  const analyzeParcel = async (parcel, { refresh = false } = {}) => {
     const tms = parcel.external_id;
     if (!tms) return;
     setAnalysisStatus((s) => ({ ...s, [tms]: "loading" }));
     try {
-      const result = await api(`/analyze/parcel/${encodeURIComponent(tms)}`, {
+      const result = await api(`/analyze/parcel/${encodeURIComponent(tms)}${refresh ? "?refresh=true" : ""}`, {
         method: "POST",
         body: JSON.stringify({ parcel: parcel.parcel_props }),
       });
