@@ -3300,9 +3300,11 @@ function AnalysisModal({ state, parcel, onClose, onRerun }) {
               )}
             </div>
 
-            {Number(data.version) < 4 && onRerun && (
+            {(Number(data.version) < 4 || !data.rezoning_checked) && onRerun && (
               <div style={{ marginBottom: 14, fontSize: 12, color: C.textSub, background: C.surfaceHi, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 12px" }}>
-                This estimate was made before build-to-sell scenarios were added; its numbers now include financing.{" "}
+                {Number(data.version) < 4
+                  ? "This estimate was made before build-to-sell and “if rezoned” scenarios were added; its numbers now include financing."
+                  : "This estimate was made before “if rezoned” scenarios were added."}{" "}
                 <button style={homeLinkBtn} onClick={onRerun}>Re-run estimate</button>
               </div>
             )}
@@ -3318,7 +3320,7 @@ function AnalysisModal({ state, parcel, onClose, onRerun }) {
                   const pf = s.proforma || {};
                   return (
                     <div key={i} style={{
-                      border: `1px solid ${isRec ? C.orange : C.border}`,
+                      border: `1px ${s.if_rezoned ? "dashed" : "solid"} ${isRec ? C.orange : s.if_rezoned ? "#a78bfa" : C.border}`,
                       borderRadius: 10, padding: "16px 18px",
                       background: isRec ? `${C.orange}08` : C.surfaceHi,
                     }}>
@@ -3336,6 +3338,12 @@ function AnalysisModal({ state, parcel, onClose, onRerun }) {
                             fontSize: 10, fontWeight: 700, borderRadius: 4, padding: "1px 6px", textTransform: "uppercase",
                           }}>{ZONING_FIT_LABELS[s.zoning_fit].label}</span>
                         )}
+                        {s.if_rezoned && (
+                          <span title="Upside case: the current zoning doesn't allow this use; it needs the approvals listed below"
+                            style={{ fontSize: 10, fontWeight: 700, color: "#a78bfa", border: "1px solid #a78bfa66", borderRadius: 4, padding: "1px 6px", textTransform: "uppercase" }}>
+                            If rezoned
+                          </span>
+                        )}
                         {pf.exit && (
                           <span style={{ fontSize: 10, fontWeight: 700, color: C.sky, border: `1px solid ${C.sky}55`, borderRadius: 4, padding: "1px 6px", textTransform: "uppercase" }}>
                             {pf.exit === "sell" ? "Build to sell" : "Hold & lease"}
@@ -3346,6 +3354,12 @@ function AnalysisModal({ state, parcel, onClose, onRerun }) {
                       <p style={{ margin: "0 0 12px", color: C.textSub, fontSize: 13, lineHeight: 1.55 }}>{s.description}</p>
                       {s.zoning_notes && (
                         <p style={{ margin: "-6px 0 10px", color: C.textSub, fontSize: 12, lineHeight: 1.5 }}>🏛 {s.zoning_notes}</p>
+                      )}
+                      {s.if_rezoned && (
+                        <p style={{ margin: "-4px 0 10px", color: "#a78bfa", fontSize: 12, lineHeight: 1.5 }}>
+                          Upside only: shows what the site could be worth if every approval above were won. Never the recommendation;
+                          the numbers carry 24 months of approvals, and approval is uncertain.
+                        </p>
                       )}
                       {assumptionsLine(s.assumptions) && (
                         <div style={{ margin: "-4px 0 10px", fontSize: 12, color: C.textSub, lineHeight: 1.5 }}>
