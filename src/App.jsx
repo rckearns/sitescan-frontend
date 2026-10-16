@@ -268,7 +268,7 @@ function parcelOppScore(props) {
   const land = parseFloat(props.LAND_APPR) || 0;
   const imp  = parseFloat(props.IMP_APPR)  || 0;
 
-  if (land === 0 && imp === 0) return 50;   // unknown
+  if (land === 0 && imp === 0) return props.EXEMPT ? 100 : 50;   // exempt lot: nothing built, just not assessed
   if (imp === 0)  return 100;               // vacant land → maximum opportunity
   if (land === 0) return 15;               // improvements only, no land value recorded
 
@@ -329,10 +329,14 @@ function parcelToProject(feat) {
   const addr = [p.HOUSE, p.STREET].filter(Boolean).join(" ");
   const score = parcelOppScore(p);
   const imp = parseFloat(p.IMP_APPR) || 0;
-  // County class codes: 952 vacant commercial lot, 910 commercial development acreage.
-  const title = p.CLASS_CODE === "910" ? "Commercial development acreage"
+  // County class codes: 952 vacant commercial lot, 910 commercial development acreage,
+  // 460 parking lot, 905 vacant residential lot (fetched only for tax-exempt owners).
+  const base = p.CLASS_CODE === "910" ? "Commercial development acreage"
+    : p.CLASS_CODE === "460" ? "Surface parking lot"
+    : p.CLASS_CODE === "905" ? "Vacant lot"
     : p.CLASS_CODE === "952" || imp === 0 ? "Vacant commercial lot"
     : "Underimproved commercial parcel";
+  const title = p.EXEMPT ? `${base} · tax-exempt owner` : base;
   return {
     id: `parcel-${p.TMS || p.PARCELID}`,
     source_id: "parcel-opportunity",
@@ -342,7 +346,9 @@ function parcelToProject(feat) {
     address: addr,
     latitude: lat,
     longitude: lng,
-    value: p.LAND_APPR || p.APPRVAL || null,
+    value: p.LAND_APPR || p.APPRVAL || p.LAND_EST || null,
+    exempt: !!p.EXEMPT,
+    land_est: parseFloat(p.LAND_EST) || null,
     category: "commercial",
     // Rounding can reach 100% even with a small building on the lot.
     opp_score: imp > 0 ? Math.min(score, 99) : score,
@@ -3138,7 +3144,7 @@ function ParcelDots({ parcels, analyses, selectedId, onSelect, renderPopup }) {
           <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12 }}>
             <div style={{ fontWeight: 700 }}>{p.address || p.title}</div>
             <div>{p.title}{p.hood ? ` · ${p.hood}` : ""}</div>
-            <div>Land {fmt$(p.land_value)} · {p.opp_score}% underutilized</div>
+            <div>Land {p.land_value ? fmt$(p.land_value) : p.land_est ? `not assessed (~${fmt$(p.land_est)} est.)` : "—"} · {p.opp_score}% underutilized</div>
             {summary && (
               <div>{summary.use}{summary.profitOnCost != null ? ` · ${fmtPct(summary.profitOnCost)} profit on cost` : ""}</div>
             )}
@@ -3416,7 +3422,7 @@ function MapTab({ mapHeight = "calc(100vh - 230px)", parcels = [], analyses = {}
         <div style={{ fontWeight: 700, marginBottom: 2, color: "#111", fontSize: 14 }}>{p.address || "No address"}</div>
         <div style={{ color: "#777", fontSize: 11, marginBottom: 6 }}>{p.title}{p.hood ? ` · ${p.hood}` : ""}</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 12, marginBottom: 8 }}>
-          <div><div style={{ color: "#999", fontSize: 10, textTransform: "uppercase" }}>Land value</div><strong>{fmt$(p.land_value)}</strong></div>
+          <div><div style={{ color: "#999", fontSize: 10, textTransform: "uppercase" }}>Land value</div><strong>{p.land_value ? fmt$(p.land_value) : p.land_est ? `~${fmt$(p.land_est)} est.` : "—"}</strong></div>
           <div><div style={{ color: "#999", fontSize: 10, textTransform: "uppercase" }}>Improvements</div><strong>{p.imp_value ? fmt$(p.imp_value) : "None"}</strong></div>
           <div><div style={{ color: "#999", fontSize: 10, textTransform: "uppercase" }}>Lot size</div><strong>{p.acres ? `${p.acres.toFixed(2)} ac` : "—"}</strong></div>
           {summary && (
@@ -3886,13 +3892,19 @@ function ParcelCard({ parcel, analysis, status, error, onAnalyze, onOpenAnalysis
             {parcel.construction && <ConstructionBadge c={parcel.construction} />}
           </div>
           <div className="project-header-side" style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-            <div className="parcel-land-value" style={{ textAlign: "right" }} title="Appraised value of the land (county assessor)">
+            <div className="parcel-land-value" style={{ textAlign: "right" }}
+              title={parcel.exempt
+                ? "Tax-exempt owner, so the county assigns no value. The estimate uses assessed land per acre on similar-sized Peninsula lots."
+                : "Appraised value of the land (county assessor)"}>
               <div style={{ fontSize: 9, letterSpacing: 1, textTransform: "uppercase", color: C.textMuted, fontFamily: "'Space Mono', monospace" }}>
                 Land value
               </div>
               <div style={{ color: C.text, fontWeight: 700, fontSize: 14, fontFamily: "'JetBrains Mono', monospace", whiteSpace: "nowrap" }}>
-                {parcel.land_value ? fmt$(parcel.land_value) : "—"}
+                {parcel.land_value ? fmt$(parcel.land_value) : parcel.exempt ? "Not assessed" : "—"}
               </div>
+              {!parcel.land_value && parcel.land_est && (
+                <div style={{ color: C.textMuted, fontSize: 10 }}>~{fmt$(parcel.land_est)} est.</div>
+              )}
             </div>
             <div style={{ width: 110, display: "flex", justifyContent: "flex-end" }}>
               <span
