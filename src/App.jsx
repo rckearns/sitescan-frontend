@@ -3234,7 +3234,39 @@ function ParcelMapView({ parcels, analyses, selected, onSelect, renderCard }) {
 
 // ─── ANALYSIS MODAL ─────────────────────────────────────────────────────────
 
-function AnalysisModal({ state, parcel, onClose, onRerun }) {
+// "Model this site as …": asks for one more scenario for a use the user names.
+function CustomScenarioBox({ onAdd }) {
+  const [use, setUse] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!use.trim() || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await onAdd(use.trim());
+      setUse("");
+    } catch (err) {
+      setError(err.message || "Couldn't add that scenario");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <form onSubmit={submit} style={{ marginBottom: 20, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+      <label htmlFor="custom-use" style={{ fontSize: 12, color: C.textSub }}>Model this site as</label>
+      <input id="custom-use" value={use} onChange={(e) => setUse(e.target.value)} maxLength={80} placeholder="e.g. boutique hotel"
+        style={{ flex: "1 1 180px", padding: "7px 10px", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 7, color: C.text, fontSize: 13, fontFamily: "inherit" }} />
+      <button type="submit" disabled={busy || !use.trim()} style={chipStyle(false, C.orange)}>
+        {busy ? "Modeling… (about a minute)" : "Add scenario"}
+      </button>
+      {error && <div style={{ width: "100%", color: "#ef4444", fontSize: 12 }}>{error}</div>}
+    </form>
+  );
+}
+
+function AnalysisModal({ state, parcel, onClose, onRerun, onAddScenario }) {
   if (!state) return null;
   const { loading, error, data } = state;
   const addr = [parcel?.HOUSE, parcel?.STREET].filter(Boolean).join(" ") || "Commercial Parcel";
@@ -3338,6 +3370,12 @@ function AnalysisModal({ state, parcel, onClose, onRerun }) {
                             fontSize: 10, fontWeight: 700, borderRadius: 4, padding: "1px 6px", textTransform: "uppercase",
                           }}>{ZONING_FIT_LABELS[s.zoning_fit].label}</span>
                         )}
+                        {s.custom && (
+                          <span title={`You asked to model: ${s.requested_use}`}
+                            style={{ fontSize: 10, fontWeight: 700, color: C.orange, border: `1px solid ${C.orange}66`, borderRadius: 4, padding: "1px 6px", textTransform: "uppercase" }}>
+                            Requested
+                          </span>
+                        )}
                         {s.if_rezoned && (
                           <span title="Upside case: the current zoning doesn't allow this use; it needs the approvals listed below"
                             style={{ fontSize: 10, fontWeight: 700, color: "#a78bfa", border: "1px solid #a78bfa66", borderRadius: 4, padding: "1px 6px", textTransform: "uppercase" }}>
@@ -3426,6 +3464,8 @@ function AnalysisModal({ state, parcel, onClose, onRerun }) {
               </div>
             </div>
 
+            {onAddScenario && <CustomScenarioBox onAdd={onAddScenario} />}
+
             {/* Next Steps */}
             {(data.next_steps || []).length > 0 && (
               <div style={{
@@ -3453,7 +3493,7 @@ function AnalysisModal({ state, parcel, onClose, onRerun }) {
 
 const CHARLESTON_CENTER = [32.7765, -79.9311];
 
-function MapTab({ mapHeight = "calc(100vh - 230px)", parcels = [], analyses = {}, analysisStatus = {}, analysisErrors = {}, onAnalyze }) {
+function MapTab({ mapHeight = "calc(100vh - 230px)", parcels = [], analyses = {}, analysisStatus = {}, analysisErrors = {}, onAnalyze, onAddScenario }) {
   const [points, setPoints] = useState([]);
   const [mapLoading, setMapLoading] = useState(true);
   const [showParcels, setShowParcels] = useState(false);
@@ -3517,6 +3557,7 @@ function MapTab({ mapHeight = "calc(100vh - 230px)", parcels = [], analyses = {}
         parcel={modalParcel?.parcel_props}
         onClose={() => setModalParcel(null)}
         onRerun={modalParcel ? () => onAnalyze?.(modalParcel, { refresh: true }) : null}
+        onAddScenario={modalParcel && modalAnalysis && onAddScenario ? (use) => onAddScenario(modalParcel, use) : null}
       />
       {/* Toolbar */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
@@ -4475,7 +4516,7 @@ function GcPipelineSection() {
 }
 
 function LandingTab({
-  parcels, parcelsLoading, bids, hiddenBids, bidsLoading, analyses, analysisStatus, analysisErrors = {}, onAnalyze,
+  parcels, parcelsLoading, bids, hiddenBids, bidsLoading, analyses, analysisStatus, analysisErrors = {}, onAnalyze, onAddScenario,
   bondingCapacity, onEditProfile, onSave, savedIds, dismissedIds, onDismiss, onRestore,
 }) {
   const [view, setView] = useState(readHomeView);
@@ -4714,6 +4755,7 @@ function LandingTab({
         parcel={openAnalysis?.parcel_props}
         onClose={() => setOpenAnalysis(null)}
         onRerun={openAnalysis ? () => onAnalyze(openAnalysis, { refresh: true }) : null}
+        onAddScenario={openAnalysis && onAddScenario ? (use) => onAddScenario(openAnalysis, use) : null}
       />
       <div role="tablist" aria-label="Home view" style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
         {tabs.map((t) => {
@@ -4921,6 +4963,17 @@ export default function SiteScanApp() {
       setAnalysisErrors((m) => ({ ...m, [tms]: reason }));
       setAnalysisStatus((s) => ({ ...s, [tms]: "error" }));
     }
+  };
+
+  // One more scenario for a use the user names; resolves when it's stored, throws with the reason.
+  const addParcelScenario = async (parcel, use) => {
+    const tms = parcel.external_id;
+    const result = await api(`/analyze/parcel/${encodeURIComponent(tms)}/scenario`, {
+      method: "POST",
+      body: JSON.stringify({ parcel: parcel.parcel_props, use }),
+    });
+    if (!result?.analysis) throw new Error(typeof result?.detail === "string" ? result.detail : "Couldn't add that scenario");
+    setParcelAnalyses((a) => ({ ...a, [tms]: result.analysis }));
   };
 
   // Show stored analyses for every parcel. New estimates come from the backend's
@@ -5222,6 +5275,7 @@ export default function SiteScanApp() {
             analysisStatus={analysisStatus}
             analysisErrors={analysisErrors}
             onAnalyze={analyzeParcel}
+            onAddScenario={addParcelScenario}
             bondingCapacity={bondingCapacity}
             onEditProfile={() => setTab("company")}
             onSave={saveProject}
@@ -5291,6 +5345,7 @@ export default function SiteScanApp() {
               analysisStatus={analysisStatus}
               analysisErrors={analysisErrors}
               onAnalyze={analyzeParcel}
+              onAddScenario={addParcelScenario}
             />
           </div>
         </div>
