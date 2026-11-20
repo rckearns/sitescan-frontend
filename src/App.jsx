@@ -4076,7 +4076,19 @@ const GC_SOURCE_LABELS = {
   "scbo-construction": "SCBO",
   board: "City board",
   award: "Agency notice",
+  intel: "Research note",
 };
+// Private, per-user tracking of a pipeline project (PUT /pipeline/projects/{id}/save).
+const GC_SAVE_STATUSES = [
+  { id: "interested", label: "Interested" },
+  { id: "contacted", label: "Contacted" },
+  { id: "pursuing", label: "Pursuing" },
+  { id: "bidding", label: "Bidding" },
+  { id: "won", label: "Won" },
+  { id: "lost", label: "Lost" },
+  { id: "passed", label: "Passed" },
+];
+const gcSaveLabel = (id) => GC_SAVE_STATUSES.find((s) => s.id === id)?.label || "Saved";
 const GC_DELIVERY_OPTIONS = [
   { id: "cmr", label: "CM at Risk" },
   { id: "design-build", label: "Design-build" },
@@ -4321,10 +4333,62 @@ function LikelyCompetitors({ project: p }) {
   );
 }
 
-function PipelineCard({ project: p }) {
+// Private status + notes for one pipeline project. Saved through the API and
+// visible only to the signed-in user (pipeline events are shared by everyone).
+function PipelineSavePanel({ project, onSaved, onClose }) {
+  const [status, setStatus] = useState(project.saved?.status || "interested");
+  const [notes, setNotes] = useState(project.saved?.notes || "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const call = async (method, body) => {
+    setBusy(true);
+    setError("");
+    try {
+      const d = await api(`/pipeline/projects/${project.id}/save`, { method, ...(body ? { body: JSON.stringify(body) } : {}) });
+      if (!d || !("saved" in d)) throw new Error(typeof d?.detail === "string" ? d.detail : "Couldn't save. Try again.");
+      onSaved(d.saved);
+      onClose();
+    } catch (e) {
+      setError(e.message);
+    }
+    setBusy(false);
+  };
+  return (
+    <div style={{ marginTop: 10, padding: 12, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8 }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
+        <select aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value)} style={styles.select}>
+          {GC_SAVE_STATUSES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+        </select>
+        <span style={{ color: C.textMuted, fontSize: 11 }}>Only you can see your status and notes.</span>
+      </div>
+      <textarea
+        aria-label="Notes"
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        maxLength={10000}
+        rows={4}
+        placeholder="Contacts, calls, who else is pricing…"
+        style={{ ...styles.input, marginBottom: 8, resize: "vertical", fontSize: 13 }}
+      />
+      {error && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 8 }}>{error}</div>}
+      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        <button style={styles.saveBtn} disabled={busy} onClick={() => call("PUT", { status, notes })}>
+          {busy ? "Saving…" : "Save"}
+        </button>
+        {project.saved && (
+          <button style={{ ...homeLinkBtn, fontSize: 11 }} disabled={busy} onClick={() => call("DELETE")}>Remove</button>
+        )}
+        <button style={{ ...homeLinkBtn, fontSize: 11, color: C.textSub }} disabled={busy} onClick={onClose}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function PipelineCard({ project: p, onSavedChange }) {
   const [showAll, setShowAll] = useState(false);
   const [showCompetitors, setShowCompetitors] = useState(false);
   const [showSubs, setShowSubs] = useState(false);
+  const [showSave, setShowSave] = useState(false);
   const matchColor_ = p.match === "match" ? "#22c55e" : p.match === "unconfirmed" ? "#f59e0b" : C.textMuted;
   const matchLabel = p.match === "match" ? "Matches your profile" : p.match === "unconfirmed" ? "Unconfirmed" : "Not a match";
   const events = p.events || [];
@@ -4350,6 +4414,12 @@ function PipelineCard({ project: p }) {
           </div>
         </div>
         <div className="project-header-side" style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          {p.saved && (
+            <span title="Your status. Only you can see it." style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4,
+              whiteSpace: "nowrap", color: C.orange, background: `${C.orange}1f`, border: `1px solid ${C.orange}55` }}>
+              ★ {gcSaveLabel(p.saved.status)}
+            </span>
+          )}
           <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4, whiteSpace: "nowrap",
             color: matchColor_, background: `${matchColor_}1f`, border: `1px solid ${matchColor_}55` }}>
             {matchLabel}
@@ -4367,7 +4437,16 @@ function PipelineCard({ project: p }) {
       {p.match !== "match" && (p.match_reasons || []).length > 0 && (
         <div style={{ color: matchColor_, fontSize: 11, marginTop: 6 }}>{p.match_reasons.join(" · ")}</div>
       )}
-      <div style={{ display: "flex", gap: 14, marginTop: 8 }}>
+      {p.saved?.notes && !showSave && (
+        <div style={{ color: C.textSub, fontSize: 12, marginTop: 8, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+          <span style={{ color: C.orange, fontWeight: 600 }}>Your notes: </span>
+          {p.saved.notes.length > 280 ? `${p.saved.notes.slice(0, 280)}…` : p.saved.notes}
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 14, marginTop: 8, flexWrap: "wrap" }}>
+        <button style={{ ...homeLinkBtn, fontSize: 11 }} aria-expanded={showSave} onClick={() => setShowSave((v) => !v)}>
+          {showSave ? "Close notes" : p.saved ? "Edit status / notes" : "Save / add notes"}
+        </button>
         <button style={{ ...homeLinkBtn, fontSize: 11 }} aria-expanded={showCompetitors} onClick={() => setShowCompetitors((v) => !v)}>
           {showCompetitors ? "Hide likely competitors" : "Likely competitors"}
         </button>
@@ -4375,6 +4454,13 @@ function PipelineCard({ project: p }) {
           {showSubs ? "Hide sub list" : "Build sub list"}
         </button>
       </div>
+      {showSave && (
+        <PipelineSavePanel
+          project={p}
+          onSaved={(saved) => onSavedChange?.(p.id, saved)}
+          onClose={() => setShowSave(false)}
+        />
+      )}
       {showCompetitors && <LikelyCompetitors project={p} />}
       {showSubs && <ProjectSubList project={p} />}
       {events.length > 0 && (
@@ -4405,6 +4491,12 @@ function GcPipelineSection() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [showExcluded, setShowExcluded] = useState(false);
+  const [savedOnly, setSavedOnly] = useState(false);
+
+  // A card saved/edited/removed its private status: update it in place.
+  const updateSaved = useCallback((id, saved) => {
+    setData((d) => (d ? { ...d, projects: d.projects.map((x) => (x.id === id ? { ...x, saved } : x)) } : d));
+  }, []);
 
   const load = useCallback(async (includeExcluded) => {
     setError(null);
@@ -4432,7 +4524,10 @@ function GcPipelineSection() {
 
   const all = data?.projects || [];
   const showUnconfirmed = prefs?.gc_show_unconfirmed !== false;
-  const visible = all.filter((p) => p.match === "match" || (p.match === "unconfirmed" && showUnconfirmed) || (p.match === "excluded" && showExcluded));
+  // Projects you saved always show (the API returns them even when excluded).
+  const visible = all.filter((p) => (savedOnly ? !!p.saved
+    : !!p.saved || p.match === "match" || (p.match === "unconfirmed" && showUnconfirmed) || (p.match === "excluded" && showExcluded)));
+  const savedCount = all.filter((p) => p.saved).length;
   const counts = data?.counts || { match: 0, unconfirmed: 0, excluded: 0 };
   const total = counts.match + counts.unconfirmed + counts.excluded;
 
@@ -4464,10 +4559,20 @@ function GcPipelineSection() {
                 {showExcluded ? "Hide" : "Show"}
               </button>
             </span>
+            <span>
+              <strong style={{ color: C.orange }}>★ {savedCount}</strong> saved ·{" "}
+              <button style={{ ...homeLinkBtn, fontSize: 12 }} aria-pressed={savedOnly} onClick={() => setSavedOnly((v) => !v)}>
+                {savedOnly ? "Show all" : "Show saved only"}
+              </button>
+            </span>
           </div>
           {visible.length === 0
-            ? <div style={{ color: C.textMuted, fontSize: 13, padding: "24px 0", textAlign: "center" }}>Nothing matches your profile right now.</div>
-            : visible.map((p) => <PipelineCard key={p.id} project={p} />)}
+            ? (
+              <div style={{ color: C.textMuted, fontSize: 13, padding: "24px 0", textAlign: "center" }}>
+                {savedOnly ? "You haven't saved any pipeline projects yet." : "Nothing matches your profile right now."}
+              </div>
+            )
+            : visible.map((p) => <PipelineCard key={p.id} project={p} onSavedChange={updateSaved} />)}
         </>
       )}
     </section>
