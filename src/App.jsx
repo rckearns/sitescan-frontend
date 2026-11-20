@@ -2219,17 +2219,32 @@ function StateAwards() {
 const PROVEN_MIN_VALUES = [[1000000, "$1M+"], [5000000, "$5M+"], [10000000, "$10M+"], [25000000, "$25M+"]];
 
 // Trade contractors with permits on large commercial jobs: subs proven at that scale.
+const SUBS_SHOWN_PER_TRADE = 15;
+
 function ProvenSubs() {
   const [minValue, setMinValue] = useState(5000000);
   const [days, setDays] = useState(1825);
+  const [showResidential, setShowResidential] = useState(false);
+  const [localOnly, setLocalOnly] = useState(false);
+  const [query, setQuery] = useState("");
+  const [expanded, setExpanded] = useState({});   // trade -> show every sub
   const [selected, setSelected] = useState(null);
-  const { data, loading, failed } = useApiGet(`/directory/subs?min_value=${minValue}&days=${days}`, (d) => !!d?.trades);
+  const { data, loading, failed } = useApiGet(
+    `/directory/subs?min_value=${minValue}&days=${days}&per_trade=1000${showResidential ? "&include_residential=true" : ""}`,
+    (d) => !!d?.trades);
 
   const selectStyle = {
     background: C.surface, color: C.text, border: `1px solid ${C.border}`, borderRadius: 8,
     padding: "6px 10px", fontSize: 13, fontFamily: "'DM Sans', sans-serif",
   };
-  const trades = Object.entries(data?.trades || {});
+  const q = query.trim().toLowerCase();
+  const matches = (sub) => (!localOnly || sub.local === true) && (!q || [
+    sub.name, sub.contact?.listing_name, sub.contact?.city, ...(sub.gcs || []),
+  ].some((v) => (v || "").toLowerCase().includes(q)));
+  const trades = Object.entries(data?.trades || {})
+    .map(([trade, t]) => [trade, t, t.subs.filter(matches)])
+    .filter(([, , subs]) => subs.length > 0 || !q);
+  const hiddenResidential = Object.values(data?.trades || {}).reduce((n, t) => n + (t.hidden_residential || 0), 0);
 
   return (
     <div>
@@ -2238,14 +2253,24 @@ function ProvenSubs() {
         Electrical, plumbing, mechanical, fire and roofing contractors who pulled permits on large commercial jobs,
         matched to the job by parcel and date. City of Charleston permits only.
       </div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
+        <input type="search" aria-label="Search subs" placeholder="Search subs, GCs or towns" value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          style={{ ...selectStyle, flex: "1 1 220px", minWidth: 0 }} />
         <select aria-label="Smallest job" value={minValue} onChange={(e) => setMinValue(Number(e.target.value))} style={selectStyle}>
           {PROVEN_MIN_VALUES.map(([v, l]) => <option key={v} value={v}>Jobs {l}</option>)}
         </select>
         <select aria-label="Time window" value={days} onChange={(e) => setDays(Number(e.target.value))} style={selectStyle}>
           {GC_WINDOWS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
-        {data && !loading && <span style={{ color: C.textMuted, fontSize: 12, alignSelf: "center" }}>{data.jobs_checked} jobs checked</span>}
+        <label style={{ color: C.textSub, fontSize: 12, display: "flex", gap: 5, alignItems: "center", cursor: "pointer" }}>
+          <input type="checkbox" checked={localOnly} onChange={(e) => setLocalOnly(e.target.checked)} /> Local only
+        </label>
+        <label style={{ color: C.textSub, fontSize: 12, display: "flex", gap: 5, alignItems: "center", cursor: "pointer" }}>
+          <input type="checkbox" checked={showResidential} onChange={(e) => setShowResidential(e.target.checked)} />
+          Show residential subs{!showResidential && hiddenResidential ? ` (${hiddenResidential} hidden)` : ""}
+        </label>
+        {data && !loading && <span style={{ color: C.textMuted, fontSize: 12 }}>{data.jobs_checked} jobs checked</span>}
       </div>
       {loading ? (
         <div style={{ textAlign: "center", padding: 40 }}><div style={styles.spinner} /></div>
@@ -2253,42 +2278,88 @@ function ProvenSubs() {
         <div style={{ color: C.textMuted, fontSize: 13, padding: 24, textAlign: "center" }}>Couldn't load subs. Try again shortly.</div>
       ) : trades.length === 0 ? (
         <div style={{ color: C.textMuted, fontSize: 13, padding: 24, textAlign: "center", border: `1px dashed ${C.border}`, borderRadius: 10 }}>
-          No trade permits matched to jobs that size yet.
+          {q || localOnly ? "No subs match." : "No trade permits matched to jobs that size yet."}
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(360px, 100%), 1fr))", gap: 16, alignItems: "start" }}>
-          {trades.map(([trade, t]) => (
-            <div key={trade} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
-              <div style={{ padding: "10px 14px", fontWeight: 700, color: C.text, fontSize: 14, borderBottom: `1px solid ${C.border}` }}>
-                {t.label} <span style={{ color: C.textMuted, fontWeight: 400, fontSize: 12 }}>· {t.total}</span>
+          {trades.map(([trade, t, subs]) => {
+            const all = q || expanded[trade];
+            const shown = all ? subs : subs.slice(0, SUBS_SHOWN_PER_TRADE);
+            return (
+              <div key={trade} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+                <div style={{ padding: "10px 14px", fontWeight: 700, color: C.text, fontSize: 14, borderBottom: `1px solid ${C.border}` }}>
+                  {t.label} <span style={{ color: C.textMuted, fontWeight: 400, fontSize: 12 }}>· {q || localOnly ? `${subs.length} of ${t.total}` : t.total}</span>
+                </div>
+                {shown.length === 0 && (
+                  <div style={{ padding: "9px 14px", color: C.textMuted, fontSize: 12 }}>
+                    {t.hidden_residential ? `${t.hidden_residential} residential sub${t.hidden_residential === 1 ? "" : "s"} hidden` : "None"}
+                  </div>
+                )}
+                {shown.map((sub) => (
+                  <SubRow key={sub.key} sub={sub} onOpen={() => setSelected({ key: sub.key, name: sub.name, kind: "sub", specialty: t.label })} />
+                ))}
+                {!all && subs.length > SUBS_SHOWN_PER_TRADE && (
+                  <button type="button" onClick={() => setExpanded((m) => ({ ...m, [trade]: true }))}
+                    style={{ ...homeLinkBtn, display: "block", width: "100%", padding: "8px 14px", fontSize: 12, borderTop: `1px solid ${C.border}`, textAlign: "left" }}>
+                    Show all {subs.length}
+                  </button>
+                )}
               </div>
-              {t.subs.map((sub) => (
-                <SubRow key={sub.key} sub={sub} onOpen={() => setSelected({ key: sub.key, name: sub.name, kind: "sub", specialty: t.label })} />
-              ))}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
 
+// "Local" when the sub's business address is in the job's metro counties.
+function LocalBadge({ sub }) {
+  if (sub.local == null) return null;
+  const where = [sub.contact?.city, sub.contact?.state].filter(Boolean).join(", ");
+  return sub.local ? (
+    <span style={{ color: "#22c55e", fontSize: 11, whiteSpace: "nowrap" }} title={where}>● Local</span>
+  ) : (
+    <span style={{ color: C.orange, fontSize: 11, whiteSpace: "nowrap" }}>● Out of area{where ? `: ${where}` : ""}</span>
+  );
+}
+
+function SubContact({ contact }) {
+  if (!contact) return null;
+  const link = { color: C.sky, textDecoration: "none" };
+  const site = contact.website ? contact.website.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "") : "";
+  return (
+    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontSize: 12, marginTop: 3 }}>
+      {contact.phone && <a href={`tel:${contact.phone.replace(/[^\d+]/g, "")}`} style={link}>{contact.phone}</a>}
+      {site && <a href={contact.website} target="_blank" rel="noopener noreferrer" style={link}>{site}</a>}
+      {contact.address && <span style={{ color: C.textMuted }}>{contact.address.replace(/, USA$/, "")}</span>}
+    </div>
+  );
+}
+
 function SubRow({ sub, onOpen }) {
   return (
-    <button type="button" className="card-row" onClick={onOpen} aria-label={`${sub.name}: show permits`} style={{
-      display: "block", width: "100%", textAlign: "left", padding: "9px 14px", background: "transparent",
-      border: "none", borderTop: `1px solid ${C.border}`, cursor: "pointer", fontFamily: "inherit", color: "inherit",
-    }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-        <span style={{ color: C.text, fontWeight: 600, fontSize: 13 }}>{sub.name}</span>
-        <span style={{ color: C.orange, fontSize: 12, whiteSpace: "nowrap" }}>{sub.job_count} job{sub.job_count === 1 ? "" : "s"}</span>
+    <div style={{ padding: "9px 14px", borderTop: `1px solid ${C.border}` }}>
+      <button type="button" className="card-row" onClick={onOpen} aria-label={`${sub.name}: show permits`} style={{
+        display: "block", width: "100%", textAlign: "left", padding: 0, background: "transparent",
+        border: "none", cursor: "pointer", fontFamily: "inherit", color: "inherit",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+          <span style={{ color: C.text, fontWeight: 600, fontSize: 13 }}>{sub.name}</span>
+          <span style={{ color: C.orange, fontSize: 12, whiteSpace: "nowrap" }}>{sub.job_count} job{sub.job_count === 1 ? "" : "s"}</span>
+        </div>
+        <div style={{ color: C.textMuted, fontSize: 11, marginTop: 2 }}>
+          {sub.gcs?.length ? `For ${sub.gcs.slice(0, 3).join(", ")}${sub.gcs.length > 3 ? "…" : ""}` : ""}
+          {sub.job_value ? ` · ${fmt$(sub.job_value)} of jobs` : ""}
+          {sub.last_date ? ` · last ${fmtDate(sub.last_date)}` : ""}
+          {sub.primarily_residential ? ` · ${Math.round(sub.residential_share * 100)}% residential` : ""}
+        </div>
+      </button>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
+        <SubContact contact={sub.contact} />
+        <LocalBadge sub={sub} />
       </div>
-      <div style={{ color: C.textMuted, fontSize: 11, marginTop: 2 }}>
-        {sub.gcs?.length ? `For ${sub.gcs.slice(0, 3).join(", ")}${sub.gcs.length > 3 ? "…" : ""}` : ""}
-        {sub.job_value ? ` · ${fmt$(sub.job_value)} of jobs` : ""}
-        {sub.last_date ? ` · last ${fmtDate(sub.last_date)}` : ""}
-      </div>
-    </button>
+    </div>
   );
 }
 
@@ -2424,10 +2495,18 @@ function GcSubs({ gcKey, onOpen }) {
             <div key={trade}>
               <div style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: C.textMuted, fontFamily: "'Space Mono', monospace", marginBottom: 4 }}>{t.label}</div>
               {t.subs.slice(0, 5).map((sub) => (
-                <button key={sub.key} style={{ ...homeLinkBtn, display: "block", fontSize: 12, textAlign: "left", marginBottom: 3 }}
-                  onClick={() => onOpen({ key: sub.key, name: sub.name, kind: "sub", specialty: t.label })}>
-                  {sub.name} <span style={{ color: C.textMuted }}>· {sub.job_count} job{sub.job_count === 1 ? "" : "s"}</span>
-                </button>
+                <div key={sub.key} style={{ marginBottom: 5 }}>
+                  <button style={{ ...homeLinkBtn, display: "block", fontSize: 12, textAlign: "left" }}
+                    onClick={() => onOpen({ key: sub.key, name: sub.name, kind: "sub", specialty: t.label })}>
+                    {sub.name} <span style={{ color: C.textMuted }}>· {sub.job_count} job{sub.job_count === 1 ? "" : "s"}</span>
+                  </button>
+                  {(sub.contact?.phone || sub.local != null) && (
+                    <div style={{ display: "flex", gap: 8, fontSize: 11 }}>
+                      {sub.contact?.phone && <a href={`tel:${sub.contact.phone.replace(/[^\d+]/g, "")}`} style={{ color: C.sky, textDecoration: "none" }}>{sub.contact.phone}</a>}
+                      <LocalBadge sub={sub} />
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           ))}
@@ -4231,7 +4310,8 @@ function ProjectSubList({ project: p }) {
     }));
     const savedNames = new Set(saved.map((r) => nameKey(r.name)));
     const suggested = (data?.trades?.[id]?.subs || []).filter((s) => !savedNames.has(nameKey(s.name))).slice(0, 4)
-      .map((s) => ({ name: s.name, source: "Suggested", jobs: s.job_count, gcs: s.gcs }));
+      .map((s) => ({ name: s.name, source: "Suggested", jobs: s.job_count, gcs: s.gcs,
+        phone: s.contact?.phone || "", website: s.contact?.website || "", local: s.local }));
     return [...saved, ...suggested];
   };
   const toggle = (k, row) => setPicked((m) => {
@@ -4240,8 +4320,9 @@ function ProjectSubList({ project: p }) {
     return next;
   });
   const exportCsv = () => {
-    const rows = [["trade", "name", "source", "phone", "email", "similar jobs"].join(","),
-      ...Object.values(picked).map((r) => [r.trade, r.name, r.source, r.phone, r.email, r.jobs ?? ""].map(csvCell).join(","))];
+    const rows = [["trade", "name", "source", "phone", "email", "website", "local", "similar jobs"].join(","),
+      ...Object.values(picked).map((r) => [r.trade, r.name, r.source, r.phone, r.email, r.website,
+        r.local == null ? "" : r.local ? "yes" : "no", r.jobs ?? ""].map(csvCell).join(","))];
     const url = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv" }));
     const a = document.createElement("a");
     a.href = url;
@@ -4280,6 +4361,8 @@ function ProjectSubList({ project: p }) {
                       <span style={{ color: r.source === "My list" ? "#22c55e" : C.textMuted }}>
                         {r.source === "My list" ? " · my list" : ` · ${r.jobs} ${tooFew ? "" : "similar "}job${r.jobs === 1 ? "" : "s"}`}
                       </span>
+                      {r.source !== "My list" && r.phone && <span style={{ color: C.textMuted }}> · {r.phone}</span>}
+                      {r.local === false && <span style={{ color: C.orange }}> · out of area</span>}
                     </span>
                   </label>
                 );
