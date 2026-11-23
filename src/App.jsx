@@ -2665,6 +2665,24 @@ function UsageTab() {
               </div>
             )}
           </div>
+          {data.visitors && (
+            <div style={card}>
+              <h2 style={h2}>Visitors</h2>
+              <div style={{ color: C.textSub, fontSize: 12, margin: "-4px 0 10px" }}>
+                Every device that called the app, signed in or not. Location and network are approximate (by IP);
+                most show an internet provider rather than a company. IPs are erased after {data.ip_retention_days} days.
+              </div>
+              <UsageTable empty="No visitors recorded yet." rows={data.visitors} cols={[
+                ["Where", (r) => <><div>{r.location || <span style={{ color: C.textMuted }}>Looking up…</span>}</div><div style={{ color: C.textSub, fontSize: 12 }}>{r.network}</div></>],
+                ["IP", (r) => <code style={{ fontSize: 12 }}>{r.ip}</code>],
+                ["Accounts", (r) => r.accounts.length ? r.accounts.join(", ") : <span style={{ color: C.textMuted }}>not signed in</span>],
+                ["Last seen", (r) => ago(r.last_seen)],
+                ["Requests", (r) => r.requests.toLocaleString(), "right"],
+                ["Sign-ins", (r) => [r.signups ? `${r.signups} sign-up${r.signups === 1 ? "" : "s"}` : "",
+                  r.failed_logins ? `${r.failed_logins} failed` : ""].filter(Boolean).join(" · ") || "—", "right"],
+              ]} />
+            </div>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(420px, 100%), 1fr))", gap: 16 }}>
             <div style={card}>
               <h2 style={h2}>Features</h2>
