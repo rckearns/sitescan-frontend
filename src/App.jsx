@@ -363,7 +363,7 @@ function parcelToProject(feat) {
     : p.CLASS_CODE === "905" ? "Vacant lot"
     : p.CLASS_CODE === "952" || imp === 0 ? "Vacant commercial lot"
     : "Underimproved commercial parcel";
-  const title = p.EXEMPT ? `${base} · tax-exempt owner` : base;
+  const title = p.UNASSESSED ? `${base} · not yet assessed` : p.EXEMPT ? `${base} · tax-exempt owner` : base;
   return {
     id: `parcel-${p.TMS || p.PARCELID}`,
     source_id: "parcel-opportunity",
@@ -4671,6 +4671,8 @@ function LandingTab({
   const [openAnalysis, setOpenAnalysis] = useState(null);
   const [showHiddenBids, setShowHiddenBids] = useState(false);
   const [selectedParcelId, setSelectedParcelId] = useState(null);
+  const [parcelQuery, setParcelQuery] = useState("");
+  const [lookup, setLookup] = useState(null);   // { q, loading, error, features }
   const { sortBy, fitsBonding, devLayout, gcSub, showBuilt } = prefs;
   const updatePrefs = (patch) => {
     const next = { ...prefs, ...patch };
@@ -4702,14 +4704,33 @@ function LandingTab({
   // A remembered filter only applies once the data offers that option, so it can't silently empty the list.
   const useFilter = usesPresent.some((g) => g.id === prefs.useFilter) ? prefs.useFilter : "";
   const hoodFilter = hoodsPresent.includes(prefs.hoodFilter) ? prefs.hoodFilter : "";
+  // Search covers every listed parcel (filters are ignored while searching) by address,
+  // owner, parcel ID, neighborhood or estimated use.
+  const pq = parcelQuery.trim().toLowerCase();
+  const pqDigits = pq.replace(/\D/g, "");
+  const parcelMatches = (p) => [p.address, p.contractor, p.hood, p.city, p.title, p.summary?.use]
+    .some((v) => (v || "").toLowerCase().includes(pq))
+    || (pqDigits.length >= 4 && String(p.external_id || "").includes(pqDigits));
   const parcelItems = useMemo(
     () => sortParcels(
-      allParcels.filter((p) => (showBuilt || !p.construction)
-        && (!useFilter || p.useGroup === useFilter) && (!hoodFilter || p.hood === hoodFilter)),
+      allParcels.filter((p) => (pq ? parcelMatches(p) : (showBuilt || !p.construction)
+        && (!useFilter || p.useGroup === useFilter) && (!hoodFilter || p.hood === hoodFilter))),
       sortBy,
     ),
-    [allParcels, useFilter, hoodFilter, sortBy, showBuilt],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allParcels, useFilter, hoodFilter, sortBy, showBuilt, pq],
   );
+  const runLookup = async () => {
+    const q = parcelQuery.trim();
+    if (q.length < 3) return;
+    setLookup({ q, loading: true });
+    try {
+      const d = await api(`/projects/home/parcels/lookup?q=${encodeURIComponent(q)}`);
+      setLookup({ q, features: d.features || [] });
+    } catch (e) {
+      setLookup({ q, error: e.message || "lookup failed" });
+    }
+  };
   // City permits show new construction on these since 2021, so they're no longer open opportunities.
   const builtCount = allParcels.filter((p) => p.construction).length;
   // Counted over the parcels the list can show (recent construction only when that's switched on).
@@ -4776,7 +4797,48 @@ function LandingTab({
   );
   const selectedParcel = selectedParcelId ? allParcels.find((p) => p.id === selectedParcelId) || null : null;
 
+  const lookupPanel = pq && lookup?.q?.toLowerCase() === pq ? (
+    <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: 12, marginBottom: 14, fontSize: 13 }}>
+      <div style={{ color: C.textSub, fontSize: 12, marginBottom: 6 }}>County records for “{lookup.q}”</div>
+      {lookup.loading ? <div style={{ color: C.textMuted }}>Looking up…</div>
+        : lookup.error ? <div style={{ color: C.textMuted }}>Couldn't reach the county ({lookup.error}).</div>
+        : lookup.features.length === 0 ? <div style={{ color: C.textMuted }}>No county parcel matches. Try the street number and name (“129 Columbus”), the owner, or the parcel ID.</div>
+        : lookup.features.map((f) => {
+          const p = f.properties;
+          const addr = [p.HOUSE, p.STREET].filter(Boolean).join(" ") || "No street address";
+          return (
+            <div key={p.TMS} style={{ padding: "8px 0", borderTop: `1px solid ${C.border}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ color: C.text, fontWeight: 600 }}>{addr}{p.CITY ? `, ${p.CITY}` : ""}</span>
+                <span style={{ color: p.LISTED ? "#22c55e" : C.orange, fontSize: 12 }}>{p.LISTED ? "● On the list" : "● Not on the list"}</span>
+              </div>
+              <div style={{ color: C.textMuted, fontSize: 12, marginTop: 2 }}>
+                {p.OWNER} · {p.USE} · {p.GISACRES ? `${Number(p.GISACRES).toFixed(2)} ac` : ""}
+                {p.LAND_APPR ? ` · land ${fmt$(p.LAND_APPR)}` : " · not assessed"}{p.IMP_APPR ? ` · buildings ${fmt$(p.IMP_APPR)}` : ""}
+                {` · parcel ${p.TMS}`}
+              </div>
+              {p.REASON && <div style={{ color: C.textSub, fontSize: 12, marginTop: 3 }}>Why not: {p.REASON}</div>}
+              {p.LISTED && <div style={{ color: C.textSub, fontSize: 12, marginTop: 3 }}>It may be hidden by a filter or dismissed.</div>}
+            </div>
+          );
+        })}
+    </div>
+  ) : null;
+
   const developerControls = (
+    <>
+    <div style={controlRow}>
+      <input type="search" aria-label="Search parcels" placeholder="Search address, owner or parcel ID"
+        value={parcelQuery} onChange={(e) => setParcelQuery(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter" && parcelItems.length === 0) runLookup(); }}
+        style={{ ...selectStyle, flex: "1 1 240px", minWidth: 0 }} />
+      {pq.length >= 3 && (
+        <button style={chipStyle(false, C.sky)} onClick={runLookup}
+          title="Search all Charleston County parcels and see why one isn't on this list">
+          Look up in county records
+        </button>
+      )}
+    </div>
     <div style={controlRow}>
       <div role="group" aria-label="Layout" style={{ display: "flex", gap: 4, marginRight: 6 }}>
         {[["list", "☰ List"], ["map", "🗺️ Map"]].map(([id, label]) => (
@@ -4818,6 +4880,8 @@ function LandingTab({
         </span>
       )}
     </div>
+    {lookupPanel}
+    </>
   );
 
   const gcControls = (
@@ -4941,7 +5005,7 @@ function LandingTab({
           controls={developerControls}
           items={parcelItems}
           loading={parcelsLoading}
-          emptyText="No underutilized commercial parcels found."
+          emptyText={pq ? `No listed parcel matches “${parcelQuery.trim()}”. Use “Look up in county records” to see why it isn't listed.` : "No underutilized commercial parcels found."}
           renderItem={renderParcelCard}
           body={devLayout === "map" ? (
             <ParcelMapView
