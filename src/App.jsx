@@ -2516,6 +2516,179 @@ function GcSubs({ gcKey, onOpen }) {
   );
 }
 
+// ─── USAGE (admins only) ─────────────────────────────────────────────────────
+
+const USAGE_WINDOWS = [[7, "Last 7 days"], [30, "Last 30 days"], [90, "Last 90 days"], [180, "Last 180 days"]];
+const USAGE_BAR = "#4596cc";   // validated against C.surface (dark lightness band, 3:1 contrast)
+
+function StatTile({ label, value, note }) {
+  return (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "12px 14px", minWidth: 0 }}>
+      <div style={{ color: C.textSub, fontSize: 11, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace" }}>{label}</div>
+      <div style={{ color: C.text, fontSize: 26, fontWeight: 700, marginTop: 4 }}>{value}</div>
+      {note && <div style={{ color: C.textSub, fontSize: 12, marginTop: 2 }}>{note}</div>}
+    </div>
+  );
+}
+
+// Daily active users as bars; hover a day for its numbers.
+function DailyUsersChart({ daily }) {
+  const [hover, setHover] = useState(null);
+  const [W, setW] = useState(720);   // drawn at the container's real width so text stays 11px
+  const boxRef = useRef(null);
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(([e]) => setW(Math.max(240, Math.round(e.contentRect.width))));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const max = Math.max(1, ...daily.map((d) => d.active_users));
+  const H = 180, padL = 28, padB = 22, plotW = W - padL, plotH = H - padB - 6;
+  const shortDate = (iso) => new Date(iso + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const step = plotW / daily.length;
+  const bw = Math.max(2, step - 2);   // 2px gap between bars
+  const ticks = [0, Math.ceil(max / 2), max].filter((v, i, a) => a.indexOf(v) === i);
+  const y = (v) => 6 + plotH - (v / max) * plotH;
+  const h = hover != null ? daily[hover] : null;
+  return (
+    <div ref={boxRef} style={{ position: "relative" }}>
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: "block", maxWidth: "100%" }} role="img"
+        aria-label="Daily active users" onMouseLeave={() => setHover(null)}>
+        {ticks.map((t) => (
+          <g key={t}>
+            <line x1={padL} x2={W} y1={y(t)} y2={y(t)} stroke={C.border} strokeWidth="1" />
+            <text x={padL - 6} y={y(t) + 4} textAnchor="end" fontSize="11" fill={C.textSub}>{t}</text>
+          </g>
+        ))}
+        {daily.map((d, i) => {
+          const x = padL + i * step + 1;
+          const bh = (d.active_users / max) * plotH;
+          return (
+            <g key={d.date} onMouseEnter={() => setHover(i)}>
+              <rect x={padL + i * step} y={6} width={step} height={plotH} fill="transparent" />
+              {bh > 0 && <path d={`M${x},${6 + plotH} v${-Math.max(0, bh - 4)} q0,-4 4,-4 h${Math.max(0, bw - 8)} q4,0 4,4 v${Math.max(0, bh - 4)} z`}
+                fill={USAGE_BAR} opacity={hover == null || hover === i ? 1 : 0.55} />}
+            </g>
+          );
+        })}
+        {[0, Math.floor(daily.length / 2), daily.length - 1].map((i, k) => (
+          <text key={i} x={k === 0 ? padL : k === 2 ? W : padL + i * step + step / 2} y={H - 4}
+            textAnchor={k === 0 ? "start" : k === 2 ? "end" : "middle"} fontSize="11" fill={C.textSub}>
+            {shortDate(daily[i].date)}
+          </text>
+        ))}
+      </svg>
+      {h && (
+        <div style={{
+          position: "absolute", top: 0, left: `${Math.min(80, ((padL + hover * step) / W) * 100)}%`, pointerEvents: "none",
+          background: C.surfaceHi, border: `1px solid ${C.borderHi}`, borderRadius: 8, padding: "6px 10px", fontSize: 12, color: C.text, whiteSpace: "nowrap",
+        }}>
+          <div style={{ fontWeight: 700 }}>{shortDate(h.date)}</div>
+          <div>{h.active_users} active user{h.active_users === 1 ? "" : "s"}</div>
+          <div style={{ color: C.textSub }}>{h.logins} sign-in{h.logins === 1 ? "" : "s"} · {h.requests.toLocaleString()} requests{h.errors ? ` · ${h.errors} errors` : ""}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UsageTable({ cols, rows, empty }) {
+  const th = { textAlign: "left", color: C.textSub, fontWeight: 600, fontSize: 11, padding: "6px 8px", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" };
+  const td = { padding: "7px 8px", borderBottom: `1px solid ${C.border}`, color: C.text, fontSize: 13, verticalAlign: "top" };
+  if (!rows.length) return <div style={{ color: C.textMuted, fontSize: 13, padding: 8 }}>{empty}</div>;
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead><tr>{cols.map(([label, , align]) => <th key={label} style={{ ...th, textAlign: align || "left" }}>{label}</th>)}</tr></thead>
+        <tbody>{rows.map((r, i) => (
+          <tr key={i}>{cols.map(([label, get, align]) => <td key={label} style={{ ...td, textAlign: align || "left", whiteSpace: align ? "nowrap" : undefined }}>{get(r)}</td>)}</tr>
+        ))}</tbody>
+      </table>
+    </div>
+  );
+}
+
+const ago = (iso) => {
+  if (!iso) return "—";
+  const mins = Math.round((Date.now() - new Date(iso + "Z").getTime()) / 60000);
+  if (mins < 60) return `${Math.max(1, mins)} min ago`;
+  if (mins < 48 * 60) return `${Math.round(mins / 60)} h ago`;
+  return `${Math.round(mins / 1440)} days ago`;
+};
+
+function UsageTab() {
+  const [days, setDays] = useState(30);
+  const { data, loading, failed } = useApiGet(`/admin/usage?days=${days}`, (d) => !!d?.totals);
+  const card = { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 14, marginBottom: 16 };
+  const h2 = { color: C.text, fontWeight: 700, fontSize: 15, margin: "0 0 10px" };
+  const t = data?.totals;
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+        <div>
+          <div style={{ color: C.text, fontWeight: 700, fontSize: 18 }}>Usage</div>
+          <div style={{ color: C.textSub, fontSize: 12 }}>Signed-in activity from the API. Visible to admins only.</div>
+        </div>
+        <select aria-label="Time window" value={days} onChange={(e) => setDays(Number(e.target.value))} style={{
+          background: C.surface, color: C.text, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 10px", fontSize: 13,
+        }}>
+          {USAGE_WINDOWS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+      </div>
+      {loading && !data ? <div style={{ textAlign: "center", padding: 40 }}><div style={styles.spinner} /></div>
+        : failed ? <div style={{ color: C.textMuted, padding: 24, textAlign: "center" }}>Couldn't load usage.</div>
+        : data && (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(170px, 100%), 1fr))", gap: 12, marginBottom: 16 }}>
+            <StatTile label="Active users" value={t.active_users} note={`${t.active_users_7d} in the last 7 days`} />
+            <StatTile label="Registered" value={t.registered_users} note={`${t.new_users} new in this window`} />
+            <StatTile label="Requests" value={t.requests.toLocaleString()} note={`p95 ${t.p95_ms.toLocaleString()} ms`} />
+            <StatTile label="Server errors" value={t.errors.toLocaleString()} note={`${(t.error_rate * 100).toFixed(2)}% of requests`} />
+          </div>
+          <div style={card}>
+            <h2 style={h2}>Daily active users</h2>
+            <DailyUsersChart daily={data.daily} />
+          </div>
+          <div style={card}>
+            <h2 style={h2}>People</h2>
+            <UsageTable empty="No signed-in activity yet." rows={data.users} cols={[
+              ["User", (r) => <><div>{r.name || r.email}</div>{r.name && <div style={{ color: C.textSub, fontSize: 12 }}>{r.email}</div>}{r.company && <div style={{ color: C.textSub, fontSize: 12 }}>{r.company}</div>}</>],
+              ["Last seen", (r) => ago(r.last_seen)],
+              ["Days active", (r) => r.active_days, "right"],
+              ["Requests", (r) => r.requests.toLocaleString(), "right"],
+              ["Uses most", (r) => <span style={{ color: C.textSub }}>{r.top_features.join(", ")}</span>],
+            ]} />
+            {data.never_active.length > 0 && (
+              <div style={{ color: C.textSub, fontSize: 12, marginTop: 10 }}>
+                Not active in this window: {data.never_active.join(", ")}
+              </div>
+            )}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(420px, 100%), 1fr))", gap: 16 }}>
+            <div style={card}>
+              <h2 style={h2}>Features</h2>
+              <UsageTable empty="Nothing yet." rows={data.features} cols={[
+                ["Feature", (r) => r.feature],
+                ["Users", (r) => r.users, "right"],
+                ["Requests", (r) => r.requests.toLocaleString(), "right"],
+              ]} />
+            </div>
+            <div style={card}>
+              <h2 style={h2}>Errors &amp; slow endpoints</h2>
+              <UsageTable empty="No server errors or slow endpoints." rows={data.problem_routes} cols={[
+                ["Endpoint", (r) => <code style={{ fontSize: 12 }}>{r.route}</code>],
+                ["Errors", (r) => r.errors, "right"],
+                ["p95", (r) => `${(r.p95_ms / 1000).toFixed(1)} s`, "right"],
+              ]} />
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // One contractor's permits: totals, a map and the list. `contractor` needs `key` and `name`.
 function ContractorDetail({ contractor: initial, onClose }) {
   // Subs opened from this page, newest last; tied to the contractor the page was opened for.
@@ -5248,6 +5421,7 @@ export default function SiteScanApp() {
     setAuthed(false);
   };
 
+  const [isAdmin, setIsAdmin] = useState(false);
   useEffect(() => {
     if (!authed) return;
     loadStats();
@@ -5258,6 +5432,7 @@ export default function SiteScanApp() {
     api("/profile/org").then((org) => setBondingCapacity(parseMoney(org?.bonding_capacity))).catch(() => {});
     // Pre-populate filters from saved profile preferences
     api("/auth/me").then((data) => {
+      setIsAdmin(!!data.is_admin);
       setFilters((f) => ({
         ...f,
         clientTypes: data.criteria_client_types?.length ? data.criteria_client_types : f.clientTypes,
@@ -5388,6 +5563,7 @@ export default function SiteScanApp() {
               { id: "company",      label: "Profile",                    icon: "🏢" },
               { id: "history",      label: "History",                    icon: "📊" },
               { id: "profile",      label: "Settings",                   icon: "⚙" },
+              ...(isAdmin ? [{ id: "usage", label: "Usage", icon: "📈" }] : []),
             ].map((t) => (
               <button
                 key={t.id}
@@ -5494,6 +5670,7 @@ export default function SiteScanApp() {
         )}
         {tab === "saved" && <SavedTab saved={saved} onUnsave={unsaveProject} />}
         {tab === "contractors" && <ContractorsTab />}
+        {tab === "usage" && isAdmin && <UsageTab />}
         {tab === "company" && <CompanyTab />}
         {tab === "history" && <HistoryTab history={history} onRefresh={loadHistory} />}
         {tab === "profile" && (
