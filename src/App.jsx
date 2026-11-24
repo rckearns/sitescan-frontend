@@ -332,6 +332,74 @@ function zoningSummary(z) {
   return parts.join(" · ");
 }
 
+// Analyses made with the parcel's public records (city board items, research notes) carry
+// `filings`, and may price the project as filed in one scenario marked `as_proposed`.
+const AS_PROPOSED_COLOR = "#2dd4bf";
+
+// Filing dates are calendar days ("2026-04-08"). new Date() reads that as UTC midnight,
+// which shows as the day before in US time zones, so build the date from its parts.
+function fmtCalendarDay(day) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(day || "");
+  if (!m) return "—";
+  return new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+// Why a stored estimate should be re-run, most important reason first; null if it's current.
+function analysisRerunReason(data) {
+  if (Number(data.version) < 4) {
+    return "This estimate was made before build-to-sell and “if rezoned” scenarios were added; its numbers now include financing.";
+  }
+  if (data.filings_changed) {
+    return data.filings
+      ? "New public records have been added for the project on this parcel since this estimate was made."
+      : "A project is on file with the city for this parcel, and this estimate was made without it, so none of the scenarios below is the project as filed.";
+  }
+  if (!data.rezoning_checked) return "This estimate was made before “if rezoned” scenarios were added.";
+  return null;
+}
+
+function FiledProject({ filings }) {
+  const [showAll, setShowAll] = useState(false);
+  const project = filings?.project;
+  if (!project) return null;
+  const items = filings.items || [];
+  const shown = showAll ? items : items.slice(0, 3);
+  const count = filings.count || items.length;
+  return (
+    <div style={{ marginBottom: 14, background: C.surfaceHi, border: `1px solid ${AS_PROPOSED_COLOR}55`, borderRadius: 10, padding: "12px 16px" }}>
+      <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>
+        <span style={{ fontWeight: 700 }}>📋 On file with the city: {project.title || "a project on this parcel"}</span>
+        <span style={{ color: C.textSub }}>
+          {" "}· {GC_STAGE_LABELS[project.stage] || "In review"} · {count} public record{count === 1 ? "" : "s"}
+        </span>
+      </div>
+      {filings.multi_parcel && (
+        <div style={{ marginTop: 4, fontSize: 12, color: C.textSub, lineHeight: 1.5 }}>
+          The city filings cover {filings.parcels?.length || "several"} parcels, so the project isn’t priced as a scenario on this parcel alone.
+        </div>
+      )}
+      <div style={{ marginTop: 6 }}>
+        {shown.map((f, i) => (
+          <div key={i} style={{ display: "flex", gap: 10, fontSize: 12, padding: "2px 0", flexWrap: "wrap" }}>
+            <span style={{ color: C.textMuted, width: 92, flexShrink: 0 }}>{fmtCalendarDay(f.date)}</span>
+            <span style={{ color: C.textSub, flex: 1, minWidth: 160 }}>
+              {f.url
+                ? <a href={f.url} target="_blank" rel="noopener noreferrer" style={{ color: C.textSub }}>{f.title || f.label}</a>
+                : (f.title || f.label)}
+              <span style={{ color: C.textMuted }}> · {f.label}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+      {items.length > 3 && (
+        <button style={{ ...homeLinkBtn, fontSize: 11 }} onClick={() => setShowAll((v) => !v)}>
+          {showAll ? "Show fewer" : `Show all ${items.length} records`}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function parcelColor(score) {
   if (score >= 80) return "#f0a030";  // orange — vacant/underbuilt
   if (score >= 55) return "#7ec8e3";  // sky   — mixed
@@ -3570,11 +3638,14 @@ function AnalysisModal({ state, parcel, onClose, onRerun }) {
               )}
             </div>
 
-            {(Number(data.version) < 4 || !data.rezoning_checked) && onRerun && (
-              <div style={{ marginBottom: 14, fontSize: 12, color: C.textSub, background: C.surfaceHi, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 12px" }}>
-                {Number(data.version) < 4
-                  ? "This estimate was made before build-to-sell and “if rezoned” scenarios were added; its numbers now include financing."
-                  : "This estimate was made before “if rezoned” scenarios were added."}{" "}
+            <FiledProject filings={data.filings} />
+
+            {analysisRerunReason(data) && onRerun && (
+              <div style={{
+                marginBottom: 14, fontSize: 12, color: data.filings_changed ? C.text : C.textSub, background: C.surfaceHi,
+                border: `1px solid ${data.filings_changed ? C.orange : C.border}`, borderRadius: 8, padding: "8px 12px",
+              }}>
+                {analysisRerunReason(data)}{" "}
                 <button style={homeLinkBtn} onClick={onRerun}>Re-run estimate</button>
               </div>
             )}
@@ -3590,12 +3661,18 @@ function AnalysisModal({ state, parcel, onClose, onRerun }) {
                   const pf = s.proforma || {};
                   return (
                     <div key={i} style={{
-                      border: `1px ${s.if_rezoned ? "dashed" : "solid"} ${isRec ? C.orange : s.if_rezoned ? "#a78bfa" : C.border}`,
+                      border: `1px ${s.if_rezoned ? "dashed" : "solid"} ${isRec ? C.orange : s.if_rezoned ? "#a78bfa" : s.as_proposed ? AS_PROPOSED_COLOR : C.border}`,
                       borderRadius: 10, padding: "16px 18px",
                       background: isRec ? `${C.orange}08` : C.surfaceHi,
                     }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
                         <span style={{ fontWeight: 700, fontSize: 15, color: C.text }}>{s.name}</span>
+                        {s.as_proposed && (
+                          <span title="The project as filed with the city: its program comes from the public records above"
+                            style={{ fontSize: 10, fontWeight: 700, color: "#06241f", background: AS_PROPOSED_COLOR, borderRadius: 4, padding: "2px 7px", textTransform: "uppercase" }}>
+                            As proposed
+                          </span>
+                        )}
                         {isRec && (
                           <span style={{
                             background: data.pencils === false ? "#b4413a" : C.orange, color: "#fff", fontSize: 10, fontWeight: 700,
@@ -3631,9 +3708,16 @@ function AnalysisModal({ state, parcel, onClose, onRerun }) {
                           the numbers carry 24 months of approvals, and approval is uncertain.
                         </p>
                       )}
+                      {s.as_proposed && (
+                        <p style={{ margin: "-4px 0 10px", color: AS_PROPOSED_COLOR, fontSize: 12, lineHeight: 1.5 }}>
+                          The project as filed: the size and use come from the public records above. Costs, income and the land
+                          price are this estimate’s assumptions, not the developer’s numbers.
+                        </p>
+                      )}
                       {assumptionsLine(s.assumptions) && (
                         <div style={{ margin: "-4px 0 10px", fontSize: 12, color: C.textSub, lineHeight: 1.5 }}>
                           <span style={{ fontFamily: "'Space Mono', monospace", color: C.text }}>{assumptionsLine(s.assumptions)}</span>
+                          {s.as_proposed && s.assumptions?.program_basis && <div style={{ color: C.textMuted }}>Program: {s.assumptions.program_basis}</div>}
                           {pf.exit !== "sell" && s.assumptions?.noi_basis && <div style={{ color: C.textMuted }}>NOI: {s.assumptions.noi_basis}</div>}
                           {pf.exit === "sell" && s.assumptions?.sale_basis && <div style={{ color: C.textMuted }}>Sales: {s.assumptions.sale_basis}</div>}
                         </div>
